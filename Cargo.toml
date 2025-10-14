@@ -1,0 +1,33 @@
+[package]
+name = "epics-pvxs-sys"
+version = "0.1.0"
+edition = "2021"
+authors = ["Your Name <your.email@example.com>"]
+description = "Rust bindings for EPICS PVXS (PVAccess) library"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/yourusername/epics-pvxs-sys"
+
+# This is a *-sys crate providing low-level FFI bindings
+links = "pvxs"
+
+[dependencies]
+cxx = "1.0"
+
+[build-dependencies]
+cxx-build = "1.0"
+
+[lib]
+name = "epics_pvxs_sys"
+path = "src/lib.rs"
+
+[[example]]
+name = "simple_get"
+path = "examples/simple_get.rs"
+
+[[example]]
+name = "simple_put"
+path = "examples/simple_put.rs"
+
+[package.metadata.docs.rs]
+# Environment variables needed for docs.rs builds
+rustdoc-args = ["--cfg", "docsrs"]
