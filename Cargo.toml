@@ -32,6 +32,10 @@ path = "examples/simple_put.rs"
 name = "simple_info"
 path = "examples/simple_info.rs"
 
+[[example]]
+name = "thread_safe"
+path = "examples/thread_safe.rs"
+
 [package.metadata.docs.rs]
 # Environment variables needed for docs.rs builds
 rustdoc-args = ["--cfg", "docsrs"]

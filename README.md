@@ -10,7 +10,7 @@ This crate provides idiomatic Rust wrappers around the PVXS C++ library, which i
 - ✅ **GET Operations** - Read process variable values
 - ✅ **PUT Operations** - Write process variable values
 - ✅ **INFO Operations** - Query PV type information
-- ✅ **Thread-safe** - Context can be safely shared between threads
+- ✅ **Thread-safe** - Context can be safely shared between threads (see `thread_safe.rs` example)
 - 🚧 **Async Support** - Coming soon
 - 🚧 **Monitor/Subscription** - Coming soon
 - 🚧 **Server API** - Coming soon
@@ -180,6 +180,9 @@ cargo run --example simple_put -- TEST:PV1 42.5
 
 # Run the simple_info example (query PV type information)
 cargo run --example simple_info -- TEST:PV1
+
+# Run the thread_safe example (demonstrates concurrent PV access)
+cargo run --example thread_safe -- TEST:PV1 TEST:PV2
 ```
 
 ```bash
@@ -190,6 +193,7 @@ cargo build --examples
 cargo run --example simple_get -- my:pv:name
 cargo run --example simple_put -- my:pv:name 42.5
 cargo run --example simple_info -- my:pv:name
+cargo run --example thread_safe -- my:pv:name1 my:pv:name2
 ```
 
 ## Project Structure
@@ -207,7 +211,8 @@ epics-pvxs-sys/
 ├── examples/
 │   ├── simple_get.rs    # GET operation example
 │   ├── simple_put.rs    # PUT operation example
-│   └── simple_info.rs   # INFO operation example (query PV structure)
+│   ├── simple_info.rs   # INFO operation example (query PV structure)
+│   └── thread_safe.rs   # Thread-safety demonstration
 └── README.md            # This file
 ```
 
