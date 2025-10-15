@@ -81,6 +81,42 @@ public:
     std::string name() const;
 };
 
+/// Wraps pvxs::client::Subscription for safe Rust access
+class MonitorWrapper {
+private:
+    std::shared_ptr<pvxs::client::Subscription> monitor_;
+    std::string pv_name_;
+    
+public:
+    MonitorWrapper() = default;
+    explicit MonitorWrapper(std::shared_ptr<pvxs::client::Subscription>&& monitor, const std::string& pv_name) 
+        : monitor_(std::move(monitor)), pv_name_(pv_name) {}
+    
+    // Start monitoring
+    void start();
+    
+    // Stop monitoring
+    void stop();
+    
+    // Check if monitor is running
+    bool is_running() const;
+    
+    // Check if there are updates available (non-blocking)
+    bool has_update() const;
+    
+    // Get the next update (blocking with timeout)
+    std::unique_ptr<ValueWrapper> get_update(double timeout);
+    
+    // Get the next update (non-blocking, returns nullptr if no update)
+    std::unique_ptr<ValueWrapper> try_get_update();
+    
+    // Get PV name
+    std::string name() const { return pv_name_; }
+    
+    // Get connection status
+    bool is_connected() const;
+};
+
 /// Wraps pvxs::client::Context for safe Rust access
 class ContextWrapper {
 private:
@@ -117,6 +153,9 @@ public:
     
     // Create RPC builder
     std::unique_ptr<class RpcWrapper> rpc_create(const std::string& pv_name);
+    
+    // Create Monitor
+    std::unique_ptr<MonitorWrapper> monitor(const std::string& pv_name);
 };
 
 /// Wraps pvxs::client::RPCBuilder for safe RPC operations
@@ -197,5 +236,18 @@ rust::String value_to_string(const ValueWrapper& val);
 double value_get_field_double(const ValueWrapper& val, rust::Str field_name);
 int32_t value_get_field_int32(const ValueWrapper& val, rust::Str field_name);
 rust::String value_get_field_string(const ValueWrapper& val, rust::Str field_name);
+
+// Monitor operations for Rust
+std::unique_ptr<MonitorWrapper> context_monitor_create(
+    ContextWrapper& ctx,
+    rust::Str pv_name);
+void monitor_start(MonitorWrapper& monitor);
+void monitor_stop(MonitorWrapper& monitor);
+bool monitor_is_running(const MonitorWrapper& monitor);
+bool monitor_has_update(const MonitorWrapper& monitor);
+std::unique_ptr<ValueWrapper> monitor_get_update(MonitorWrapper& monitor, double timeout);
+std::unique_ptr<ValueWrapper> monitor_try_get_update(MonitorWrapper& monitor);
+bool monitor_is_connected(const MonitorWrapper& monitor);
+rust::String monitor_get_name(const MonitorWrapper& monitor);
 
 } // namespace pvxs_adapter

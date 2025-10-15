@@ -49,7 +49,7 @@ mod bridge;
 use cxx::UniquePtr;
 use std::fmt;
 
-pub use bridge::{ContextWrapper, ValueWrapper, RpcWrapper};
+pub use bridge::{ContextWrapper, ValueWrapper, RpcWrapper, MonitorWrapper};
 
 // Re-export for convenience
 pub type Result<T> = std::result::Result<T, PvxsError>;
@@ -222,6 +222,40 @@ impl Context {
     pub fn rpc(&mut self, pv_name: &str) -> Result<Rpc> {
         let inner = bridge::context_rpc_create(self.inner.pin_mut(), pv_name)?;
         Ok(Rpc { inner })
+    }
+
+    /// Create a monitor for a process variable
+    /// 
+    /// Monitors allow you to subscribe to value changes and receive notifications
+    /// when a PV updates, providing an efficient alternative to polling.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `pv_name` - Name of the process variable to monitor
+    /// 
+    /// # Returns
+    /// 
+    /// A `Monitor` instance that can be used to receive value updates.
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// # use epics_pvxs_sys::Context;
+    /// # let mut ctx = Context::from_env().unwrap();
+    /// let mut monitor = ctx.monitor("TEST:PV_Double").expect("Monitor creation failed");
+    /// 
+    /// monitor.start();
+    /// 
+    /// // Check for updates
+    /// if let Some(value) = monitor.try_get_update().expect("Monitor check failed") {
+    ///     println!("PV updated: {}", value);
+    /// }
+    /// 
+    /// monitor.stop();
+    /// ```
+    pub fn monitor(&mut self, pv_name: &str) -> Result<Monitor> {
+        let inner = bridge::context_monitor_create(self.inner.pin_mut(), pv_name)?;
+        Ok(Monitor { inner })
     }
 }
 
@@ -424,6 +458,219 @@ impl fmt::Debug for Value {
 /// let result = rpc.execute(5.0).expect("RPC execution failed");
 /// println!("RPC result: {}", result);
 /// ```
+
+/// Monitor represents a subscription to value changes for a process variable.
+/// 
+/// Monitors allow you to receive notifications when a PV's value changes,
+/// providing an efficient way to track real-time updates without polling.
+/// 
+/// # Example
+/// 
+/// ```no_run
+/// use epics_pvxs_sys::Context;
+/// 
+/// let mut ctx = Context::from_env()?;
+/// let mut monitor = ctx.monitor("MY:PV")?;
+/// 
+/// monitor.start();
+/// 
+/// // Wait for updates
+/// loop {
+///     if let Some(value) = monitor.try_get_update()? {
+///         println!("PV updated: {}", value);
+///     }
+///     std::thread::sleep(std::time::Duration::from_millis(100));
+/// }
+/// # Ok::<(), epics_pvxs_sys::PvxsError>(())
+/// ```
+pub struct Monitor {
+    inner: UniquePtr<bridge::MonitorWrapper>,
+}
+
+impl Monitor {
+    /// Start monitoring for value changes
+    /// 
+    /// This begins the subscription and the monitor will start receiving updates.
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// # use epics_pvxs_sys::Context;
+    /// # let mut ctx = Context::from_env().unwrap();
+    /// # let mut monitor = ctx.monitor("MY:PV").unwrap();
+    /// monitor.start();
+    /// ```
+    pub fn start(&mut self) {
+        bridge::monitor_start(self.inner.pin_mut());
+    }
+    
+    /// Stop monitoring for value changes
+    /// 
+    /// This ends the subscription and no more updates will be received.
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// # use epics_pvxs_sys::Context;
+    /// # let mut ctx = Context::from_env().unwrap();
+    /// # let mut monitor = ctx.monitor("MY:PV").unwrap();
+    /// # monitor.start();
+    /// monitor.stop();
+    /// ```
+    pub fn stop(&mut self) {
+        bridge::monitor_stop(self.inner.pin_mut());
+    }
+    
+    /// Check if the monitor is currently running
+    /// 
+    /// # Returns
+    /// 
+    /// `true` if the monitor is active and receiving updates, `false` otherwise.
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// # use epics_pvxs_sys::Context;
+    /// # let mut ctx = Context::from_env().unwrap();
+    /// # let mut monitor = ctx.monitor("MY:PV").unwrap();
+    /// monitor.start();
+    /// assert!(monitor.is_running());
+    /// ```
+    pub fn is_running(&self) -> bool {
+        bridge::monitor_is_running(&self.inner)
+    }
+    
+    /// Check if there are updates available without blocking
+    /// 
+    /// # Returns
+    /// 
+    /// `true` if updates are available, `false` otherwise.
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// # use epics_pvxs_sys::Context;
+    /// # let mut ctx = Context::from_env().unwrap();
+    /// # let mut monitor = ctx.monitor("MY:PV").unwrap();
+    /// # monitor.start();
+    /// if monitor.has_update() {
+    ///     let value = monitor.try_get_update()?;
+    ///     println!("Update available: {:?}", value);
+    /// }
+    /// # Ok::<(), epics_pvxs_sys::PvxsError>(())
+    /// ```
+    pub fn has_update(&self) -> bool {
+        bridge::monitor_has_update(&self.inner)
+    }
+    
+    /// Get the next update, blocking with a timeout
+    /// 
+    /// This method will wait for an update to arrive, up to the specified timeout.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `timeout` - Maximum time to wait in seconds
+    /// 
+    /// # Returns
+    /// 
+    /// A `Value` if an update was received within the timeout, or an error.
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// # use epics_pvxs_sys::Context;
+    /// # let mut ctx = Context::from_env().unwrap();
+    /// # let mut monitor = ctx.monitor("MY:PV").unwrap();
+    /// # monitor.start();
+    /// match monitor.get_update(5.0) {
+    ///     Ok(value) => println!("Update received: {}", value),
+    ///     Err(e) => println!("No update within 5 seconds: {}", e),
+    /// }
+    /// # Ok::<(), epics_pvxs_sys::PvxsError>(())
+    /// ```
+    pub fn get_update(&mut self, timeout: f64) -> Result<Value> {
+        let value_wrapper = bridge::monitor_get_update(self.inner.pin_mut(), timeout)?;
+        Ok(Value { inner: value_wrapper })
+    }
+    
+    /// Try to get the next update without blocking
+    /// 
+    /// This method returns immediately, either with an update if one is available,
+    /// or `None` if no update is ready.
+    /// 
+    /// # Returns
+    /// 
+    /// `Some(Value)` if an update is available, `None` otherwise.
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// # use epics_pvxs_sys::Context;
+    /// # let mut ctx = Context::from_env().unwrap();
+    /// # let mut monitor = ctx.monitor("MY:PV").unwrap();
+    /// # monitor.start();
+    /// if let Some(value) = monitor.try_get_update()? {
+    ///     println!("Update: {}", value);
+    /// } else {
+    ///     println!("No update available");
+    /// }
+    /// # Ok::<(), epics_pvxs_sys::PvxsError>(())
+    /// ```
+    pub fn try_get_update(&mut self) -> Result<Option<Value>> {
+        match bridge::monitor_try_get_update(self.inner.pin_mut()) {
+            Ok(value_wrapper) => {
+                if value_wrapper.is_null() {
+                    Ok(None)
+                } else {
+                    Ok(Some(Value { inner: value_wrapper }))
+                }
+            },
+            Err(_) => Ok(None), // No update available or error
+        }
+    }
+    
+    /// Check if the monitor is connected to the PV
+    /// 
+    /// # Returns
+    /// 
+    /// `true` if connected to the PV, `false` otherwise.
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// # use epics_pvxs_sys::Context;
+    /// # let mut ctx = Context::from_env().unwrap();
+    /// # let mut monitor = ctx.monitor("MY:PV").unwrap();
+    /// # monitor.start();
+    /// if monitor.is_connected() {
+    ///     println!("Connected to PV");
+    /// } else {
+    ///     println!("Not connected");
+    /// }
+    /// ```
+    pub fn is_connected(&self) -> bool {
+        bridge::monitor_is_connected(&self.inner)
+    }
+    
+    /// Get the name of the PV being monitored
+    /// 
+    /// # Returns
+    /// 
+    /// The PV name as a string.
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// # use epics_pvxs_sys::Context;
+    /// # let mut ctx = Context::from_env().unwrap();
+    /// # let monitor = ctx.monitor("MY:PV").unwrap();
+    /// println!("Monitoring PV: {}", monitor.name());
+    /// ```
+    pub fn name(&self) -> String {
+        bridge::monitor_get_name(&self.inner)
+    }
+}
+
 pub struct Rpc {
     inner: UniquePtr<bridge::RpcWrapper>,
 }

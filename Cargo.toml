@@ -14,6 +14,7 @@ links = "pvxs"
 cxx = "1.0.120"
 tokio = { version = "1.0", features = ["full"], optional = true }
 futures = { version = "0.3", optional = true }
+chrono = { version = "0.4", features = ["serde"] }
 
 [features]
 default = []
@@ -46,6 +47,22 @@ path = "examples/thread_safe.rs"
 name = "async_operations"
 path = "examples/async_operations.rs"
 required-features = ["async"]
+
+[[example]]
+name = "monitor_example"
+path = "examples/monitor_example.rs"
+
+[[example]]
+name = "multi_monitor_demo"
+path = "examples/multi_monitor_demo.rs"
+
+[[example]]
+name = "pv_explorer"
+path = "examples/pv_explorer.rs"
+
+[[example]]
+name = "random_monitor_test"
+path = "examples/random_monitor_test.rs"
 
 [[example]]
 name = "rpc_example"

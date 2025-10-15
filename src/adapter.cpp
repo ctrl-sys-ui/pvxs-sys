@@ -2,6 +2,8 @@
 
 #include "adapter.h"
 #include <sstream>
+#include <chrono>
+#include <thread>
 #include <pvxs/log.h>
 
 namespace pvxs_adapter {
@@ -260,6 +262,17 @@ std::unique_ptr<RpcWrapper> ContextWrapper::rpc_create(const std::string& pv_nam
     }
 }
 
+std::unique_ptr<MonitorWrapper> ContextWrapper::monitor(const std::string& pv_name) {
+    try {
+        // Create a PVXS subscription using the same pattern as get_sync
+        auto subscription_builder = ctx_.monitor(pv_name);
+        auto subscription = subscription_builder.exec();
+        return std::make_unique<MonitorWrapper>(std::move(subscription), pv_name);
+    } catch (const std::exception& e) {
+        throw PvxsError(std::string("Monitor creation failed for '") + pv_name + "': " + e.what());
+    }
+}
+
 // ============================================================================
 // Factory functions for Rust FFI
 // ============================================================================
@@ -485,6 +498,172 @@ std::unique_ptr<OperationWrapper> rpc_execute_async(RpcWrapper& rpc, double time
     } catch (const std::exception& e) {
         throw PvxsError(std::string("RPC asynchronous execution failed: ") + e.what());
     }
+}
+
+// ============================================================================
+// MonitorWrapper implementation - Proper PVXS client::Subscription API usage
+// ============================================================================
+
+void MonitorWrapper::start() {
+    // Resume the subscription (in case it was paused)
+    if (monitor_) {
+        try {
+            monitor_->resume();  // resume() is shorthand for pause(false)
+        } catch (const std::exception& e) {
+            // Ignore errors - subscription might already be running
+        }
+    }
+}
+
+void MonitorWrapper::stop() {
+    // Pause the subscription instead of destroying it
+    if (monitor_) {
+        try {
+            monitor_->pause(true);
+        } catch (const std::exception& e) {
+            // If pause fails, cancel the subscription
+            monitor_->cancel();
+        }
+    }
+}
+
+bool MonitorWrapper::is_running() const {
+    // Return true if we have an active subscription that hasn't been cancelled
+    return static_cast<bool>(monitor_);
+}
+
+bool MonitorWrapper::has_update() const {
+    // Check if the subscription has updates by trying a non-blocking pop
+    if (monitor_) {
+        try {
+            // Create a temporary copy to avoid modifying the monitor state
+            // We'll use the actual get_update method for real retrieval
+            auto temp_monitor = monitor_;
+            auto update = temp_monitor->pop();
+            return update.valid();
+        } catch (const std::exception& e) {
+            // Any exception means no update or connection issue
+            return false;
+        }
+    }
+    return false;
+}
+
+std::unique_ptr<ValueWrapper> MonitorWrapper::get_update(double timeout) {
+    // Get an update from the subscription
+    if (monitor_) {
+        try {
+            // PVXS pop() is non-blocking, so we need to implement our own timeout
+            auto start_time = std::chrono::steady_clock::now();
+            auto timeout_duration = std::chrono::duration<double>(timeout);
+            
+            while (true) {
+                auto update = monitor_->pop();
+                if (update.valid()) {
+                    return std::make_unique<ValueWrapper>(std::move(update));
+                }
+                
+                // Check timeout
+                auto elapsed = std::chrono::steady_clock::now() - start_time;
+                if (elapsed >= timeout_duration) {
+                    break;
+                }
+                
+                // Small sleep to avoid busy waiting
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
+        } catch (const pvxs::client::Connected& e) {
+            // Connection event - not a data update, return null
+        } catch (const pvxs::client::Disconnect& e) {
+            // Disconnection event - not a data update, return null  
+        } catch (const pvxs::client::Finished& e) {
+            // Subscription finished - not a data update, return null
+        } catch (const std::exception& e) {
+            // Other errors - return null
+        }
+    }
+    return nullptr;
+}
+
+std::unique_ptr<ValueWrapper> MonitorWrapper::try_get_update() {
+    // Try to get update without blocking
+    if (monitor_) {
+        try {
+            auto update = monitor_->pop();
+            if (update.valid()) {
+                return std::make_unique<ValueWrapper>(std::move(update));
+            }
+        } catch (const pvxs::client::Connected& e) {
+            // Connection event - not a data update
+        } catch (const pvxs::client::Disconnect& e) {
+            // Disconnection event - not a data update
+        } catch (const pvxs::client::Finished& e) {
+            // Subscription finished - not a data update
+        } catch (const std::exception& e) {
+            // Other errors
+        }
+    }
+    return nullptr;
+}
+
+bool MonitorWrapper::is_connected() const {
+    // Check if subscription is connected by checking if it's valid and not cancelled
+    if (monitor_) {
+        try {
+            // If we can access the name, the subscription is likely connected
+            auto name = monitor_->name();
+            return !name.empty();
+        } catch (const std::exception& e) {
+            return false;
+        }
+    }
+    return false;
+}
+
+// ============================================================================
+// Monitor bridge functions for Rust
+// ============================================================================
+
+std::unique_ptr<MonitorWrapper> context_monitor_create(ContextWrapper& ctx, rust::Str pv_name) {
+    try {
+        std::string pv_name_str(pv_name);
+        auto monitor = ctx.monitor(pv_name_str);
+        return monitor;
+    } catch (const std::exception& e) {
+        throw PvxsError(std::string("Monitor creation failed: ") + e.what());
+    }
+}
+
+void monitor_start(MonitorWrapper& monitor) {
+    monitor.start();
+}
+
+void monitor_stop(MonitorWrapper& monitor) {
+    monitor.stop();
+}
+
+bool monitor_is_running(const MonitorWrapper& monitor) {
+    return monitor.is_running();
+}
+
+bool monitor_has_update(const MonitorWrapper& monitor) {
+    return monitor.has_update();
+}
+
+std::unique_ptr<ValueWrapper> monitor_get_update(MonitorWrapper& monitor, double timeout) {
+    return monitor.get_update(timeout);
+}
+
+std::unique_ptr<ValueWrapper> monitor_try_get_update(MonitorWrapper& monitor) {
+    return monitor.try_get_update();
+}
+
+bool monitor_is_connected(const MonitorWrapper& monitor) {
+    return monitor.is_connected();
+}
+
+rust::String monitor_get_name(const MonitorWrapper& monitor) {
+    return rust::String(monitor.name());
 }
 
 } // namespace pvxs_adapter

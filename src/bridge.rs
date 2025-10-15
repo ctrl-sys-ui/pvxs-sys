@@ -69,6 +69,7 @@ mod ffi {
         
         // RPC operations
         type RpcWrapper;
+        type MonitorWrapper;
         fn context_rpc_create(
             ctx: Pin<&mut ContextWrapper>,
             pv_name: &str,
@@ -89,6 +90,20 @@ mod ffi {
         fn value_get_field_double(val: &ValueWrapper, field_name: &str) -> Result<f64>;
         fn value_get_field_int32(val: &ValueWrapper, field_name: &str) -> Result<i32>;
         fn value_get_field_string(val: &ValueWrapper, field_name: &str) -> Result<String>;
+        
+        // Monitor operations
+        fn context_monitor_create(
+            ctx: Pin<&mut ContextWrapper>,
+            pv_name: &str,
+        ) -> Result<UniquePtr<MonitorWrapper>>;
+        fn monitor_start(monitor: Pin<&mut MonitorWrapper>);
+        fn monitor_stop(monitor: Pin<&mut MonitorWrapper>);
+        fn monitor_is_running(monitor: &MonitorWrapper) -> bool;
+        fn monitor_has_update(monitor: &MonitorWrapper) -> bool;
+        fn monitor_get_update(monitor: Pin<&mut MonitorWrapper>, timeout: f64) -> Result<UniquePtr<ValueWrapper>>;
+        fn monitor_try_get_update(monitor: Pin<&mut MonitorWrapper>) -> Result<UniquePtr<ValueWrapper>>;
+        fn monitor_is_connected(monitor: &MonitorWrapper) -> bool;
+        fn monitor_get_name(monitor: &MonitorWrapper) -> String;
     }
 }
 
