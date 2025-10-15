@@ -11,7 +11,7 @@ This crate provides idiomatic Rust wrappers around the PVXS C++ library, which i
 - ✅ **PUT Operations** - Write process variable values
 - ✅ **INFO Operations** - Query PV type information
 - ✅ **Thread-safe** - Context can be safely shared between threads (see `thread_safe.rs` example)
-- 🚧 **Async Support** - Coming soon
+- ✅ **Async Support** - Async/await support using Tokio (see `async_operations.rs` example)
 - 🚧 **Monitor/Subscription** - Coming soon
 - 🚧 **Server API** - Coming soon
 
@@ -70,7 +70,17 @@ Add this to your `Cargo.toml`:
 ```toml
 [dependencies]
 epics-pvxs-sys = "0.1"
+
+# For async support
+epics-pvxs-sys = { version = "0.1", features = ["async"] }
 ```
+
+### Optional Features
+
+- **`async`** - Enables async/await support using Tokio
+  - Adds `get_async()`, `put_double_async()`, and `info_async()` methods
+  - Requires Tokio runtime
+  - Example: `cargo run --features async --example async_operations`
 
 ### Runtime Requirements (Windows)
 
@@ -183,9 +193,50 @@ cargo run --example simple_info -- TEST:PV1
 
 # Run the thread_safe example (demonstrates concurrent PV access)
 cargo run --example thread_safe -- TEST:PV1 TEST:PV2
+
+# Run the async example (requires async feature)
+cargo run --features async --example async_operations -- TEST:PV1
+
+# Run the RPC example (demonstrates remote procedure calls)
+cargo run --example rpc_example -- service:function arg1=value1 arg2=42.0
 ```
 
+## Testing
+
+### Available Examples
+
+This repository includes several examples demonstrating different functionality:
+
+- **`simple_get.rs`** - Basic PV value retrieval
+- **`simple_put.rs`** - PV value setting  
+- **`simple_info.rs`** - PV metadata inspection
+- **`thread_safe.rs`** - Thread safety demonstration
+- **`async_operations.rs`** - Asynchronous operations (requires `async` feature)
+- **`rpc_example.rs`** - Remote procedure call demonstration
+
+### Running Examples
+
 ```bash
+# Test basic GET operation
+cargo run --example simple_get -- TEST:PV_Double
+
+# Test PUT operation  
+cargo run --example simple_put -- TEST:PV_Double 123.456
+
+# Test structure discovery
+cargo run --example simple_info -- TEST:PV_RichInfo
+
+# Test thread safety
+cargo run --example thread_safe -- TEST:PV_Thread1 TEST:PV_Thread2
+
+# Test async operations (requires async feature)
+cargo run --features async --example async_operations -- TEST:PV_Double
+
+# Run the RPC example (demonstrates remote procedure calls)
+cargo run --example rpc_example -- service:function arg1=value1 arg2=42.0
+```
+
+## API Reference
 # Linux/macOS - Build all examples
 cargo build --examples
 
@@ -194,6 +245,7 @@ cargo run --example simple_get -- my:pv:name
 cargo run --example simple_put -- my:pv:name 42.5
 cargo run --example simple_info -- my:pv:name
 cargo run --example thread_safe -- my:pv:name1 my:pv:name2
+cargo run --features async --example async_operations -- my:pv:name
 ```
 
 ## Project Structure
@@ -209,11 +261,12 @@ epics-pvxs-sys/
 │   ├── bridge.rs        # CXX bridge definitions
 │   └── adapter.cpp      # C++ adapter implementation
 ├── examples/
-│   ├── simple_get.rs    # GET operation example
-│   ├── simple_put.rs    # PUT operation example
-│   ├── simple_info.rs   # INFO operation example (query PV structure)
-│   └── thread_safe.rs   # Thread-safety demonstration
-└── README.md            # This file
+│   ├── simple_get.rs      # GET operation example
+│   ├── simple_put.rs      # PUT operation example
+│   ├── simple_info.rs     # INFO operation example (query PV structure)
+│   ├── thread_safe.rs     # Thread-safety demonstration
+│   └── async_operations.rs # Async/await demonstration (requires 'async' feature)
+└── README.md              # This file
 ```
 
 ## Architecture

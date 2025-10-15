@@ -99,6 +99,51 @@ std::string OperationWrapper::name() const {
     return op_->name();
 }
 
+bool OperationWrapper::is_done() const {
+    if (!op_) {
+        return true; // Null operation is considered "done"
+    }
+    // Use a non-blocking check with wait() and 0 timeout
+    try {
+        op_->wait(0.0);
+        return true; // Operation completed successfully
+    } catch (const pvxs::client::Timeout&) {
+        return false; // Still in progress
+    } catch (...) {
+        return true; // Error means operation is done
+    }
+}
+
+std::unique_ptr<ValueWrapper> OperationWrapper::get_result() {
+    if (!op_) {
+        throw PvxsError("Operation is null");
+    }
+    
+    try {
+        // Use wait() to get the result
+        pvxs::Value result = op_->wait(10.0); // 10 second timeout
+        return std::make_unique<ValueWrapper>(std::move(result));
+    } catch (const std::exception& e) {
+        throw PvxsError(std::string("Failed to get operation result: ") + e.what());
+    }
+}
+
+bool OperationWrapper::wait_for_completion(uint64_t timeout_ms) {
+    if (!op_) {
+        return true; // Null operation is considered complete
+    }
+    
+    try {
+        double timeout_sec = timeout_ms / 1000.0;
+        op_->wait(timeout_sec);
+        return true; // If wait() succeeds, operation is complete
+    } catch (const pvxs::client::Timeout&) {
+        return false; // Timeout - operation still running
+    } catch (...) {
+        return true; // Other error - operation is done
+    }
+}
+
 // ============================================================================
 // ContextWrapper implementation
 // ============================================================================
@@ -126,13 +171,40 @@ std::unique_ptr<ValueWrapper> ContextWrapper::get_sync(
 }
 
 std::unique_ptr<OperationWrapper> ContextWrapper::get_async(
-    const std::string& pv_name) 
+    const std::string& pv_name, double timeout) 
 {
     try {
         auto op = ctx_.get(pv_name).exec();
         return std::make_unique<OperationWrapper>(std::move(op));
     } catch (const std::exception& e) {
         throw PvxsError(std::string("Failed to start GET for '") + pv_name + "': " + e.what());
+    }
+}
+
+std::unique_ptr<OperationWrapper> ContextWrapper::put_double_async(
+    const std::string& pv_name, 
+    double value, 
+    double timeout) 
+{
+    try {
+        auto op = ctx_.put(pv_name)
+            .set("value", value)
+            .exec();
+        return std::make_unique<OperationWrapper>(std::move(op));
+    } catch (const std::exception& e) {
+        throw PvxsError(std::string("Failed to start PUT for '") + pv_name + "': " + e.what());
+    }
+}
+
+std::unique_ptr<OperationWrapper> ContextWrapper::info_async(
+    const std::string& pv_name, 
+    double timeout) 
+{
+    try {
+        auto op = ctx_.info(pv_name).exec();
+        return std::make_unique<OperationWrapper>(std::move(op));
+    } catch (const std::exception& e) {
+        throw PvxsError(std::string("Failed to start INFO for '") + pv_name + "': " + e.what());
     }
 }
 
@@ -176,6 +248,15 @@ std::unique_ptr<ValueWrapper> ContextWrapper::info_sync(
         return std::make_unique<ValueWrapper>(std::move(result));
     } catch (const std::exception& e) {
         throw PvxsError(std::string("INFO failed for '") + pv_name + "': " + e.what());
+    }
+}
+
+std::unique_ptr<RpcWrapper> ContextWrapper::rpc_create(const std::string& pv_name) {
+    try {
+        auto builder = ctx_.rpc(pv_name);
+        return std::make_unique<RpcWrapper>(std::move(builder));
+    } catch (const std::exception& e) {
+        throw PvxsError(std::string("RPC creation failed for '") + pv_name + "': " + e.what());
     }
 }
 
@@ -240,6 +321,170 @@ int32_t value_get_field_int32(const ValueWrapper& val, rust::Str field_name) {
 rust::String value_get_field_string(const ValueWrapper& val, rust::Str field_name) {
     std::string field_name_str(field_name.data(), field_name.size());
     return rust::String(val.get_field_string(field_name_str));
+}
+
+// ============================================================================
+// Async operation functions for Rust FFI
+// ============================================================================
+
+std::unique_ptr<OperationWrapper> context_get_async(
+    ContextWrapper& ctx,
+    rust::Str pv_name,
+    double timeout)
+{
+    std::string pv_name_str(pv_name.data(), pv_name.size());
+    return ctx.get_async(pv_name_str, timeout);
+}
+
+std::unique_ptr<OperationWrapper> context_put_double_async(
+    ContextWrapper& ctx,
+    rust::Str pv_name,
+    double value,
+    double timeout)
+{
+    std::string pv_name_str(pv_name.data(), pv_name.size());
+    return ctx.put_double_async(pv_name_str, value, timeout);
+}
+
+std::unique_ptr<OperationWrapper> context_info_async(
+    ContextWrapper& ctx,
+    rust::Str pv_name,
+    double timeout)
+{
+    std::string pv_name_str(pv_name.data(), pv_name.size());
+    return ctx.info_async(pv_name_str, timeout);
+}
+
+bool operation_is_done(const OperationWrapper& op) {
+    return op.is_done();
+}
+
+std::unique_ptr<ValueWrapper> operation_get_result(OperationWrapper& op) {
+    return op.get_result();
+}
+
+void operation_cancel(OperationWrapper& op) {
+    op.cancel();
+}
+
+bool operation_wait_for_completion(OperationWrapper& op, uint64_t timeout_ms) {
+    return op.wait_for_completion(timeout_ms);
+}
+
+// ============================================================================
+// RpcWrapper implementation
+// ============================================================================
+
+void RpcWrapper::arg_string(const std::string& name, const std::string& value) {
+    builder_.arg(name, value);
+}
+
+void RpcWrapper::arg_double(const std::string& name, double value) {
+    builder_.arg(name, value);
+}
+
+void RpcWrapper::arg_int32(const std::string& name, int32_t value) {
+    builder_.arg(name, value);
+}
+
+void RpcWrapper::arg_bool(const std::string& name, bool value) {
+    builder_.arg(name, value);
+}
+
+std::unique_ptr<ValueWrapper> RpcWrapper::execute_sync(double timeout) {
+    try {
+        auto op = builder_.exec();
+        if (!op) {
+            throw PvxsError("Failed to create RPC operation");
+        }
+        
+        auto result = op->wait(timeout);
+        return std::make_unique<ValueWrapper>(std::move(result));
+    } catch (const std::exception& e) {
+        throw PvxsError(std::string("RPC execution failed: ") + e.what());
+    }
+}
+
+std::unique_ptr<OperationWrapper> RpcWrapper::execute_async(double timeout) {
+    try {
+        auto op = builder_.exec();
+        if (!op) {
+            throw PvxsError("Failed to create RPC operation");
+        }
+        
+        return std::make_unique<OperationWrapper>(std::move(op));
+    } catch (const std::exception& e) {
+        throw PvxsError(std::string("RPC execution failed: ") + e.what());
+    }
+}
+
+// ============================================================================
+// Bridge functions for RPC
+// ============================================================================
+
+std::unique_ptr<RpcWrapper> context_rpc_create(
+    ContextWrapper& ctx, 
+    rust::Str pv_name) {
+    try {
+        std::string pv_name_str(pv_name.data(), pv_name.size());
+        auto builder = ctx.rpc_create(pv_name_str);
+        return builder;
+    } catch (const std::exception& e) {
+        throw PvxsError(std::string("Failed to create RPC: ") + e.what());
+    }
+}
+
+void rpc_arg_string(RpcWrapper& rpc, rust::Str name, rust::Str value) {
+    try {
+        std::string name_str(name.data(), name.size());
+        std::string value_str(value.data(), value.size());
+        rpc.arg_string(name_str, value_str);
+    } catch (const std::exception& e) {
+        throw PvxsError(std::string("Failed to set RPC string argument: ") + e.what());
+    }
+}
+
+void rpc_arg_double(RpcWrapper& rpc, rust::Str name, double value) {
+    try {
+        std::string name_str(name.data(), name.size());
+        rpc.arg_double(name_str, value);
+    } catch (const std::exception& e) {
+        throw PvxsError(std::string("Failed to set RPC double argument: ") + e.what());
+    }
+}
+
+void rpc_arg_int32(RpcWrapper& rpc, rust::Str name, int32_t value) {
+    try {
+        std::string name_str(name.data(), name.size());
+        rpc.arg_int32(name_str, value);
+    } catch (const std::exception& e) {
+        throw PvxsError(std::string("Failed to set RPC int32 argument: ") + e.what());
+    }
+}
+
+void rpc_arg_bool(RpcWrapper& rpc, rust::Str name, bool value) {
+    try {
+        std::string name_str(name.data(), name.size());
+        rpc.arg_bool(name_str, value);
+    } catch (const std::exception& e) {
+        throw PvxsError(std::string("Failed to set RPC bool argument: ") + e.what());
+    }
+}
+
+std::unique_ptr<ValueWrapper> rpc_execute_sync(RpcWrapper& rpc, double timeout) {
+    try {
+        return rpc.execute_sync(timeout);
+    } catch (const std::exception& e) {
+        throw PvxsError(std::string("RPC synchronous execution failed: ") + e.what());
+    }
+}
+
+std::unique_ptr<OperationWrapper> rpc_execute_async(RpcWrapper& rpc, double timeout) {
+    try {
+        return rpc.execute_async(timeout);
+    } catch (const std::exception& e) {
+        throw PvxsError(std::string("RPC asynchronous execution failed: ") + e.what());
+    }
 }
 
 } // namespace pvxs_adapter

@@ -31,8 +31,8 @@ fn main() {
             }
         });
     
-    println!("cargo:warning=Using EPICS_BASE: {}", epics_base);
-    println!("cargo:warning=Using EPICS_HOST_ARCH: {}", epics_host_arch);
+    println!("cargo:warning=INFO: Using EPICS_BASE: {}", epics_base);
+    println!("cargo:warning=INFO: Using EPICS_HOST_ARCH: {}", epics_host_arch);
     
     // EPICS Base paths
     let epics_include = epics_base_path.join("include");
@@ -62,8 +62,8 @@ fn main() {
     let libevent_include = libevent_base_path.join("include");
     let libevent_lib = libevent_base_path.join("lib");
     
-    println!("cargo:warning=Using PVXS location: {}", pvxs_base);
-    println!("cargo:warning=Using libevent location: {}", libevent_base);
+    println!("cargo:warning=INFO: Using PVXS location: {}", pvxs_base);
+    println!("cargo:warning=INFO: Using libevent location: {}", libevent_base);
     
     // Tell cargo to rerun this build script if files change
     println!("cargo:rerun-if-changed=src/lib.rs");
@@ -141,8 +141,76 @@ fn main() {
         println!("cargo:rustc-link-lib=advapi32");
     }
     
+    // Copy required DLLs to target directories for seamless execution
+    copy_runtime_dlls(&epics_base_path, &pvxs_base_path, &libevent_base_path, &epics_host_arch);
+    
     // Export include paths for dependent crates
     println!("cargo:include={}", pvxs_include.display());
     println!("cargo:include={}", epics_include.display());
     println!("cargo:include={}", libevent_include.display());
+}
+
+fn copy_runtime_dlls(epics_base: &PathBuf, pvxs_base: &PathBuf, libevent_base: &PathBuf, host_arch: &str) {
+    let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
+    
+    // Determine target directory (go up from OUT_DIR to find target/debug or target/release)
+    let mut target_dir = out_dir.clone();
+    while target_dir.file_name() != Some(std::ffi::OsStr::new("target")) {
+        if !target_dir.pop() {
+            return; // Silently skip if we can't find target directory
+        }
+    }
+    
+    // Determine which profile we're building (debug or release)
+    let profile = if out_dir.to_string_lossy().contains("release") {
+        "release"
+    } else {
+        "debug"
+    };
+    
+    // Source paths for DLLs
+    let pvxs_dll = pvxs_base.join("bin").join(host_arch).join("pvxs.dll");
+    let com_dll = epics_base.join("bin").join(host_arch).join("Com.dll");
+    let event_dll = libevent_base.join("lib").join("event_core.dll");
+    
+    // Copy to main profile directory and examples subdirectory
+    let directories = [
+        target_dir.join(profile),
+        target_dir.join(profile).join("examples"),
+    ];
+    
+    let mut copied_dlls = Vec::new();
+    
+    for dest_dir in &directories {
+        // Only process directories that exist or can be created
+        if std::fs::create_dir_all(dest_dir).is_err() {
+            continue;
+        }
+        
+        // Copy DLLs if they exist
+        if pvxs_dll.exists() {
+            std::fs::copy(&pvxs_dll, dest_dir.join("pvxs.dll")).ok();
+            if !copied_dlls.contains(&"pvxs.dll") {
+                copied_dlls.push("pvxs.dll");
+            }
+        }
+        
+        if com_dll.exists() {
+            std::fs::copy(&com_dll, dest_dir.join("Com.dll")).ok();
+            if !copied_dlls.contains(&"Com.dll") {
+                copied_dlls.push("Com.dll");
+            }
+        }
+        
+        if event_dll.exists() {
+            std::fs::copy(&event_dll, dest_dir.join("event_core.dll")).ok();
+            if !copied_dlls.contains(&"event_core.dll") {
+                copied_dlls.push("event_core.dll");
+            }
+        }
+    }
+    
+    if !copied_dlls.is_empty() {
+        println!("cargo:warning=INFO: Copied {} to {}", copied_dlls.join(", "), profile);
+    }
 }
