@@ -185,13 +185,15 @@ This should take 5-15 minutes total (libevent + PVXS).
 ```powershell
 # Add to profile or set permanently
 $env:PVXS_DIR = "C:\epics\pvxs"
+$env:EPICS_PVXS_LIBEVENT = "C:\epics\pvxs\bundle\usr\windows-x64"
 
 # Or permanently:
-[Environment]::SetEnvironmentVariable("PVXS_DIR", "C:\epics\pvxs", "User")
+[Environment]::SetEnvironmentVariable("EPICS_PVXS", "C:\epics\pvxs", "User")
+[Environment]::SetEnvironmentVariable("EPICS_PVXS_LIBEVENT", "C:\epics\pvxs\bundle\usr\windows-x64", "User")
 
-# Add PVXS DLLs to PATH
+# Add PVXS and libevent DLLs to PATH
 $currentPath = [Environment]::GetEnvironmentVariable("PATH", "User")
-$newPath = "$currentPath;C:\epics\pvxs\bin\windows-x64"
+$newPath = "$currentPath;C:\epics\pvxs\bin\windows-x64;C:\epics\pvxs\bundle\usr\windows-x64\lib"
 [Environment]::SetEnvironmentVariable("PATH", $newPath, "User")
 ```
 
@@ -205,6 +207,10 @@ pvxget.exe -h
 # Check that libraries exist
 dir C:\epics\pvxs\lib\windows-x64\
 # Should see pvxs.lib and pvxs.dll
+
+# Check libevent libraries (bundled with PVXS)
+dir C:\epics\pvxs\bundle\usr\windows-x64\lib\
+# Should see event.dll, event_core.dll, event_extra.dll
 
 # Check headers
 dir C:\epics\pvxs\include\pvxs\
@@ -229,7 +235,7 @@ Start a softIOC with PVXS:
 
 ```powershell
 # In one PowerShell window
-softIoc -d test.db
+softIocPVA -d test.db
 ```
 
 ### Test with PVXS Tools

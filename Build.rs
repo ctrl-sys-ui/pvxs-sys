@@ -51,7 +51,19 @@ fn main() {
     let pvxs_include = pvxs_base_path.join("include");
     let pvxs_lib = pvxs_base_path.join("lib").join(&epics_host_arch);
     
+    // Get libevent location (bundled with PVXS)
+    let libevent_base = env::var("EPICS_PVXS_LIBEVENT")
+        .unwrap_or_else(|_| {
+            // Default to bundled libevent within PVXS
+            pvxs_base_path.join("bundle").join("usr").join(&epics_host_arch).to_string_lossy().to_string()
+        });
+    
+    let libevent_base_path = PathBuf::from(&libevent_base);
+    let libevent_include = libevent_base_path.join("include");
+    let libevent_lib = libevent_base_path.join("lib");
+    
     println!("cargo:warning=Using PVXS location: {}", pvxs_base);
+    println!("cargo:warning=Using libevent location: {}", libevent_base);
     
     // Tell cargo to rerun this build script if files change
     println!("cargo:rerun-if-changed=src/lib.rs");
@@ -63,6 +75,7 @@ fn main() {
     println!("cargo:rerun-if-env-changed=EPICS_HOST_ARCH");
     println!("cargo:rerun-if-env-changed=EPICS_PVXS");
     println!("cargo:rerun-if-env-changed=PVXS_DIR");
+    println!("cargo:rerun-if-env-changed=EPICS_PVXS_LIBEVENT");
     
     // Copy adapter.h to cxxbridge include directory so it can be found
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
@@ -95,6 +108,7 @@ fn main() {
         .include(epics_include.join("compiler").join(compiler_dir))
         .include(epics_include.join("os").join(os_dir))
         .include(&pvxs_include)
+        .include(&libevent_include)  // Add libevent include path
         .flag_if_supported("-std=c++11")
         .flag_if_supported("/std:c++11");  // MSVC
     
@@ -111,6 +125,7 @@ fn main() {
     // Link to PVXS and EPICS libraries
     println!("cargo:rustc-link-search=native={}", pvxs_lib.display());
     println!("cargo:rustc-link-search=native={}", epics_lib.display());
+    println!("cargo:rustc-link-search=native={}", libevent_lib.display());
     
     // Link required libraries
     println!("cargo:rustc-link-lib=pvxs");
@@ -129,4 +144,5 @@ fn main() {
     // Export include paths for dependent crates
     println!("cargo:include={}", pvxs_include.display());
     println!("cargo:include={}", epics_include.display());
+    println!("cargo:include={}", libevent_include.display());
 }

@@ -41,6 +41,9 @@ Set the following environment variables:
   - Examples: `linux-x86_64`, `windows-x64`, `darwin-x86`
 - **`EPICS_PVXS`** - Path to PVXS installation (required)
   - Also accepts `PVXS_DIR` or `PVXS_BASE` as alternatives
+- **`EPICS_PVXS_LIBEVENT`** - Path to libevent installation (optional)
+  - Defaults to bundled libevent within PVXS: `{PVXS}/bundle/usr/{ARCH}`
+  - Required DLLs: `event.dll`, `event_core.dll`, `event_extra.dll`
 
 Example setup:
 
@@ -49,6 +52,7 @@ Example setup:
 export EPICS_BASE=/opt/epics/base
 export EPICS_HOST_ARCH=linux-x86_64
 export EPICS_PVXS=/opt/epics/modules/pvxs
+# Optional: export EPICS_PVXS_LIBEVENT=/opt/epics/modules/pvxs/bundle/usr/linux-x86_64
 ```
 
 ```powershell
@@ -56,6 +60,7 @@ export EPICS_PVXS=/opt/epics/modules/pvxs
 $env:EPICS_BASE = "C:\epics\base"
 $env:EPICS_HOST_ARCH = "windows-x64"
 $env:EPICS_PVXS = "C:\epics\pvxs"
+# Optional: $env:EPICS_PVXS_LIBEVENT = "C:\epics\pvxs\bundle\usr\windows-x64"
 ```
 
 ## Installation
@@ -65,6 +70,19 @@ Add this to your `Cargo.toml`:
 ```toml
 [dependencies]
 epics-pvxs-sys = "0.1"
+```
+
+### Runtime Requirements (Windows)
+
+For Windows users, the EPICS and PVXS DLLs must be in your system PATH for the examples to run:
+
+1. **EPICS Base DLLs**: `{EPICS_BASE}\bin\{EPICS_HOST_ARCH}`
+2. **PVXS DLLs**: `{EPICS_PVXS}\bin\{EPICS_HOST_ARCH}`  
+3. **libevent DLLs**: `{EPICS_PVXS}\bundle\usr\{EPICS_HOST_ARCH}\lib`
+
+Example PowerShell commands to add to PATH for current session:
+```powershell
+$env:PATH = "C:\epics\base\bin\windows-x64;C:\epics\pvxs\bin\windows-x64;C:\epics\pvxs\bundle\usr\windows-x64\lib;" + $env:PATH
 ```
 
 ## Quick Start
@@ -159,6 +177,9 @@ cargo run --example simple_get -- TEST:PV1
 
 # Run the simple_put example
 cargo run --example simple_put -- TEST:PV1 42.5
+
+# Run the simple_info example (query PV type information)
+cargo run --example simple_info -- TEST:PV1
 ```
 
 ```bash
@@ -168,6 +189,7 @@ cargo build --examples
 # Run examples
 cargo run --example simple_get -- my:pv:name
 cargo run --example simple_put -- my:pv:name 42.5
+cargo run --example simple_info -- my:pv:name
 ```
 
 ## Project Structure
@@ -184,7 +206,8 @@ epics-pvxs-sys/
 │   └── adapter.cpp      # C++ adapter implementation
 ├── examples/
 │   ├── simple_get.rs    # GET operation example
-│   └── simple_put.rs    # PUT operation example
+│   ├── simple_put.rs    # PUT operation example
+│   └── simple_info.rs   # INFO operation example (query PV structure)
 └── README.md            # This file
 ```
 

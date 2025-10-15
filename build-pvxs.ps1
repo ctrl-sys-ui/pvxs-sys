@@ -176,13 +176,15 @@ $hostArch = "windows-x64"
 Write-Host "Setting user environment variables..." -ForegroundColor Yellow
 [Environment]::SetEnvironmentVariable("EPICS_BASE", $baseDir, "User")
 [Environment]::SetEnvironmentVariable("EPICS_HOST_ARCH", $hostArch, "User")
-[Environment]::SetEnvironmentVariable("PVXS_DIR", $pvxsDir, "User")
+[Environment]::SetEnvironmentVariable("EPICS_PVXS", $pvxsDir, "User")
+[Environment]::SetEnvironmentVariable("EPICS_PVXS_LIBEVENT", (Join-Path $pvxsDir "bundle\usr\$hostArch"), "User")
 
 # Add to PATH
 $currentPath = [Environment]::SetEnvironmentVariable("PATH", "User")
 $binPaths = @(
     (Join-Path $baseDir "bin\$hostArch"),
-    (Join-Path $pvxsDir "bin\$hostArch")
+    (Join-Path $pvxsDir "bin\$hostArch"),
+    (Join-Path $pvxsDir "bundle\usr\$hostArch\lib")
 )
 
 foreach ($binPath in $binPaths) {
@@ -198,13 +200,15 @@ foreach ($binPath in $binPaths) {
 $env:EPICS_BASE = $baseDir
 $env:EPICS_HOST_ARCH = $hostArch
 $env:PVXS_DIR = $pvxsDir
-$env:PATH = "$($binPaths[0]);$($binPaths[1]);$env:PATH"
+$env:EPICS_PVXS_LIBEVENT = (Join-Path $pvxsDir "bundle\usr\$hostArch")
+$env:PATH = "$($binPaths[0]);$($binPaths[1]);$($binPaths[2]);$env:PATH"
 
 Write-Host ""
 Write-Host "✓ Environment variables set:" -ForegroundColor Green
 Write-Host "  EPICS_BASE = $baseDir" -ForegroundColor Gray
 Write-Host "  EPICS_HOST_ARCH = $hostArch" -ForegroundColor Gray
 Write-Host "  PVXS_DIR = $pvxsDir" -ForegroundColor Gray
+Write-Host "  EPICS_PVXS_LIBEVENT = $(Join-Path $pvxsDir "bundle\usr\$hostArch")" -ForegroundColor Gray
 
 # Verify installation
 Write-Host ""
