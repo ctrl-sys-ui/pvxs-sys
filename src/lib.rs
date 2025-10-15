@@ -205,6 +205,98 @@ impl Context {
 unsafe impl Send for Context {}
 unsafe impl Sync for Context {}
 
+/// Async implementation for Context
+#[cfg(feature = "async")]
+impl Context {
+    /// Asynchronously read a process variable value
+    /// 
+    /// This method uses PVXS RPC for non-blocking operations.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `pv_name` - The name of the process variable
+    /// * `timeout` - Maximum time to wait in seconds
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// # use epics_pvxs_sys::Context;
+    /// # async fn example() -> Result<(), epics_pvxs_sys::PvxsError> {
+    /// let mut ctx = Context::from_env()?;
+    /// let value = ctx.get_async("my:pv:name", 5.0).await?;
+    /// let val = value.get_field_double("value")?;
+    /// println!("Value: {}", val);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn get_async(&mut self, pv_name: &str, timeout: f64) -> Result<Value> {
+        let operation = bridge::context_get_async(self.inner.pin_mut(), pv_name, timeout)?;
+        self.wait_for_operation(operation).await
+    }
+    
+    /// Asynchronously write a double value to a process variable
+    /// 
+    /// # Arguments
+    /// 
+    /// * `pv_name` - The name of the process variable
+    /// * `value` - The value to write
+    /// * `timeout` - Maximum time to wait in seconds
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// # use epics_pvxs_sys::Context;
+    /// # async fn example() -> Result<(), epics_pvxs_sys::PvxsError> {
+    /// let mut ctx = Context::from_env()?;
+    /// ctx.put_double_async("my:pv:name", 42.0, 5.0).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn put_double_async(&mut self, pv_name: &str, value: f64, timeout: f64) -> Result<()> {
+        let operation = bridge::context_put_double_async(self.inner.pin_mut(), pv_name, value, timeout)?;
+        self.wait_for_operation(operation).await?;
+        Ok(())
+    }
+    
+    /// Asynchronously get type information about a process variable
+    /// 
+    /// # Arguments
+    /// 
+    /// * `pv_name` - The name of the process variable
+    /// * `timeout` - Maximum time to wait in seconds
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// # use epics_pvxs_sys::Context;
+    /// # async fn example() -> Result<(), epics_pvxs_sys::PvxsError> {
+    /// let mut ctx = Context::from_env()?;
+    /// let info = ctx.info_async("my:pv:name", 5.0).await?;
+    /// println!("PV structure: {}", info);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn info_async(&mut self, pv_name: &str, timeout: f64) -> Result<Value> {
+        let operation = bridge::context_info_async(self.inner.pin_mut(), pv_name, timeout)?;
+        self.wait_for_operation(operation).await
+    }
+    
+    /// Wait for an operation to complete using Tokio's async runtime
+    async fn wait_for_operation(&self, mut operation: cxx::UniquePtr<bridge::OperationWrapper>) -> Result<Value> {
+        use tokio::time::{sleep, Duration};
+        
+        loop {
+            if bridge::operation_is_done(&operation) {
+                let result = bridge::operation_get_result(operation.pin_mut())?;
+                return Ok(Value { inner: result });
+            }
+            
+            // Yield control to the async runtime
+            sleep(Duration::from_millis(10)).await;
+        }
+    }
+}
+
 /// A PVAccess value container
 /// 
 /// Represents a structured data value returned from PVXS operations.

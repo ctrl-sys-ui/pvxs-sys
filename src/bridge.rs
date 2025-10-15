@@ -34,6 +34,32 @@ mod ffi {
             timeout: f64,
         ) -> Result<UniquePtr<ValueWrapper>>;
         
+        // Async operations using PVXS RPC
+        fn context_get_async(
+            ctx: Pin<&mut ContextWrapper>,
+            pv_name: &str,
+            timeout: f64,
+        ) -> Result<UniquePtr<OperationWrapper>>;
+        
+        fn context_put_double_async(
+            ctx: Pin<&mut ContextWrapper>,
+            pv_name: &str,
+            value: f64,
+            timeout: f64,
+        ) -> Result<UniquePtr<OperationWrapper>>;
+        
+        fn context_info_async(
+            ctx: Pin<&mut ContextWrapper>,
+            pv_name: &str,
+            timeout: f64,
+        ) -> Result<UniquePtr<OperationWrapper>>;
+        
+        // Operation polling and completion
+        fn operation_is_done(op: &OperationWrapper) -> bool;
+        fn operation_get_result(op: Pin<&mut OperationWrapper>) -> Result<UniquePtr<ValueWrapper>>;
+        fn operation_cancel(op: Pin<&mut OperationWrapper>);
+        fn operation_wait_for_completion(op: Pin<&mut OperationWrapper>, timeout_ms: u64) -> bool;
+        
         // Value inspection
         fn value_is_valid(val: &ValueWrapper) -> bool;
         fn value_to_string(val: &ValueWrapper) -> String;

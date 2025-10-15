@@ -68,6 +68,15 @@ public:
     // Cancel the operation
     bool cancel() const;
     
+    // Check if operation is complete
+    bool is_done() const;
+    
+    // Get result (non-blocking, throws if not ready)
+    std::unique_ptr<ValueWrapper> get_result();
+    
+    // Wait for completion with timeout (returns true if completed)
+    bool wait_for_completion(uint64_t timeout_ms);
+    
     // Get PV name
     std::string name() const;
 };
@@ -89,7 +98,13 @@ public:
     std::unique_ptr<ValueWrapper> get_sync(const std::string& pv_name, double timeout);
     
     // Start an async GET operation
-    std::unique_ptr<OperationWrapper> get_async(const std::string& pv_name);
+    std::unique_ptr<OperationWrapper> get_async(const std::string& pv_name, double timeout);
+    
+    // Start an async PUT operation
+    std::unique_ptr<OperationWrapper> put_double_async(const std::string& pv_name, double value, double timeout);
+    
+    // Start an async INFO operation
+    std::unique_ptr<OperationWrapper> info_async(const std::string& pv_name, double timeout);
     
     // Perform a PUT operation (simplified - just set a double value)
     void put_double(const std::string& pv_name, double value, double timeout);
@@ -116,6 +131,27 @@ std::unique_ptr<ValueWrapper> context_info_sync(
     ContextWrapper& ctx,
     rust::Str pv_name,
     double timeout);
+
+// Async operations for Rust
+std::unique_ptr<OperationWrapper> context_get_async(
+    ContextWrapper& ctx,
+    rust::Str pv_name,
+    double timeout);
+std::unique_ptr<OperationWrapper> context_put_double_async(
+    ContextWrapper& ctx,
+    rust::Str pv_name,
+    double value,
+    double timeout);
+std::unique_ptr<OperationWrapper> context_info_async(
+    ContextWrapper& ctx,
+    rust::Str pv_name,
+    double timeout);
+
+// Operation management for Rust
+bool operation_is_done(const OperationWrapper& op);
+std::unique_ptr<ValueWrapper> operation_get_result(OperationWrapper& op);
+void operation_cancel(OperationWrapper& op);
+bool operation_wait_for_completion(OperationWrapper& op, uint64_t timeout_ms);
 
 // Value accessors for Rust
 bool value_is_valid(const ValueWrapper& val);
