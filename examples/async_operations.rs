@@ -29,9 +29,9 @@ async fn main() -> Result<(), PvxsError> {
     println!();
     
     // Demonstrate concurrent async operations
-    let mut tasks: Vec<tokio::task::JoinHandle<()>> = Vec::new();
+    let _tasks: Vec<tokio::task::JoinHandle<()>> = Vec::new();
     
-    for (i, pv_name) in pv_names.iter().enumerate() {
+    for (_i, pv_name) in pv_names.iter().enumerate() {
         let pv_name_clone = pv_name.clone();
         
         println!("🔄 Starting async operations for '{}'...", pv_name);

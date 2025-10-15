@@ -49,7 +49,7 @@ mod bridge;
 use cxx::UniquePtr;
 use std::fmt;
 
-pub use bridge::{ContextWrapper, ValueWrapper};
+pub use bridge::{ContextWrapper, ValueWrapper, RpcWrapper};
 
 // Re-export for convenience
 pub type Result<T> = std::result::Result<T, PvxsError>;
@@ -198,6 +198,30 @@ impl Context {
     pub fn info(&mut self, pv_name: &str, timeout: f64) -> Result<Value> {
         let inner = bridge::context_info_sync(self.inner.pin_mut(), pv_name, timeout)?;
         Ok(Value { inner })
+    }
+    
+    /// Create an RPC (Remote Procedure Call) builder
+    /// 
+    /// Creates a builder for performing RPC operations on EPICS servers.
+    /// RPC allows calling server-side functions with arguments.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `pv_name` - The name of the RPC service/endpoint
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// # use epics_pvxs_sys::Context;
+    /// # let mut ctx = Context::from_env().unwrap();
+    /// let mut rpc = ctx.rpc("my:service").expect("RPC creation failed");
+    /// rpc.arg_string("command", "start");
+    /// rpc.arg_double("value", 42.0);
+    /// let result = rpc.execute(5.0).expect("RPC execution failed");
+    /// ```
+    pub fn rpc(&mut self, pv_name: &str) -> Result<Rpc> {
+        let inner = bridge::context_rpc_create(self.inner.pin_mut(), pv_name)?;
+        Ok(Rpc { inner })
     }
 }
 
@@ -375,6 +399,153 @@ impl fmt::Debug for Value {
         f.debug_struct("Value")
             .field("data", &bridge::value_to_string(&self.inner))
             .finish()
+    }
+}
+
+/// RPC (Remote Procedure Call) builder for EPICS servers
+/// 
+/// Provides a fluent interface for building and executing RPC calls.
+/// RPC allows calling server-side functions with typed arguments.
+/// 
+/// # Example
+/// 
+/// ```no_run
+/// # use epics_pvxs_sys::Context;
+/// # let mut ctx = Context::from_env().unwrap();
+/// let mut rpc = ctx.rpc("my:service").expect("RPC creation failed");
+/// 
+/// // Add arguments of different types
+/// rpc.arg_string("command", "initialize");
+/// rpc.arg_double("threshold", 3.14);
+/// rpc.arg_int32("count", 100);
+/// rpc.arg_bool("enabled", true);
+/// 
+/// // Execute synchronously
+/// let result = rpc.execute(5.0).expect("RPC execution failed");
+/// println!("RPC result: {}", result);
+/// ```
+pub struct Rpc {
+    inner: UniquePtr<bridge::RpcWrapper>,
+}
+
+impl Rpc {
+    /// Add a string argument to the RPC call
+    /// 
+    /// # Arguments
+    /// 
+    /// * `name` - The argument name
+    /// * `value` - The string value
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// # use epics_pvxs_sys::Context;
+    /// # let mut ctx = Context::from_env().unwrap();
+    /// # let mut rpc = ctx.rpc("my:service").unwrap();
+    /// rpc.arg_string("filename", "/path/to/file.txt");
+    /// ```
+    pub fn arg_string(&mut self, name: &str, value: &str) -> Result<&mut Self> {
+        bridge::rpc_arg_string(self.inner.pin_mut(), name, value)?;
+        Ok(self)
+    }
+    
+    /// Add a double argument to the RPC call
+    /// 
+    /// # Arguments
+    /// 
+    /// * `name` - The argument name
+    /// * `value` - The double value
+    pub fn arg_double(&mut self, name: &str, value: f64) -> Result<&mut Self> {
+        bridge::rpc_arg_double(self.inner.pin_mut(), name, value)?;
+        Ok(self)
+    }
+    
+    /// Add an int32 argument to the RPC call
+    /// 
+    /// # Arguments
+    /// 
+    /// * `name` - The argument name
+    /// * `value` - The int32 value
+    pub fn arg_int32(&mut self, name: &str, value: i32) -> Result<&mut Self> {
+        bridge::rpc_arg_int32(self.inner.pin_mut(), name, value)?;
+        Ok(self)
+    }
+    
+    /// Add a boolean argument to the RPC call
+    /// 
+    /// # Arguments
+    /// 
+    /// * `name` - The argument name
+    /// * `value` - The boolean value
+    pub fn arg_bool(&mut self, name: &str, value: bool) -> Result<&mut Self> {
+        bridge::rpc_arg_bool(self.inner.pin_mut(), name, value)?;
+        Ok(self)
+    }
+    
+    /// Execute the RPC call synchronously
+    /// 
+    /// # Arguments
+    /// 
+    /// * `timeout` - Maximum time to wait in seconds
+    /// 
+    /// # Returns
+    /// 
+    /// Returns the result value from the server, or an error if the
+    /// operation failed or timed out.
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// # use epics_pvxs_sys::Context;
+    /// # let mut ctx = Context::from_env().unwrap();
+    /// let mut rpc = ctx.rpc("calculator:add").unwrap();
+    /// rpc.arg_double("a", 10.0);
+    /// rpc.arg_double("b", 5.0);
+    /// let result = rpc.execute(5.0).unwrap();
+    /// let sum = result.get_field_double("result").unwrap();
+    /// ```
+    pub fn execute(mut self, timeout: f64) -> Result<Value> {
+        let inner = bridge::rpc_execute_sync(self.inner.pin_mut(), timeout)?;
+        Ok(Value { inner })
+    }
+}
+
+/// Async implementation for RPC
+#[cfg(feature = "async")]
+impl Rpc {
+    /// Execute the RPC call asynchronously
+    /// 
+    /// # Arguments
+    /// 
+    /// * `timeout` - Maximum time to wait in seconds
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// # use epics_pvxs_sys::Context;
+    /// # async fn example() -> Result<(), epics_pvxs_sys::PvxsError> {
+    /// let mut ctx = Context::from_env()?;
+    /// let mut rpc = ctx.rpc("my:service")?;
+    /// rpc.arg_string("command", "process");
+    /// let result = rpc.execute_async(5.0).await?;
+    /// println!("Async RPC result: {}", result);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn execute_async(mut self, timeout: f64) -> Result<Value> {
+        use tokio::time::{sleep, Duration};
+        
+        let mut operation = bridge::rpc_execute_async(self.inner.pin_mut(), timeout)?;
+        
+        loop {
+            if bridge::operation_is_done(&operation) {
+                let result = bridge::operation_get_result(operation.pin_mut())?;
+                return Ok(Value { inner: result });
+            }
+            
+            // Yield control to the async runtime
+            sleep(Duration::from_millis(10)).await;
+        }
     }
 }
 

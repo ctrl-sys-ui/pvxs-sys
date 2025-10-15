@@ -114,10 +114,48 @@ public:
     
     // Get type information (INFO operation)
     std::unique_ptr<ValueWrapper> info_sync(const std::string& pv_name, double timeout);
+    
+    // Create RPC builder
+    std::unique_ptr<class RpcWrapper> rpc_create(const std::string& pv_name);
+};
+
+/// Wraps pvxs::client::RPCBuilder for safe RPC operations
+class RpcWrapper {
+private:
+    pvxs::client::RPCBuilder builder_;
+    
+public:
+    explicit RpcWrapper(pvxs::client::RPCBuilder&& builder) 
+        : builder_(std::move(builder)) {}
+    
+    // Add arguments to the RPC call
+    void arg_string(const std::string& name, const std::string& value);
+    void arg_double(const std::string& name, double value);
+    void arg_int32(const std::string& name, int32_t value);
+    void arg_bool(const std::string& name, bool value);
+    
+    // Execute RPC call synchronously
+    std::unique_ptr<ValueWrapper> execute_sync(double timeout);
+    
+    // Execute RPC call asynchronously
+    std::unique_ptr<OperationWrapper> execute_async(double timeout);
 };
 
 // Factory functions for Rust (these will be exposed via cxx bridge)
 std::unique_ptr<ContextWrapper> create_context_from_env();
+
+// RPC operations bridge functions
+std::unique_ptr<RpcWrapper> context_rpc_create(
+    ContextWrapper& ctx,
+    rust::Str pv_name);
+
+void rpc_arg_string(RpcWrapper& rpc, rust::Str name, rust::Str value);
+void rpc_arg_double(RpcWrapper& rpc, rust::Str name, double value);
+void rpc_arg_int32(RpcWrapper& rpc, rust::Str name, int32_t value);
+void rpc_arg_bool(RpcWrapper& rpc, rust::Str name, bool value);
+
+std::unique_ptr<ValueWrapper> rpc_execute_sync(RpcWrapper& rpc, double timeout);
+std::unique_ptr<OperationWrapper> rpc_execute_async(RpcWrapper& rpc, double timeout);
 std::unique_ptr<ValueWrapper> context_get_sync(
     ContextWrapper& ctx, 
     rust::Str pv_name, 

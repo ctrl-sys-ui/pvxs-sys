@@ -251,6 +251,15 @@ std::unique_ptr<ValueWrapper> ContextWrapper::info_sync(
     }
 }
 
+std::unique_ptr<RpcWrapper> ContextWrapper::rpc_create(const std::string& pv_name) {
+    try {
+        auto builder = ctx_.rpc(pv_name);
+        return std::make_unique<RpcWrapper>(std::move(builder));
+    } catch (const std::exception& e) {
+        throw PvxsError(std::string("RPC creation failed for '") + pv_name + "': " + e.what());
+    }
+}
+
 // ============================================================================
 // Factory functions for Rust FFI
 // ============================================================================
@@ -360,6 +369,122 @@ void operation_cancel(OperationWrapper& op) {
 
 bool operation_wait_for_completion(OperationWrapper& op, uint64_t timeout_ms) {
     return op.wait_for_completion(timeout_ms);
+}
+
+// ============================================================================
+// RpcWrapper implementation
+// ============================================================================
+
+void RpcWrapper::arg_string(const std::string& name, const std::string& value) {
+    builder_.arg(name, value);
+}
+
+void RpcWrapper::arg_double(const std::string& name, double value) {
+    builder_.arg(name, value);
+}
+
+void RpcWrapper::arg_int32(const std::string& name, int32_t value) {
+    builder_.arg(name, value);
+}
+
+void RpcWrapper::arg_bool(const std::string& name, bool value) {
+    builder_.arg(name, value);
+}
+
+std::unique_ptr<ValueWrapper> RpcWrapper::execute_sync(double timeout) {
+    try {
+        auto op = builder_.exec();
+        if (!op) {
+            throw PvxsError("Failed to create RPC operation");
+        }
+        
+        auto result = op->wait(timeout);
+        return std::make_unique<ValueWrapper>(std::move(result));
+    } catch (const std::exception& e) {
+        throw PvxsError(std::string("RPC execution failed: ") + e.what());
+    }
+}
+
+std::unique_ptr<OperationWrapper> RpcWrapper::execute_async(double timeout) {
+    try {
+        auto op = builder_.exec();
+        if (!op) {
+            throw PvxsError("Failed to create RPC operation");
+        }
+        
+        return std::make_unique<OperationWrapper>(std::move(op));
+    } catch (const std::exception& e) {
+        throw PvxsError(std::string("RPC execution failed: ") + e.what());
+    }
+}
+
+// ============================================================================
+// Bridge functions for RPC
+// ============================================================================
+
+std::unique_ptr<RpcWrapper> context_rpc_create(
+    ContextWrapper& ctx, 
+    rust::Str pv_name) {
+    try {
+        std::string pv_name_str(pv_name.data(), pv_name.size());
+        auto builder = ctx.rpc_create(pv_name_str);
+        return builder;
+    } catch (const std::exception& e) {
+        throw PvxsError(std::string("Failed to create RPC: ") + e.what());
+    }
+}
+
+void rpc_arg_string(RpcWrapper& rpc, rust::Str name, rust::Str value) {
+    try {
+        std::string name_str(name.data(), name.size());
+        std::string value_str(value.data(), value.size());
+        rpc.arg_string(name_str, value_str);
+    } catch (const std::exception& e) {
+        throw PvxsError(std::string("Failed to set RPC string argument: ") + e.what());
+    }
+}
+
+void rpc_arg_double(RpcWrapper& rpc, rust::Str name, double value) {
+    try {
+        std::string name_str(name.data(), name.size());
+        rpc.arg_double(name_str, value);
+    } catch (const std::exception& e) {
+        throw PvxsError(std::string("Failed to set RPC double argument: ") + e.what());
+    }
+}
+
+void rpc_arg_int32(RpcWrapper& rpc, rust::Str name, int32_t value) {
+    try {
+        std::string name_str(name.data(), name.size());
+        rpc.arg_int32(name_str, value);
+    } catch (const std::exception& e) {
+        throw PvxsError(std::string("Failed to set RPC int32 argument: ") + e.what());
+    }
+}
+
+void rpc_arg_bool(RpcWrapper& rpc, rust::Str name, bool value) {
+    try {
+        std::string name_str(name.data(), name.size());
+        rpc.arg_bool(name_str, value);
+    } catch (const std::exception& e) {
+        throw PvxsError(std::string("Failed to set RPC bool argument: ") + e.what());
+    }
+}
+
+std::unique_ptr<ValueWrapper> rpc_execute_sync(RpcWrapper& rpc, double timeout) {
+    try {
+        return rpc.execute_sync(timeout);
+    } catch (const std::exception& e) {
+        throw PvxsError(std::string("RPC synchronous execution failed: ") + e.what());
+    }
+}
+
+std::unique_ptr<OperationWrapper> rpc_execute_async(RpcWrapper& rpc, double timeout) {
+    try {
+        return rpc.execute_async(timeout);
+    } catch (const std::exception& e) {
+        throw PvxsError(std::string("RPC asynchronous execution failed: ") + e.what());
+    }
 }
 
 } // namespace pvxs_adapter

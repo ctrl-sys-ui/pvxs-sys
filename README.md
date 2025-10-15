@@ -196,9 +196,47 @@ cargo run --example thread_safe -- TEST:PV1 TEST:PV2
 
 # Run the async example (requires async feature)
 cargo run --features async --example async_operations -- TEST:PV1
+
+# Run the RPC example (demonstrates remote procedure calls)
+cargo run --example rpc_example -- service:function arg1=value1 arg2=42.0
 ```
 
+## Testing
+
+### Available Examples
+
+This repository includes several examples demonstrating different functionality:
+
+- **`simple_get.rs`** - Basic PV value retrieval
+- **`simple_put.rs`** - PV value setting  
+- **`simple_info.rs`** - PV metadata inspection
+- **`thread_safe.rs`** - Thread safety demonstration
+- **`async_operations.rs`** - Asynchronous operations (requires `async` feature)
+- **`rpc_example.rs`** - Remote procedure call demonstration
+
+### Running Examples
+
 ```bash
+# Test basic GET operation
+cargo run --example simple_get -- TEST:PV_Double
+
+# Test PUT operation  
+cargo run --example simple_put -- TEST:PV_Double 123.456
+
+# Test structure discovery
+cargo run --example simple_info -- TEST:PV_RichInfo
+
+# Test thread safety
+cargo run --example thread_safe -- TEST:PV_Thread1 TEST:PV_Thread2
+
+# Test async operations (requires async feature)
+cargo run --features async --example async_operations -- TEST:PV_Double
+
+# Run the RPC example (demonstrates remote procedure calls)
+cargo run --example rpc_example -- service:function arg1=value1 arg2=42.0
+```
+
+## API Reference
 # Linux/macOS - Build all examples
 cargo build --examples
 
