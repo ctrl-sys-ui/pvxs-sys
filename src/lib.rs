@@ -44,7 +44,7 @@
 //! - PVXS library (set `PVXS_DIR` or built within EPICS)
 //! - `EPICS_HOST_ARCH` environment variable (auto-detected if not set)
 
-mod bridge;
+pub mod bridge;
 
 use cxx::UniquePtr;
 use std::fmt;
@@ -220,7 +220,7 @@ impl Context {
     /// let result = rpc.execute(5.0).expect("RPC execution failed");
     /// ```
     pub fn rpc(&mut self, pv_name: &str) -> Result<Rpc> {
-        let inner = bridge::context_rpc_create(self.inner.pin_mut(), pv_name)?;
+        let inner = bridge::context_rpc_create(self.inner.pin_mut(), pv_name.to_string())?;
         Ok(Rpc { inner })
     }
 
@@ -254,7 +254,7 @@ impl Context {
     /// monitor.stop();
     /// ```
     pub fn monitor(&mut self, pv_name: &str) -> Result<Monitor> {
-        let inner = bridge::context_monitor_create(self.inner.pin_mut(), pv_name)?;
+        let inner = bridge::context_monitor_create(self.inner.pin_mut(), pv_name.to_string())?;
         Ok(Monitor { inner })
     }
 }
@@ -398,7 +398,7 @@ impl Value {
     /// Returns an error if the field doesn't exist or cannot be
     /// converted to a double.
     pub fn get_field_double(&self, field_name: &str) -> Result<f64> {
-        Ok(bridge::value_get_field_double(&self.inner, field_name)?)
+        Ok(bridge::value_get_field_double(&self.inner, field_name.to_string())?)
     }
     
     /// Get a field value as an i32
@@ -408,7 +408,7 @@ impl Value {
     /// Returns an error if the field doesn't exist or cannot be
     /// converted to an i32.
     pub fn get_field_int32(&self, field_name: &str) -> Result<i32> {
-        Ok(bridge::value_get_field_int32(&self.inner, field_name)?)
+        Ok(bridge::value_get_field_int32(&self.inner, field_name.to_string())?)
     }
     
     /// Get a field value as a String
@@ -418,7 +418,7 @@ impl Value {
     /// Returns an error if the field doesn't exist or cannot be
     /// converted to a string.
     pub fn get_field_string(&self, field_name: &str) -> Result<String> {
-        Ok(bridge::value_get_field_string(&self.inner, field_name)?)
+        Ok(bridge::value_get_field_string(&self.inner, field_name.to_string())?)
     }
 }
 
@@ -692,7 +692,7 @@ impl Rpc {
     /// rpc.arg_string("filename", "/path/to/file.txt");
     /// ```
     pub fn arg_string(&mut self, name: &str, value: &str) -> Result<&mut Self> {
-        bridge::rpc_arg_string(self.inner.pin_mut(), name, value)?;
+        bridge::rpc_arg_string(self.inner.pin_mut(), name.to_string(), value.to_string())?;
         Ok(self)
     }
     
@@ -703,7 +703,7 @@ impl Rpc {
     /// * `name` - The argument name
     /// * `value` - The double value
     pub fn arg_double(&mut self, name: &str, value: f64) -> Result<&mut Self> {
-        bridge::rpc_arg_double(self.inner.pin_mut(), name, value)?;
+        bridge::rpc_arg_double(self.inner.pin_mut(), name.to_string(), value)?;
         Ok(self)
     }
     
@@ -714,7 +714,7 @@ impl Rpc {
     /// * `name` - The argument name
     /// * `value` - The int32 value
     pub fn arg_int32(&mut self, name: &str, value: i32) -> Result<&mut Self> {
-        bridge::rpc_arg_int32(self.inner.pin_mut(), name, value)?;
+        bridge::rpc_arg_int32(self.inner.pin_mut(), name.to_string(), value)?;
         Ok(self)
     }
     
@@ -725,7 +725,7 @@ impl Rpc {
     /// * `name` - The argument name
     /// * `value` - The boolean value
     pub fn arg_bool(&mut self, name: &str, value: bool) -> Result<&mut Self> {
-        bridge::rpc_arg_bool(self.inner.pin_mut(), name, value)?;
+        bridge::rpc_arg_bool(self.inner.pin_mut(), name.to_string(), value)?;
         Ok(self)
     }
     

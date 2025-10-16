@@ -8,6 +8,8 @@
 #include <stdexcept>
 #include "rust/cxx.h"  // For rust::String and rust::Str types
 #include <pvxs/client.h>
+#include <pvxs/server.h>
+#include <pvxs/sharedpv.h>
 #include <pvxs/nt.h>
 
 namespace pvxs_wrapper {
@@ -16,6 +18,9 @@ namespace pvxs_wrapper {
 class ContextWrapper;
 class OperationWrapper;
 class ValueWrapper;
+class ServerWrapper;
+class SharedPVWrapper;
+class StaticSourceWrapper;
 
 /// Exception wrapper for Rust-friendly error handling
 class PvxsError : public std::runtime_error {
@@ -84,13 +89,16 @@ public:
 /// Wraps pvxs::client::Subscription for safe Rust access
 class MonitorWrapper {
 private:
+    pvxs::client::Context& context_;
     std::shared_ptr<pvxs::client::Subscription> monitor_;
     std::string pv_name_;
     
 public:
-    MonitorWrapper() = default;
-    explicit MonitorWrapper(std::shared_ptr<pvxs::client::Subscription>&& monitor, const std::string& pv_name) 
-        : monitor_(std::move(monitor)), pv_name_(pv_name) {}
+    MonitorWrapper() = delete; // Must have context and PV name
+    MonitorWrapper(pvxs::client::Context& ctx, const std::string& pv_name)
+        : context_(ctx), pv_name_(pv_name) {}
+    explicit MonitorWrapper(std::shared_ptr<pvxs::client::Subscription>&& monitor, const std::string& pv_name, pvxs::client::Context& ctx) 
+        : context_(ctx), monitor_(std::move(monitor)), pv_name_(pv_name) {}
     
     // Start monitoring
     void start();
@@ -120,7 +128,7 @@ public:
 /// Wraps pvxs::client::Context for safe Rust access
 class ContextWrapper {
 private:
-    pvxs::client::Context ctx_;
+    pvxs::client::Context context_;
     
 public:
     // Create context from environment variables
@@ -128,7 +136,7 @@ public:
     
     // Create context with explicit configuration
     explicit ContextWrapper(pvxs::client::Context&& ctx) 
-        : ctx_(std::move(ctx)) {}
+        : context_(std::move(ctx)) {}
     
     // Perform a GET operation (synchronous version for simplicity)
     std::unique_ptr<ValueWrapper> get_sync(const std::string& pv_name, double timeout);
@@ -158,14 +166,16 @@ public:
     std::unique_ptr<MonitorWrapper> monitor(const std::string& pv_name);
 };
 
-/// Wraps pvxs::client::RPCBuilder for safe RPC operations
+/// Wraps RPC operations for safe Rust access
 class RpcWrapper {
 private:
-    pvxs::client::RPCBuilder builder_;
+    pvxs::client::Context& context_;
+    std::string pv_name_;
+    pvxs::Value arguments_;
     
 public:
-    explicit RpcWrapper(pvxs::client::RPCBuilder&& builder) 
-        : builder_(std::move(builder)) {}
+    RpcWrapper(pvxs::client::Context& ctx, const std::string& pv_name) 
+        : context_(ctx), pv_name_(pv_name) {}
     
     // Add arguments to the RPC call
     void arg_string(const std::string& name, const std::string& value);
@@ -186,12 +196,12 @@ std::unique_ptr<ContextWrapper> create_context_from_env();
 // RPC operations bridge functions
 std::unique_ptr<RpcWrapper> context_rpc_create(
     ContextWrapper& ctx,
-    rust::Str pv_name);
+    rust::String pv_name);
 
-void rpc_arg_string(RpcWrapper& rpc, rust::Str name, rust::Str value);
-void rpc_arg_double(RpcWrapper& rpc, rust::Str name, double value);
-void rpc_arg_int32(RpcWrapper& rpc, rust::Str name, int32_t value);
-void rpc_arg_bool(RpcWrapper& rpc, rust::Str name, bool value);
+void rpc_arg_string(RpcWrapper& rpc, rust::String name, rust::String value);
+void rpc_arg_double(RpcWrapper& rpc, rust::String name, double value);
+void rpc_arg_int32(RpcWrapper& rpc, rust::String name, int32_t value);
+void rpc_arg_bool(RpcWrapper& rpc, rust::String name, bool value);
 
 std::unique_ptr<ValueWrapper> rpc_execute_sync(RpcWrapper& rpc, double timeout);
 std::unique_ptr<OperationWrapper> rpc_execute_async(RpcWrapper& rpc, double timeout);
@@ -233,14 +243,14 @@ bool operation_wait_for_completion(OperationWrapper& op, uint64_t timeout_ms);
 // Value accessors for Rust
 bool value_is_valid(const ValueWrapper& val);
 rust::String value_to_string(const ValueWrapper& val);
-double value_get_field_double(const ValueWrapper& val, rust::Str field_name);
-int32_t value_get_field_int32(const ValueWrapper& val, rust::Str field_name);
-rust::String value_get_field_string(const ValueWrapper& val, rust::Str field_name);
+double value_get_field_double(const ValueWrapper& val, rust::String field_name);
+int32_t value_get_field_int32(const ValueWrapper& val, rust::String field_name);
+rust::String value_get_field_string(const ValueWrapper& val, rust::String field_name);
 
 // Monitor operations for Rust
 std::unique_ptr<MonitorWrapper> context_monitor_create(
     ContextWrapper& ctx,
-    rust::Str pv_name);
+    rust::String pv_name);
 void monitor_start(MonitorWrapper& monitor);
 void monitor_stop(MonitorWrapper& monitor);
 bool monitor_is_running(const MonitorWrapper& monitor);
@@ -249,5 +259,141 @@ std::unique_ptr<ValueWrapper> monitor_get_update(MonitorWrapper& monitor, double
 std::unique_ptr<ValueWrapper> monitor_try_get_update(MonitorWrapper& monitor);
 bool monitor_is_connected(const MonitorWrapper& monitor);
 rust::String monitor_get_name(const MonitorWrapper& monitor);
+
+// ============================================================================
+// Server-side wrappers
+// ============================================================================
+
+/// Wraps pvxs::server::SharedPV for safe Rust access
+class SharedPVWrapper {
+private:
+    pvxs::server::SharedPV pv_;
+    pvxs::Value template_value_; // Store template for cloneEmpty()
+    
+public:
+    SharedPVWrapper() = default;
+    explicit SharedPVWrapper(pvxs::server::SharedPV&& pv) : pv_(std::move(pv)) {}
+    
+    // Open the PV with initial value
+    void open(const ValueWrapper& initial_value);
+    
+    // Check if PV is open
+    bool is_open() const;
+    
+    // Close the PV
+    void close();
+    
+    // Post a new value
+    void post_value(const ValueWrapper& value);
+    
+    // Get current value
+    std::unique_ptr<ValueWrapper> fetch_value() const;
+    
+    // Get the underlying SharedPV (internal use)
+    pvxs::server::SharedPV& get() { return pv_; }
+    const pvxs::server::SharedPV& get() const { return pv_; }
+    
+    // Get template value for creating compatible updates
+    const pvxs::Value& get_template() const { return template_value_; }
+    
+    // Factory methods
+    static std::unique_ptr<SharedPVWrapper> create_mailbox();
+    static std::unique_ptr<SharedPVWrapper> create_readonly();
+};
+
+/// Wraps pvxs::server::StaticSource for safe Rust access
+class StaticSourceWrapper {
+private:
+    pvxs::server::StaticSource source_;
+    
+public:
+    StaticSourceWrapper() = default;
+    explicit StaticSourceWrapper(pvxs::server::StaticSource source) : source_(std::move(source)) {}
+    
+    // Add a SharedPV with a name
+    void add_pv(const std::string& name, SharedPVWrapper& pv);
+    
+    // Remove a PV by name
+    void remove_pv(const std::string& name);
+    
+    // Close all PVs
+    void close_all();
+    
+    // Get the underlying source (internal use)
+    pvxs::server::StaticSource& get() { return source_; }
+    const pvxs::server::StaticSource& get() const { return source_; }
+    
+    // Factory method
+    static std::unique_ptr<StaticSourceWrapper> create();
+};
+
+/// Wraps pvxs::server::Server for safe Rust access
+class ServerWrapper {
+private:
+    pvxs::server::Server server_;
+    
+public:
+    ServerWrapper() = default;
+    explicit ServerWrapper(pvxs::server::Server&& server) : server_(std::move(server)) {}
+    
+    // Start the server
+    void start();
+    
+    // Stop the server
+    void stop();
+    
+    // Add a SharedPV directly (uses built-in StaticSource)
+    void add_pv(const std::string& name, SharedPVWrapper& pv);
+    
+    // Remove a PV by name
+    void remove_pv(const std::string& name);
+    
+    // Add a source
+    void add_source(const std::string& name, StaticSourceWrapper& source, int order);
+    
+    // Get server configuration info
+    uint16_t get_tcp_port() const;
+    uint16_t get_udp_port() const;
+    
+    // Factory methods
+    static std::unique_ptr<ServerWrapper> from_env();
+    static std::unique_ptr<ServerWrapper> isolated();
+};
+
+// ============================================================================
+// Server factory functions for Rust FFI
+// ============================================================================
+
+// Server creation
+std::unique_ptr<ServerWrapper> server_create_from_env();
+std::unique_ptr<ServerWrapper> server_create_isolated();
+
+// Server operations
+void server_start(ServerWrapper& server);
+void server_stop(ServerWrapper& server);
+void server_add_pv(ServerWrapper& server, rust::String name, SharedPVWrapper& pv);
+void server_remove_pv(ServerWrapper& server, rust::String name);
+void server_add_source(ServerWrapper& server, rust::String name, StaticSourceWrapper& source, int32_t order);
+uint16_t server_get_tcp_port(const ServerWrapper& server);
+uint16_t server_get_udp_port(const ServerWrapper& server);
+
+// SharedPV creation and operations
+std::unique_ptr<SharedPVWrapper> shared_pv_create_mailbox();
+std::unique_ptr<SharedPVWrapper> shared_pv_create_readonly();
+void shared_pv_open_double(SharedPVWrapper& pv, double initial_value);
+void shared_pv_open_int32(SharedPVWrapper& pv, int32_t initial_value);
+void shared_pv_open_string(SharedPVWrapper& pv, rust::String initial_value);
+bool shared_pv_is_open(const SharedPVWrapper& pv);
+void shared_pv_close(SharedPVWrapper& pv);
+void shared_pv_post_double(SharedPVWrapper& pv, double value);
+void shared_pv_post_int32(SharedPVWrapper& pv, int32_t value);
+void shared_pv_post_string(SharedPVWrapper& pv, rust::String value);
+std::unique_ptr<ValueWrapper> shared_pv_fetch(const SharedPVWrapper& pv);
+
+// StaticSource creation and operations
+std::unique_ptr<StaticSourceWrapper> static_source_create();
+void static_source_add_pv(StaticSourceWrapper& source, rust::String name, SharedPVWrapper& pv);
+void static_source_remove_pv(StaticSourceWrapper& source, rust::String name);
+void static_source_close_all(StaticSourceWrapper& source);
 
 } // namespace pvxs_wrapper

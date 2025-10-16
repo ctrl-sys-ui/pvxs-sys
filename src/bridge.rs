@@ -72,13 +72,13 @@ mod ffi {
         type MonitorWrapper;
         fn context_rpc_create(
             ctx: Pin<&mut ContextWrapper>,
-            pv_name: &str,
+            pv_name: String,
         ) -> Result<UniquePtr<RpcWrapper>>;
         
-        fn rpc_arg_string(rpc: Pin<&mut RpcWrapper>, name: &str, value: &str) -> Result<()>;
-        fn rpc_arg_double(rpc: Pin<&mut RpcWrapper>, name: &str, value: f64) -> Result<()>;
-        fn rpc_arg_int32(rpc: Pin<&mut RpcWrapper>, name: &str, value: i32) -> Result<()>;
-        fn rpc_arg_bool(rpc: Pin<&mut RpcWrapper>, name: &str, value: bool) -> Result<()>;
+        fn rpc_arg_string(rpc: Pin<&mut RpcWrapper>, name: String, value: String) -> Result<()>;
+        fn rpc_arg_double(rpc: Pin<&mut RpcWrapper>, name: String, value: f64) -> Result<()>;
+        fn rpc_arg_int32(rpc: Pin<&mut RpcWrapper>, name: String, value: i32) -> Result<()>;
+        fn rpc_arg_bool(rpc: Pin<&mut RpcWrapper>, name: String, value: bool) -> Result<()>;
         
         fn rpc_execute_sync(rpc: Pin<&mut RpcWrapper>, timeout: f64) -> Result<UniquePtr<ValueWrapper>>;
         #[allow(dead_code)]
@@ -87,14 +87,14 @@ mod ffi {
         // Value inspection
         fn value_is_valid(val: &ValueWrapper) -> bool;
         fn value_to_string(val: &ValueWrapper) -> String;
-        fn value_get_field_double(val: &ValueWrapper, field_name: &str) -> Result<f64>;
-        fn value_get_field_int32(val: &ValueWrapper, field_name: &str) -> Result<i32>;
-        fn value_get_field_string(val: &ValueWrapper, field_name: &str) -> Result<String>;
+        fn value_get_field_double(val: &ValueWrapper, field_name: String) -> Result<f64>;
+        fn value_get_field_int32(val: &ValueWrapper, field_name: String) -> Result<i32>;
+        fn value_get_field_string(val: &ValueWrapper, field_name: String) -> Result<String>;
         
         // Monitor operations
         fn context_monitor_create(
             ctx: Pin<&mut ContextWrapper>,
-            pv_name: &str,
+            pv_name: String,
         ) -> Result<UniquePtr<MonitorWrapper>>;
         fn monitor_start(monitor: Pin<&mut MonitorWrapper>);
         fn monitor_stop(monitor: Pin<&mut MonitorWrapper>);
@@ -104,6 +104,45 @@ mod ffi {
         fn monitor_try_get_update(monitor: Pin<&mut MonitorWrapper>) -> Result<UniquePtr<ValueWrapper>>;
         fn monitor_is_connected(monitor: &MonitorWrapper) -> bool;
         fn monitor_get_name(monitor: &MonitorWrapper) -> String;
+        
+        // ====================================================================
+        // Server-side types and operations
+        // ====================================================================
+        
+        // Server wrapper types
+        type ServerWrapper;
+        type SharedPVWrapper;
+        type StaticSourceWrapper;
+        
+        // Server creation and management
+        fn server_create_from_env() -> Result<UniquePtr<ServerWrapper>>;
+        fn server_create_isolated() -> Result<UniquePtr<ServerWrapper>>;
+        fn server_start(server: Pin<&mut ServerWrapper>) -> Result<()>;
+        fn server_stop(server: Pin<&mut ServerWrapper>) -> Result<()>;
+        fn server_add_pv(server: Pin<&mut ServerWrapper>, name: String, pv: Pin<&mut SharedPVWrapper>) -> Result<()>;
+        fn server_remove_pv(server: Pin<&mut ServerWrapper>, name: String) -> Result<()>;
+        fn server_add_source(server: Pin<&mut ServerWrapper>, name: String, source: Pin<&mut StaticSourceWrapper>, order: i32) -> Result<()>;
+        fn server_get_tcp_port(server: &ServerWrapper) -> u16;
+        fn server_get_udp_port(server: &ServerWrapper) -> u16;
+        
+        // SharedPV creation and operations
+        fn shared_pv_create_mailbox() -> Result<UniquePtr<SharedPVWrapper>>;
+        fn shared_pv_create_readonly() -> Result<UniquePtr<SharedPVWrapper>>;
+        fn shared_pv_open_double(pv: Pin<&mut SharedPVWrapper>, initial_value: f64) -> Result<()>;
+        fn shared_pv_open_int32(pv: Pin<&mut SharedPVWrapper>, initial_value: i32) -> Result<()>;
+        fn shared_pv_open_string(pv: Pin<&mut SharedPVWrapper>, initial_value: String) -> Result<()>;
+        fn shared_pv_is_open(pv: &SharedPVWrapper) -> bool;
+        fn shared_pv_close(pv: Pin<&mut SharedPVWrapper>) -> Result<()>;
+        fn shared_pv_post_double(pv: Pin<&mut SharedPVWrapper>, value: f64) -> Result<()>;
+        fn shared_pv_post_int32(pv: Pin<&mut SharedPVWrapper>, value: i32) -> Result<()>;
+        fn shared_pv_post_string(pv: Pin<&mut SharedPVWrapper>, value: String) -> Result<()>;
+        fn shared_pv_fetch(pv: &SharedPVWrapper) -> Result<UniquePtr<ValueWrapper>>;
+        
+        // StaticSource creation and operations
+        fn static_source_create() -> Result<UniquePtr<StaticSourceWrapper>>;
+        fn static_source_add_pv(source: Pin<&mut StaticSourceWrapper>, name: String, pv: Pin<&mut SharedPVWrapper>) -> Result<()>;
+        fn static_source_remove_pv(source: Pin<&mut StaticSourceWrapper>, name: String) -> Result<()>;
+        fn static_source_close_all(source: Pin<&mut StaticSourceWrapper>) -> Result<()>;
     }
 }
 
