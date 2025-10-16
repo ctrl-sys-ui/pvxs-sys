@@ -12,8 +12,9 @@ This crate provides idiomatic Rust wrappers around the PVXS C++ library, which i
 - ✅ **INFO Operations** - Query PV type information
 - ✅ **Thread-safe** - Context can be safely shared between threads (see `thread_safe.rs` example)
 - ✅ **Async Support** - Async/await support using Tokio (see `async_operations.rs` example)
-- 🚧 **Monitor/Subscription** - Coming soon
+- ✅ **Monitor/Subscription** - Real-time PV monitoring (see `monitor_test.rs` example)
 - 🚧 **Server API** - Coming soon
+- 🚧 **RPC Support** - Remote procedure calls (in development)
 
 ## Prerequisites
 
@@ -27,10 +28,33 @@ Before using this crate, you need:
 ### Building PVXS from Source
 
 If you don't have PVXS installed, see our detailed guides:
+
 - **Windows**: [BUILDING_PVXS_WINDOWS.md](BUILDING_PVXS_WINDOWS.md) - Step-by-step guide
   - Or use the automated script: `.\build-pvxs-only.ps1`
   - **Note**: Requires CMake for building libevent dependency
+  - **Tip**: For environments with group policy restrictions, use: `.\build-pvxs-only.ps1 -TempDir "C:\Projects\Temp"`
 - **Linux/macOS**: See [GETTING_STARTED.md](GETTING_STARTED.md)
+
+#### Automated Windows Build Script
+
+The `build-pvxs-only.ps1` script supports several options for different environments:
+
+```powershell
+# Basic usage (uses system defaults)
+.\build-pvxs-only.ps1
+
+# With custom temp directory (helpful for group policy restrictions)
+.\build-pvxs-only.ps1 -TempDir "C:\Projects\Temp"
+
+# With custom architecture
+.\build-pvxs-only.ps1 -HostArch "windows-x64"
+
+# With custom PVXS version and install location
+.\build-pvxs-only.ps1 -PvxsVersion "1.4.1" -InstallDir "C:\Custom\Path"
+
+# All options combined
+.\build-pvxs-only.ps1 -PvxsVersion "1.4.1" -InstallDir "C:\epics\pvxs" -TempDir "C:\Projects\Temp" -HostArch "windows-x64"
+```
 
 ### Environment Variables
 
@@ -210,6 +234,8 @@ This repository includes several examples demonstrating different functionality:
 - **`simple_get.rs`** - Basic PV value retrieval
 - **`simple_put.rs`** - PV value setting  
 - **`simple_info.rs`** - PV metadata inspection
+- **`simple_monitor.rs`** - Basic PV monitoring
+- **`monitor_test.rs`** - Advanced monitoring with callbacks
 - **`thread_safe.rs`** - Thread safety demonstration
 - **`async_operations.rs`** - Asynchronous operations (requires `async` feature)
 - **`rpc_example.rs`** - Remote procedure call demonstration
@@ -226,6 +252,12 @@ cargo run --example simple_put -- TEST:PV_Double 123.456
 # Test structure discovery
 cargo run --example simple_info -- TEST:PV_RichInfo
 
+# Test monitoring
+cargo run --example simple_monitor -- TEST:PV_Double
+
+# Test advanced monitoring
+cargo run --example monitor_test -- TEST:PV1 TEST:PV2
+
 # Test thread safety
 cargo run --example thread_safe -- TEST:PV_Thread1 TEST:PV_Thread2
 
@@ -236,48 +268,56 @@ cargo run --features async --example async_operations -- TEST:PV_Double
 cargo run --example rpc_example -- service:function arg1=value1 arg2=42.0
 ```
 
-## API Reference
-# Linux/macOS - Build all examples
+### Linux/macOS Examples
+
+```bash
+# Build all examples
 cargo build --examples
 
 # Run examples
 cargo run --example simple_get -- my:pv:name
 cargo run --example simple_put -- my:pv:name 42.5
 cargo run --example simple_info -- my:pv:name
+cargo run --example simple_monitor -- my:pv:name
 cargo run --example thread_safe -- my:pv:name1 my:pv:name2
 cargo run --features async --example async_operations -- my:pv:name
 ```
 
 ## Project Structure
 
-```
+```text
 epics-pvxs-sys/
-├── Build.rs              # Build script (handles C++ compilation)
-├── Cargo.toml            # Rust package manifest
+├── Build.rs                    # Build script (handles C++ compilation)
+├── Cargo.toml                  # Rust package manifest
+├── build-pvxs-only.ps1         # Automated PVXS build script for Windows
+├── BUILDING_PVXS_WINDOWS.md    # Detailed Windows build guide
 ├── include/
-│   └── adapter.h        # C++ adapter header
+│   └── adapter.h               # C++ adapter header
 ├── src/
-│   ├── lib.rs           # Main Rust API (safe, idiomatic)
-│   ├── bridge.rs        # CXX bridge definitions
-│   └── adapter.cpp      # C++ adapter implementation
+│   ├── lib.rs                  # Main Rust API (safe, idiomatic)
+│   ├── bridge.rs               # CXX bridge definitions
+│   └── adapter.cpp             # C++ adapter implementation
 ├── examples/
-│   ├── simple_get.rs      # GET operation example
-│   ├── simple_put.rs      # PUT operation example
-│   ├── simple_info.rs     # INFO operation example (query PV structure)
-│   ├── thread_safe.rs     # Thread-safety demonstration
-│   └── async_operations.rs # Async/await demonstration (requires 'async' feature)
-└── README.md              # This file
+│   ├── simple_get.rs           # GET operation example
+│   ├── simple_put.rs           # PUT operation example
+│   ├── simple_info.rs          # INFO operation example (query PV structure)
+│   ├── simple_monitor.rs       # Basic PV monitoring
+│   ├── monitor_test.rs         # Advanced monitoring with callbacks
+│   ├── thread_safe.rs          # Thread-safety demonstration
+│   ├── async_operations.rs     # Async/await demonstration (requires 'async' feature)
+│   └── rpc_example.rs          # RPC demonstration
+└── README.md                   # This file
 ```
 
 ## Architecture
 
 The crate uses a three-layer architecture:
 
-```
+```text
 ┌─────────────────────────────────────┐
 │   Rust API (src/lib.rs)             │  ← Safe, idiomatic Rust
 │   - Context, Value                  │
-│   - Result<T>, PvxsError            │
+│   - Result<T, E>, PvxsError         │
 └─────────────────────────────────────┘
               ↓
 ┌─────────────────────────────────────┐
@@ -359,14 +399,16 @@ export EPICS_BASE=/path/to/epics/base
 
 ## Future Enhancements
 
-- [ ] Async/await support using Tokio
-- [ ] Monitor/Subscription API for real-time updates
+- ✅ Async/await support using Tokio
+- ✅ Monitor/Subscription API for real-time updates
 - [ ] Server API for serving PVs
 - [ ] RPC (Remote Procedure Call) support
 - [ ] Advanced value field navigation
 - [ ] Custom type definitions
 - [ ] Connection state callbacks
 - [ ] Batch operations
+- [ ] Enhanced error handling with detailed error contexts
+- [ ] Performance optimizations for high-frequency monitoring
 
 ## Contributing
 
