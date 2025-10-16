@@ -140,7 +140,7 @@ fn main() -> Result<(), PvxsError> {
     let mut ctx = Context::from_env()?;
     
     // Read a PV value with 5 second timeout
-    let value = ctx.get("my:pv:name", 5.0)?;
+    let value = ctx.get("TEST:DOUBLE", 5.0)?;
     
     // Access the main value field
     let v = value.get_field_double("value")?;
@@ -159,7 +159,7 @@ fn main() -> Result<(), PvxsError> {
     let mut ctx = Context::from_env()?;
     
     // Write a double value with 5 second timeout
-    ctx.put_double("my:pv:name", 42.0, 5.0)?;
+    ctx.put_double("TEST:DOUBLE", 42.0, 5.0)?;
     println!("Value written successfully!");
     
     Ok(())
@@ -175,7 +175,7 @@ fn main() -> Result<(), PvxsError> {
     let mut ctx = Context::from_env()?;
     
     // Get type information without reading data
-    let info = ctx.info("my:pv:name", 5.0)?;
+    let info = ctx.info("TEST:DOUBLE", 5.0)?;
     println!("PV structure:\n{}", info);
     
     Ok(())
@@ -216,25 +216,56 @@ cargo build
 cargo build --examples
 
 # Run the simple_get example (requires running IOC with test PV)
-cargo run --example simple_get -- TEST:PV1
+cargo run --example simple_get -- TEST:DOUBLE
 
 # Run the simple_put example
-cargo run --example simple_put -- TEST:PV1 42.5
+cargo run --example simple_put -- TEST:DOUBLE 42.5
 
 # Run the simple_info example (query PV type information)
-cargo run --example simple_info -- TEST:PV1
-
-# Run the thread_safe example (demonstrates concurrent PV access)
-cargo run --example thread_safe -- TEST:PV1 TEST:PV2
+cargo run --example simple_info -- TEST:DOUBLE
 
 # Run the async example (requires async feature)
-cargo run --features async --example async_operations -- TEST:PV1
+cargo run --features async --example simple_async -- TEST:COUNTER
 
 # Run the RPC example (demonstrates remote procedure calls)
 cargo run --example rpc_example -- service:function arg1=value1 arg2=42.0
 ```
 
 ## Testing
+
+### Setting up Test IOC
+
+This repository includes a comprehensive test database (`test.db`) with various PV types for testing. To use it:
+
+```bash
+# Start the soft IOC with the test database
+softIocPVA test.db
+
+# In another terminal, list available PVs
+pvlist
+
+# Test individual PVs
+pvget TEST:DOUBLE
+pvput TEST:DOUBLE 456.789
+pvmonitor TEST:COUNTER
+```
+
+**Note**: The test database creates auto-updating PVs (like `TEST:COUNTER` and `TEST:SINEWAVE`) that change automatically, making them ideal for monitoring examples.
+
+### Available Test PVs
+
+The `test.db` database provides these PVs for testing:
+
+- **Basic Data Types**: `TEST:DOUBLE`, `TEST:INTEGER`, `TEST:STRING`, `TEST:ENUM`
+- **Auto-updating PVs**: `TEST:COUNTER`, `TEST:RANDOM`, `TEST:SINEWAVE`, `TEST:TEMPERATURE`
+- **Setpoints**: `TEST:TEMP_SETPOINT`, `TEST:PRESSURE_SETPOINT`
+- **Status/Control**: `TEST:STATUS`, `TEST:ENABLE`
+- **Arrays**: `TEST:WAVEFORM`, `TEST:SUBARRAY`
+- **Binary/Bits**: `TEST:BITS_IN`, `TEST:BITS_OUT`
+- **Motor Simulation**: `TEST:MOTOR_POS`, `TEST:MOTOR_VEL`
+- **Alarm Testing**: `TEST:ALARM_CYCLE`, `TEST:INIT_ALARM`
+- **Special Cases**: `TEST:LONG_STRING`, `TEST:TIMESTAMP`
+- **Calculations**: `TEST:CALC1`, `TEST:CALC2`
 
 ### Available Examples
 
@@ -244,34 +275,26 @@ This repository includes several examples demonstrating different functionality:
 - **`simple_put.rs`** - PV value setting  
 - **`simple_info.rs`** - PV metadata inspection
 - **`simple_monitor.rs`** - Basic PV monitoring
-- **`monitor_test.rs`** - Advanced monitoring with callbacks
-- **`thread_safe.rs`** - Thread safety demonstration
-- **`async_operations.rs`** - Asynchronous operations (requires `async` feature)
+- **`simple_async.rs`** - Asynchronous operations (requires `async` feature)
 - **`rpc_example.rs`** - Remote procedure call demonstration
 
 ### Running Examples
 
 ```bash
 # Test basic GET operation
-cargo run --example simple_get -- TEST:PV_Double
+cargo run --example simple_get -- TEST:DOUBLE
 
 # Test PUT operation  
-cargo run --example simple_put -- TEST:PV_Double 123.456
+cargo run --example simple_put -- TEST:DOUBLE 123.456
 
 # Test structure discovery
-cargo run --example simple_info -- TEST:PV_RichInfo
+cargo run --example simple_info -- TEST:TEMPERATURE
 
 # Test monitoring
-cargo run --example simple_monitor -- TEST:PV_Double
-
-# Test advanced monitoring
-cargo run --example monitor_test -- TEST:PV1 TEST:PV2
-
-# Test thread safety
-cargo run --example thread_safe -- TEST:PV_Thread1 TEST:PV_Thread2
+cargo run --example simple_monitor -- TEST:COUNTER
 
 # Test async operations (requires async feature)
-cargo run --features async --example async_operations -- TEST:PV_Double
+cargo run --features async --example simple_async -- TEST:COUNTER
 
 # Run the RPC example (demonstrates remote procedure calls)
 cargo run --example rpc_example -- service:function arg1=value1 arg2=42.0
@@ -284,12 +307,11 @@ cargo run --example rpc_example -- service:function arg1=value1 arg2=42.0
 cargo build --examples
 
 # Run examples
-cargo run --example simple_get -- my:pv:name
-cargo run --example simple_put -- my:pv:name 42.5
-cargo run --example simple_info -- my:pv:name
-cargo run --example simple_monitor -- my:pv:name
-cargo run --example thread_safe -- my:pv:name1 my:pv:name2
-cargo run --features async --example async_operations -- my:pv:name
+cargo run --example simple_get -- TEST:DOUBLE
+cargo run --example simple_put -- TEST:DOUBLE 42.5
+cargo run --example simple_info -- TEST:TEMPERATURE
+cargo run --example simple_monitor -- TEST:COUNTER
+cargo run --features async --example simple_async -- TEST:COUNTER
 ```
 
 ## Project Structure
@@ -301,19 +323,17 @@ epics-pvxs-sys/
 ├── build-pvxs-only.ps1         # Automated PVXS build script for Windows
 ├── BUILDING_PVXS_WINDOWS.md    # Detailed Windows build guide
 ├── include/
-│   └── adapter.h               # C++ adapter header
+│   └── wrapper.h               # C++ wrapper header
 ├── src/
 │   ├── lib.rs                  # Main Rust API (safe, idiomatic)
 │   ├── bridge.rs               # CXX bridge definitions
-│   └── adapter.cpp             # C++ adapter implementation
+│   └── wrapper.cpp             # C++ wrapper implementation
 ├── examples/
 │   ├── simple_get.rs           # GET operation example
 │   ├── simple_put.rs           # PUT operation example
 │   ├── simple_info.rs          # INFO operation example (query PV structure)
 │   ├── simple_monitor.rs       # Basic PV monitoring
-│   ├── monitor_test.rs         # Advanced monitoring with callbacks
-│   ├── thread_safe.rs          # Thread-safety demonstration
-│   ├── async_operations.rs     # Async/await demonstration (requires 'async' feature)
+│   ├── simple_async.rs         # Async/await demonstration (requires 'async' feature)
 │   └── rpc_example.rs          # RPC demonstration
 └── README.md                   # This file
 ```
@@ -336,7 +356,7 @@ The crate uses a three-layer architecture:
 └─────────────────────────────────────┘
               ↓
 ┌─────────────────────────────────────┐
-│   C++ Adapter (adapter.{h,cpp})     │  ← Simplifies C++ patterns
+│   C++ Adapter (wrapper.{h,cpp})     │  ← Simplifies C++ patterns
 │   - ContextWrapper                  │
 │   - ValueWrapper                    │
 └─────────────────────────────────────┘
