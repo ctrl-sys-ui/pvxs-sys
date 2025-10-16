@@ -1,20 +1,29 @@
 # epics-pvxs-sys
 
-Safe Rust bindings for the [EPICS PVXS](https://github.com/epics-base/pvxs) (PVAccess) library.
+Low-level FFI bindings for the [EPICS PVXS](https://github.com/epics-base/pvxs) (PVAccess) library.
 
-This crate provides idiomatic Rust wrappers around the PVXS C++ library, which implements the PVAccess network protocol used in EPICS (Experimental Physics and Industrial Control System).
+> **Note**: This is a `-sys` crate providing raw FFI bindings. For a high-level, idiomatic Rust API, use the `epics-pvxs` crate (coming soon).
+
+This crate provides safe Rust bindings around the PVXS C++ library using the `cxx` crate. PVXS implements the PVAccess network protocol used in EPICS (Experimental Physics and Industrial Control System).
 
 ## Features
 
-- ✅ **Safe Rust API** - Idiomatic Rust wrappers using the `cxx` crate
+- ✅ **Safe FFI Bindings** - Memory-safe wrappers using the `cxx` crate
 - ✅ **GET Operations** - Read process variable values
-- ✅ **PUT Operations** - Write process variable values
+- ✅ **PUT Operations** - Write process variable values  
 - ✅ **INFO Operations** - Query PV type information
-- ✅ **Thread-safe** - Context can be safely shared between threads (see `thread_safe.rs` example)
-- ✅ **Async Support** - Async/await support using Tokio (see `async_operations.rs` example)
-- ✅ **Monitor/Subscription** - Real-time PV monitoring (see `monitor_test.rs` example)
+- ✅ **Async Support** - Async/await support using Tokio
+- ✅ **Monitor/Subscription** - Real-time PV monitoring
+- ✅ **Thread-safe Examples** - Multiple concurrency patterns demonstrated
 - 🚧 **Server API** - Coming soon
 - 🚧 **RPC Support** - Remote procedure calls (in development)
+
+## Crate Structure
+
+This is a `-sys` crate following Rust conventions:
+
+- **`epics-pvxs-sys`** (this crate) - Low-level FFI bindings
+- **`epics-pvxs`** (planned) - High-level, idiomatic Rust API
 
 ## Prerequisites
 
@@ -287,7 +296,7 @@ cargo run --features async --example async_operations -- my:pv:name
 
 ```text
 epics-pvxs-sys/
-├── Build.rs                    # Build script (handles C++ compilation)
+├── build.rs                    # Build script (handles C++ compilation)
 ├── Cargo.toml                  # Rust package manifest
 ├── build-pvxs-only.ps1         # Automated PVXS build script for Windows
 ├── BUILDING_PVXS_WINDOWS.md    # Detailed Windows build guide

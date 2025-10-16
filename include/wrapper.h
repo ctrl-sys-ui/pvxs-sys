@@ -1,4 +1,4 @@
-// adapter.h - C++ adapter layer to simplify PVXS for Rust FFI
+// wrapper.h - C++ wrapper layer to simplify PVXS for Rust FFI
 // This layer handles the complex C++ patterns (callbacks, shared_ptr, etc.)
 
 #pragma once
@@ -10,7 +10,7 @@
 #include <pvxs/client.h>
 #include <pvxs/nt.h>
 
-namespace pvxs_adapter {
+namespace pvxs_wrapper {
 
 // Forward declarations
 class ContextWrapper;
@@ -250,4 +250,4 @@ std::unique_ptr<ValueWrapper> monitor_try_get_update(MonitorWrapper& monitor);
 bool monitor_is_connected(const MonitorWrapper& monitor);
 rust::String monitor_get_name(const MonitorWrapper& monitor);
 
-} // namespace pvxs_adapter
+} // namespace pvxs_wrapper

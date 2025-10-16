@@ -183,11 +183,11 @@ Optional: `EPICS_HOST_ARCH` (auto-detected)
 **Rationale**: 
 - Standard EPICS convention
 - Allows flexible installation paths
-- Build.rs can find includes and libraries
+- build.rs can find includes and libraries
 
 ### Cross-Platform Considerations
 
-Build.rs handles platform differences:
+build.rs handles platform differences:
 - Library extensions (.so vs .dll vs .dylib)
 - Compiler flags (-std=c++11 vs /std:c++11)
 - System libraries (pthread on Linux, ws2_32 on Windows)

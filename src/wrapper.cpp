@@ -1,12 +1,12 @@
-// adapter.cpp - Implementation of the C++ adapter layer
+// wrapper.cpp - Implementation of the C++ wrapper layer
 
-#include "adapter.h"
+#include "wrapper.h"
 #include <sstream>
 #include <chrono>
 #include <thread>
 #include <pvxs/log.h>
 
-namespace pvxs_adapter {
+namespace pvxs_wrapper {
 
 // ============================================================================
 // ValueWrapper implementation
@@ -666,4 +666,4 @@ rust::String monitor_get_name(const MonitorWrapper& monitor) {
     return rust::String(monitor.name());
 }
 
-} // namespace pvxs_adapter
+} // namespace pvxs_wrapper

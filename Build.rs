@@ -68,8 +68,8 @@ fn main() {
     // Tell cargo to rerun this build script if files change
     println!("cargo:rerun-if-changed=src/lib.rs");
     println!("cargo:rerun-if-changed=src/bridge.rs");
-    println!("cargo:rerun-if-changed=include/adapter.h");
-    println!("cargo:rerun-if-changed=src/adapter.cpp");
+    println!("cargo:rerun-if-changed=include/wrapper.h");
+    println!("cargo:rerun-if-changed=src/wrapper.cpp");
     println!("cargo:rerun-if-changed=src/bridge.rs");
     println!("cargo:rerun-if-env-changed=EPICS_BASE");
     println!("cargo:rerun-if-env-changed=EPICS_HOST_ARCH");
@@ -77,12 +77,12 @@ fn main() {
     println!("cargo:rerun-if-env-changed=PVXS_DIR");
     println!("cargo:rerun-if-env-changed=EPICS_PVXS_LIBEVENT");
     
-    // Copy adapter.h to cxxbridge include directory so it can be found
+    // Copy wrapper.h to cxxbridge include directory so it can be found
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
     let cxxbridge_dir = out_dir.join("cxxbridge");
     let cxxbridge_include_dir = cxxbridge_dir.join("include");
     std::fs::create_dir_all(&cxxbridge_include_dir).ok();
-    std::fs::copy("include/adapter.h", cxxbridge_include_dir.join("adapter.h")).ok();
+    std::fs::copy("include/wrapper.h", cxxbridge_include_dir.join("wrapper.h")).ok();
     
     // Build the C++ bridge using cxx
     let mut build = cxx_build::bridge("src/bridge.rs");
@@ -98,12 +98,12 @@ fn main() {
         ("gcc", "default")
     };
     
-    // Get current directory for adapter.h
+    // Get current directory for wrapper.h
     let include_dir = std::env::current_dir().unwrap().join("include");
     
     build
-        .file("src/adapter.cpp")
-        .include(&include_dir)  // Add include directory first so adapter.h is found
+        .file("src/wrapper.cpp")
+        .include(&include_dir)  // Add include directory first so wrapper.h is found
         .include(&epics_include)
         .include(epics_include.join("compiler").join(compiler_dir))
         .include(epics_include.join("os").join(os_dir))

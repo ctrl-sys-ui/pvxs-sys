@@ -1,11 +1,11 @@
 // bridge.rs - CXX bridge definition for Rust/C++ FFI
 // This defines the interface between Rust and C++
 
-#[cxx::bridge(namespace = "pvxs_adapter")]
+#[cxx::bridge(namespace = "pvxs_wrapper")]
 mod ffi {
     // Opaque C++ types - Rust sees these as opaque pointers
     unsafe extern "C++" {
-        include!("adapter.h");
+        include!("wrapper.h");
         
         // C++ types that Rust can hold but not inspect
         type ContextWrapper;

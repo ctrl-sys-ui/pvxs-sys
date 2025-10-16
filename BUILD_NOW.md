@@ -84,7 +84,7 @@ cmd /c '"C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Bu
 
 ## Environment Variables Used
 
-The build script and Rust Build.rs will look for PVXS in this order:
+The build script and Rust build.rs will look for PVXS in this order:
 1. `EPICS_PVXS` (recommended)
 2. `PVXS_DIR` (also supported)
 3. `PVXS_BASE` (also supported)
