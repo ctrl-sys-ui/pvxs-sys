@@ -12,6 +12,8 @@ mod ffi {
         type ValueWrapper;
         type OperationWrapper; // Re-enabled for async operations
         
+        // Note: RpcSourceWrapper - to be implemented later
+        
         // Context creation and operations
         fn create_context_from_env() -> Result<UniquePtr<ContextWrapper>>;
         
@@ -122,6 +124,7 @@ mod ffi {
         fn server_add_pv(server: Pin<&mut ServerWrapper>, name: String, pv: Pin<&mut SharedPVWrapper>) -> Result<()>;
         fn server_remove_pv(server: Pin<&mut ServerWrapper>, name: String) -> Result<()>;
         fn server_add_source(server: Pin<&mut ServerWrapper>, name: String, source: Pin<&mut StaticSourceWrapper>, order: i32) -> Result<()>;
+        // Note: server_add_rpc_source - to be implemented later
         fn server_get_tcp_port(server: &ServerWrapper) -> u16;
         fn server_get_udp_port(server: &ServerWrapper) -> u16;
         
@@ -143,6 +146,8 @@ mod ffi {
         fn static_source_add_pv(source: Pin<&mut StaticSourceWrapper>, name: String, pv: Pin<&mut SharedPVWrapper>) -> Result<()>;
         fn static_source_remove_pv(source: Pin<&mut StaticSourceWrapper>, name: String) -> Result<()>;
         fn static_source_close_all(source: Pin<&mut StaticSourceWrapper>) -> Result<()>;
+        
+        // Note: RpcSource creation operations - to be implemented later
     }
 }
 

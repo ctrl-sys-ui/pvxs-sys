@@ -396,4 +396,7 @@ void static_source_add_pv(StaticSourceWrapper& source, rust::String name, Shared
 void static_source_remove_pv(StaticSourceWrapper& source, rust::String name);
 void static_source_close_all(StaticSourceWrapper& source);
 
+// ============================================================================
+// Note: RPC Source implementation - to be added later when needed
+
 } // namespace pvxs_wrapper
