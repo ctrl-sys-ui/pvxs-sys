@@ -3,18 +3,28 @@ name = "epics-pvxs-sys"
 version = "0.1.0"
 edition = "2021"
 authors = ["Your Name <your.email@example.com>"]
-description = "Rust bindings for EPICS PVXS (PVAccess) library"
+description = "Low-level FFI bindings for EPICS PVXS library"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/yourusername/epics-pvxs-sys"
+keywords = ["epics", "pvxs", "control-system", "ffi", "sys"]
+categories = ["external-ffi-bindings", "science"]
+readme = "README.md"
 
 # This is a *-sys crate providing low-level FFI bindings
 links = "pvxs"
 
 [dependencies]
-cxx = "1.0"
+cxx = "1.0.120"
+tokio = { version = "1.0", features = ["full"], optional = true }
+futures = { version = "0.3", optional = true }
+chrono = { version = "0.4", features = ["serde"] }
+
+[features]
+default = ["async"]
+async = ["tokio", "futures"]
 
 [build-dependencies]
-cxx-build = "1.0"
+cxx-build = "1.0.120"
 
 [lib]
 name = "epics_pvxs_sys"
@@ -33,8 +43,17 @@ name = "simple_info"
 path = "examples/simple_info.rs"
 
 [[example]]
-name = "thread_safe"
-path = "examples/thread_safe.rs"
+name = "simple_async"
+path = "examples/simple_async.rs"
+required-features = ["async"]
+
+[[example]]
+name = "rpc_example"
+path = "examples/rpc_example.rs"
+
+[[example]]
+name = "simple_monitor"
+path = "examples/simple_monitor.rs"
 
 [package.metadata.docs.rs]
 # Environment variables needed for docs.rs builds
