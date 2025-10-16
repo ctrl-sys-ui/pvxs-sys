@@ -6,7 +6,7 @@ A complete, production-ready Rust binding for EPICS PVXS with:
 
 ### ✅ Core Components
 
-1. **Build System** (`Build.rs`)
+1. **Build System** (`build.rs`)
    - Auto-detects EPICS environment
    - Links PVXS and EPICS libraries
    - Cross-platform support (Linux/Windows/macOS)
@@ -45,7 +45,7 @@ A complete, production-ready Rust binding for EPICS PVXS with:
 
 ```
 epics-pvxs-sys/
-├── Build.rs                 ✅ Sophisticated build script
+├── build.rs                 ✅ Sophisticated build script
 ├── Cargo.toml              ✅ Complete manifest
 ├── .gitignore              ✅ Git ignore rules
 │

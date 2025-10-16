@@ -1,19 +1,29 @@
 # epics-pvxs-sys
 
-Safe Rust bindings for the [EPICS PVXS](https://github.com/epics-base/pvxs) (PVAccess) library.
+Low-level FFI bindings for the [EPICS PVXS](https://github.com/epics-base/pvxs) (PVAccess) library.
 
-This crate provides idiomatic Rust wrappers around the PVXS C++ library, which implements the PVAccess network protocol used in EPICS (Experimental Physics and Industrial Control System).
+> **Note**: This is a `-sys` crate providing raw FFI bindings. For a high-level, idiomatic Rust API, use the `epics-pvxs` crate (coming soon).
+
+This crate provides safe Rust bindings around the PVXS C++ library using the `cxx` crate. PVXS implements the PVAccess network protocol used in EPICS (Experimental Physics and Industrial Control System).
 
 ## Features
 
-- ✅ **Safe Rust API** - Idiomatic Rust wrappers using the `cxx` crate
+- ✅ **Safe FFI Bindings** - Memory-safe wrappers using the `cxx` crate
 - ✅ **GET Operations** - Read process variable values
-- ✅ **PUT Operations** - Write process variable values
+- ✅ **PUT Operations** - Write process variable values  
 - ✅ **INFO Operations** - Query PV type information
-- ✅ **Thread-safe** - Context can be safely shared between threads (see `thread_safe.rs` example)
-- 🚧 **Async Support** - Coming soon
-- 🚧 **Monitor/Subscription** - Coming soon
+- ✅ **Async Support** - Async/await support using Tokio
+- ✅ **Monitor/Subscription** - Real-time PV monitoring
+- ✅ **Thread-safe Examples** - Multiple concurrency patterns demonstrated
 - 🚧 **Server API** - Coming soon
+- 🚧 **RPC Support** - Remote procedure calls (in development)
+
+## Crate Structure
+
+This is a `-sys` crate following Rust conventions:
+
+- **`epics-pvxs-sys`** (this crate) - Low-level FFI bindings
+- **`epics-pvxs`** (planned) - High-level, idiomatic Rust API
 
 ## Prerequisites
 
@@ -27,10 +37,33 @@ Before using this crate, you need:
 ### Building PVXS from Source
 
 If you don't have PVXS installed, see our detailed guides:
+
 - **Windows**: [BUILDING_PVXS_WINDOWS.md](BUILDING_PVXS_WINDOWS.md) - Step-by-step guide
   - Or use the automated script: `.\build-pvxs-only.ps1`
   - **Note**: Requires CMake for building libevent dependency
+  - **Tip**: For environments with group policy restrictions, use: `.\build-pvxs-only.ps1 -TempDir "C:\Projects\Temp"`
 - **Linux/macOS**: See [GETTING_STARTED.md](GETTING_STARTED.md)
+
+#### Automated Windows Build Script
+
+The `build-pvxs-only.ps1` script supports several options for different environments:
+
+```powershell
+# Basic usage (uses system defaults)
+.\build-pvxs-only.ps1
+
+# With custom temp directory (helpful for group policy restrictions)
+.\build-pvxs-only.ps1 -TempDir "C:\Projects\Temp"
+
+# With custom architecture
+.\build-pvxs-only.ps1 -HostArch "windows-x64"
+
+# With custom PVXS version and install location
+.\build-pvxs-only.ps1 -PvxsVersion "1.4.1" -InstallDir "C:\Custom\Path"
+
+# All options combined
+.\build-pvxs-only.ps1 -PvxsVersion "1.4.1" -InstallDir "C:\epics\pvxs" -TempDir "C:\Projects\Temp" -HostArch "windows-x64"
+```
 
 ### Environment Variables
 
@@ -70,7 +103,17 @@ Add this to your `Cargo.toml`:
 ```toml
 [dependencies]
 epics-pvxs-sys = "0.1"
+
+# For async support
+epics-pvxs-sys = { version = "0.1", features = ["async"] }
 ```
+
+### Optional Features
+
+- **`async`** - Enables async/await support using Tokio
+  - Adds `get_async()`, `put_double_async()`, and `info_async()` methods
+  - Requires Tokio runtime
+  - Example: `cargo run --features async --example async_operations`
 
 ### Runtime Requirements (Windows)
 
@@ -183,48 +226,107 @@ cargo run --example simple_info -- TEST:PV1
 
 # Run the thread_safe example (demonstrates concurrent PV access)
 cargo run --example thread_safe -- TEST:PV1 TEST:PV2
+
+# Run the async example (requires async feature)
+cargo run --features async --example async_operations -- TEST:PV1
+
+# Run the RPC example (demonstrates remote procedure calls)
+cargo run --example rpc_example -- service:function arg1=value1 arg2=42.0
 ```
 
+## Testing
+
+### Available Examples
+
+This repository includes several examples demonstrating different functionality:
+
+- **`simple_get.rs`** - Basic PV value retrieval
+- **`simple_put.rs`** - PV value setting  
+- **`simple_info.rs`** - PV metadata inspection
+- **`simple_monitor.rs`** - Basic PV monitoring
+- **`monitor_test.rs`** - Advanced monitoring with callbacks
+- **`thread_safe.rs`** - Thread safety demonstration
+- **`async_operations.rs`** - Asynchronous operations (requires `async` feature)
+- **`rpc_example.rs`** - Remote procedure call demonstration
+
+### Running Examples
+
 ```bash
-# Linux/macOS - Build all examples
+# Test basic GET operation
+cargo run --example simple_get -- TEST:PV_Double
+
+# Test PUT operation  
+cargo run --example simple_put -- TEST:PV_Double 123.456
+
+# Test structure discovery
+cargo run --example simple_info -- TEST:PV_RichInfo
+
+# Test monitoring
+cargo run --example simple_monitor -- TEST:PV_Double
+
+# Test advanced monitoring
+cargo run --example monitor_test -- TEST:PV1 TEST:PV2
+
+# Test thread safety
+cargo run --example thread_safe -- TEST:PV_Thread1 TEST:PV_Thread2
+
+# Test async operations (requires async feature)
+cargo run --features async --example async_operations -- TEST:PV_Double
+
+# Run the RPC example (demonstrates remote procedure calls)
+cargo run --example rpc_example -- service:function arg1=value1 arg2=42.0
+```
+
+### Linux/macOS Examples
+
+```bash
+# Build all examples
 cargo build --examples
 
 # Run examples
 cargo run --example simple_get -- my:pv:name
 cargo run --example simple_put -- my:pv:name 42.5
 cargo run --example simple_info -- my:pv:name
+cargo run --example simple_monitor -- my:pv:name
 cargo run --example thread_safe -- my:pv:name1 my:pv:name2
+cargo run --features async --example async_operations -- my:pv:name
 ```
 
 ## Project Structure
 
-```
+```text
 epics-pvxs-sys/
-├── Build.rs              # Build script (handles C++ compilation)
-├── Cargo.toml            # Rust package manifest
+├── build.rs                    # Build script (handles C++ compilation)
+├── Cargo.toml                  # Rust package manifest
+├── build-pvxs-only.ps1         # Automated PVXS build script for Windows
+├── BUILDING_PVXS_WINDOWS.md    # Detailed Windows build guide
 ├── include/
-│   └── adapter.h        # C++ adapter header
+│   └── adapter.h               # C++ adapter header
 ├── src/
-│   ├── lib.rs           # Main Rust API (safe, idiomatic)
-│   ├── bridge.rs        # CXX bridge definitions
-│   └── adapter.cpp      # C++ adapter implementation
+│   ├── lib.rs                  # Main Rust API (safe, idiomatic)
+│   ├── bridge.rs               # CXX bridge definitions
+│   └── adapter.cpp             # C++ adapter implementation
 ├── examples/
-│   ├── simple_get.rs    # GET operation example
-│   ├── simple_put.rs    # PUT operation example
-│   ├── simple_info.rs   # INFO operation example (query PV structure)
-│   └── thread_safe.rs   # Thread-safety demonstration
-└── README.md            # This file
+│   ├── simple_get.rs           # GET operation example
+│   ├── simple_put.rs           # PUT operation example
+│   ├── simple_info.rs          # INFO operation example (query PV structure)
+│   ├── simple_monitor.rs       # Basic PV monitoring
+│   ├── monitor_test.rs         # Advanced monitoring with callbacks
+│   ├── thread_safe.rs          # Thread-safety demonstration
+│   ├── async_operations.rs     # Async/await demonstration (requires 'async' feature)
+│   └── rpc_example.rs          # RPC demonstration
+└── README.md                   # This file
 ```
 
 ## Architecture
 
 The crate uses a three-layer architecture:
 
-```
+```text
 ┌─────────────────────────────────────┐
 │   Rust API (src/lib.rs)             │  ← Safe, idiomatic Rust
 │   - Context, Value                  │
-│   - Result<T>, PvxsError            │
+│   - Result<T, E>, PvxsError         │
 └─────────────────────────────────────┘
               ↓
 ┌─────────────────────────────────────┐
@@ -306,14 +408,16 @@ export EPICS_BASE=/path/to/epics/base
 
 ## Future Enhancements
 
-- [ ] Async/await support using Tokio
-- [ ] Monitor/Subscription API for real-time updates
+- ✅ Async/await support using Tokio
+- ✅ Monitor/Subscription API for real-time updates
 - [ ] Server API for serving PVs
 - [ ] RPC (Remote Procedure Call) support
 - [ ] Advanced value field navigation
 - [ ] Custom type definitions
 - [ ] Connection state callbacks
 - [ ] Batch operations
+- [ ] Enhanced error handling with detailed error contexts
+- [ ] Performance optimizations for high-frequency monitoring
 
 ## Contributing
 

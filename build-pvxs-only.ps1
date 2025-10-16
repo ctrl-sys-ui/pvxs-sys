@@ -1,10 +1,24 @@
 ﻿# Build PVXS only - EPICS Base already installed
 param(
     [string]$PvxsVersion = "1.4.1",
-    [string]$InstallDir = $env:EPICS_PVXS
+    [string]$InstallDir = $env:EPICS_PVXS,
+    [string]$TempDir = $null,
+    [string]$HostArch = $env:EPICS_HOST_ARCH
 )
 
 $ErrorActionPreference = "Stop"
+
+# Set temp directories and architecture (if specified)
+if ($TempDir) {
+    $env:TEMP = $TempDir
+    $env:TMP = $TempDir
+    Write-Host "Using custom temp directory: $TempDir" -ForegroundColor Yellow
+}
+
+if ($HostArch) {
+    $env:EPICS_HOST_ARCH = $HostArch
+    Write-Host "Using custom host architecture: $HostArch" -ForegroundColor Yellow
+}
 
 Write-Host "======================================== " -ForegroundColor Cyan
 Write-Host "PVXS Build Script" -ForegroundColor Cyan
@@ -20,7 +34,8 @@ $vsPaths = @(
     "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat",
     "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvarsall.bat",
     "C:\Program Files (x86)\Microsoft Visual Studio\2019\Professional\VC\Auxiliary\Build\vcvarsall.bat",
-    "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvarsall.bat"
+    "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvarsall.bat",
+    "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvarsall.bat"
 )
 
 $vcvarsPath = $null
@@ -47,11 +62,27 @@ Get-Content $tempFile | ForEach-Object {
     if ($_ -match '^(.*?)=(.*)$') {
         $varName = $matches[1]
         $varValue = $matches[2]
-        Set-Item -Path "Env:\$varName" -Value $varValue
+        # Preserve our custom temp directory settings if specified
+        if ($TempDir -and $varName -in @("TEMP", "TMP")) {
+            # Skip - keep our custom temp settings
+        } else {
+            Set-Item -Path "Env:\$varName" -Value $varValue
+        }
     }
 }
 
 Remove-Item $tempFile
+
+# Re-apply custom settings if specified
+if ($TempDir) {
+    $env:TEMP = $TempDir
+    $env:TMP = $TempDir
+}
+
+if ($HostArch) {
+    $env:EPICS_HOST_ARCH = $HostArch
+}
+
 Write-Host "Visual Studio environment loaded successfully" -ForegroundColor Green
 Write-Host ""
 
@@ -102,7 +133,7 @@ if (Get-Command perl -ErrorAction SilentlyContinue) {
     exit 1
 }
 
-# Check make (try both 'make' and 'gnumake')
+# Check make (try 'make', 'gnumake' or `gmake`)
 $makeCmd = $null
 if (Get-Command make -ErrorAction SilentlyContinue) {
     $makeCmd = "make"
@@ -110,7 +141,11 @@ if (Get-Command make -ErrorAction SilentlyContinue) {
 } elseif (Get-Command gnumake -ErrorAction SilentlyContinue) {
     $makeCmd = "gnumake"
     Write-Host "  gnumake found (will use as make)" -ForegroundColor Green
-} else {
+} elseif (Get-Command gmake -ErrorAction SilentlyContinue) {
+    $makeCmd = "gmake"
+    Write-Host "  gmake found (will use as make)" -ForegroundColor Green
+} 
+else {
     Write-Host "  make/gnumake MISSING" -ForegroundColor Red
     exit 1
 }
