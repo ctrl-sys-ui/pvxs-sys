@@ -17,7 +17,7 @@ futures = { version = "0.3", optional = true }
 chrono = { version = "0.4", features = ["serde"] }
 
 [features]
-default = []
+default = ["async"]
 async = ["tokio", "futures"]
 
 [build-dependencies]
@@ -40,17 +40,9 @@ name = "simple_info"
 path = "examples/simple_info.rs"
 
 [[example]]
-name = "thread_safe"
-path = "examples/thread_safe.rs"
-
-[[example]]
-name = "async_operations"
-path = "examples/async_operations.rs"
+name = "simple_async"
+path = "examples/simple_async.rs"
 required-features = ["async"]
-
-[[example]]
-name = "pv_explorer"
-path = "examples/pv_explorer.rs"
 
 [[example]]
 name = "rpc_example"
