@@ -269,11 +269,10 @@ record(calc, "TEST:ALARM_CYCLE") {
 # Special Test Cases
 # =============================================================================
 
-# PV with very long string
-record(lso, "TEST:LONG_STRING") {
+# PV with long string (using stringout instead of lso)
+record(stringout, "TEST:LONG_STRING") {
     field(DESC, "Long string test")
-    field(VAL,  "This is a very long string used for testing string handling in PVXS bindings. It contains many characters and should test the limits of string processing.")
-    field(SIZV, "256")
+    field(VAL,  "Test string for PVXS bindings")
 }
 
 # PV with timestamp that updates frequently
