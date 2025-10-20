@@ -139,6 +139,9 @@ mod ffi {
         fn shared_pv_post_double(pv: Pin<&mut SharedPVWrapper>, value: f64) -> Result<()>;
         fn shared_pv_post_int32(pv: Pin<&mut SharedPVWrapper>, value: i32) -> Result<()>;
         fn shared_pv_post_string(pv: Pin<&mut SharedPVWrapper>, value: String) -> Result<()>;
+        fn shared_pv_post_double_with_alarm(pv: Pin<&mut SharedPVWrapper>, value: f64, severity: i32, status: i32, message: String) -> Result<()>;
+        fn shared_pv_post_int32_with_alarm(pv: Pin<&mut SharedPVWrapper>, value: i32, severity: i32, status: i32, message: String) -> Result<()>;
+        fn shared_pv_post_string_with_alarm(pv: Pin<&mut SharedPVWrapper>, value: String, severity: i32, status: i32, message: String) -> Result<()>;
         fn shared_pv_fetch(pv: &SharedPVWrapper) -> Result<UniquePtr<ValueWrapper>>;
         
         // StaticSource creation and operations

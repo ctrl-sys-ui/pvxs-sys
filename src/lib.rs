@@ -806,7 +806,8 @@ impl Rpc {
 /// ```no_run
 /// use epics_pvxs_sys::Server;
 /// 
-/// let mut server = Server::create_isolated()?;
+/// let mut server = Server::from_env()?; // Create server from environment
+/// //let mut server = Server::create_isolated()?; // Create an isolated server
 /// 
 /// let mut pv = server.create_pv_double("test:pv", 42.0)?;
 /// server.add_pv("test:pv", &mut pv)?;
@@ -1107,6 +1108,47 @@ impl SharedPV {
     /// * `value` - The new value to post
     pub fn post_string(&mut self, value: &str) -> Result<()> {
         bridge::shared_pv_post_string(self.inner.pin_mut(), value.to_string())?;
+        Ok(())
+    }
+    
+    /// Post a new double value to the PV with alarm information
+    /// 
+    /// This updates the PV value and alarm fields, then notifies connected clients.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `value` - The new value to post
+    /// * `severity` - Alarm severity (0=NO_ALARM, 1=MINOR, 2=MAJOR, 3=INVALID)
+    /// * `status` - Alarm status code (0=NO_ALARM, various status codes)
+    /// * `message` - Alarm message string
+    pub fn post_double_with_alarm(&mut self, value: f64, severity: i32, status: i32, message: &str) -> Result<()> {
+        bridge::shared_pv_post_double_with_alarm(self.inner.pin_mut(), value, severity, status, message.to_string())?;
+        Ok(())
+    }
+    
+    /// Post a new int32 value to the PV with alarm information
+    /// 
+    /// # Arguments
+    /// 
+    /// * `value` - The new value to post
+    /// * `severity` - Alarm severity (0=NO_ALARM, 1=MINOR, 2=MAJOR, 3=INVALID)
+    /// * `status` - Alarm status code (0=NO_ALARM, various status codes)
+    /// * `message` - Alarm message string
+    pub fn post_int32_with_alarm(&mut self, value: i32, severity: i32, status: i32, message: &str) -> Result<()> {
+        bridge::shared_pv_post_int32_with_alarm(self.inner.pin_mut(), value, severity, status, message.to_string())?;
+        Ok(())
+    }
+    
+    /// Post a new string value to the PV with alarm information
+    /// 
+    /// # Arguments
+    /// 
+    /// * `value` - The new value to post
+    /// * `severity` - Alarm severity (0=NO_ALARM, 1=MINOR, 2=MAJOR, 3=INVALID)
+    /// * `status` - Alarm status code (0=NO_ALARM, various status codes)
+    /// * `message` - Alarm message string
+    pub fn post_string_with_alarm(&mut self, value: &str, severity: i32, status: i32, message: &str) -> Result<()> {
+        bridge::shared_pv_post_string_with_alarm(self.inner.pin_mut(), value.to_string(), severity, status, message.to_string())?;
         Ok(())
     }
     

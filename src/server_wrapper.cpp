@@ -323,6 +323,54 @@ void shared_pv_post_string(SharedPVWrapper& pv, rust::String value) {
     }
 }
 
+void shared_pv_post_double_with_alarm(SharedPVWrapper& pv, double value, int32_t severity, int32_t status, rust::String message) {
+    try {
+        // Use cloneEmpty() to get correct structure, then set the value and alarm fields
+        auto update = pv.get_template().cloneEmpty();
+        update["value"] = value;
+        update["alarm.severity"] = severity;
+        update["alarm.status"] = status;
+        update["alarm.message"] = std::string(message);
+        
+        ValueWrapper wrapper(std::move(update));
+        pv.post_value(wrapper);
+    } catch (const std::exception& e) {
+        throw PvxsError(std::string("Error posting double value with alarm to SharedPV: ") + e.what());
+    }
+}
+
+void shared_pv_post_int32_with_alarm(SharedPVWrapper& pv, int32_t value, int32_t severity, int32_t status, rust::String message) {
+    try {
+        // Use cloneEmpty() to get correct structure, then set the value and alarm fields
+        auto update = pv.get_template().cloneEmpty();
+        update["value"] = value;
+        update["alarm.severity"] = severity;
+        update["alarm.status"] = status;
+        update["alarm.message"] = std::string(message);
+        
+        ValueWrapper wrapper(std::move(update));
+        pv.post_value(wrapper);
+    } catch (const std::exception& e) {
+        throw PvxsError(std::string("Error posting int32 value with alarm to SharedPV: ") + e.what());
+    }
+}
+
+void shared_pv_post_string_with_alarm(SharedPVWrapper& pv, rust::String value, int32_t severity, int32_t status, rust::String message) {
+    try {
+        // Use cloneEmpty() to get correct structure, then set the value and alarm fields
+        auto update = pv.get_template().cloneEmpty();
+        update["value"] = std::string(value);
+        update["alarm.severity"] = severity;
+        update["alarm.status"] = status;
+        update["alarm.message"] = std::string(message);
+        
+        ValueWrapper wrapper(std::move(update));
+        pv.post_value(wrapper);
+    } catch (const std::exception& e) {
+        throw PvxsError(std::string("Error posting string value with alarm to SharedPV: ") + e.what());
+    }
+}
+
 std::unique_ptr<ValueWrapper> shared_pv_fetch(const SharedPVWrapper& pv) {
     return pv.fetch_value();
 }
