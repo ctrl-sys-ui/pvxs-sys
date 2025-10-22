@@ -10,6 +10,7 @@ mod ffi {
         // C++ types that Rust can hold but not inspect
         type ContextWrapper;
         type ValueWrapper;
+        #[cfg(feature = "async")]
         type OperationWrapper; // Re-enabled for async operations
         
         // Note: RpcSourceWrapper - to be implemented later
@@ -36,7 +37,8 @@ mod ffi {
             timeout: f64,
         ) -> Result<UniquePtr<ValueWrapper>>;
         
-        // Async operations using PVXS RPC
+        // Async operations using PVXS RPC (only available with async feature)
+        #[cfg(feature = "async")]
         #[allow(dead_code)]
         fn context_get_async(
             ctx: Pin<&mut ContextWrapper>,
@@ -44,6 +46,7 @@ mod ffi {
             timeout: f64,
         ) -> Result<UniquePtr<OperationWrapper>>;
         
+        #[cfg(feature = "async")]
         #[allow(dead_code)]
         fn context_put_double_async(
             ctx: Pin<&mut ContextWrapper>,
@@ -52,6 +55,7 @@ mod ffi {
             timeout: f64,
         ) -> Result<UniquePtr<OperationWrapper>>;
         
+        #[cfg(feature = "async")]
         #[allow(dead_code)]
         fn context_info_async(
             ctx: Pin<&mut ContextWrapper>,
@@ -59,13 +63,17 @@ mod ffi {
             timeout: f64,
         ) -> Result<UniquePtr<OperationWrapper>>;
         
-        // Operation polling and completion
+        // Operation polling and completion (only available with async feature)
+        #[cfg(feature = "async")]
         #[allow(dead_code)]
         fn operation_is_done(op: &OperationWrapper) -> bool;
+        #[cfg(feature = "async")]
         #[allow(dead_code)]
         fn operation_get_result(op: Pin<&mut OperationWrapper>) -> Result<UniquePtr<ValueWrapper>>;
+        #[cfg(feature = "async")]
         #[allow(dead_code)]
         fn operation_cancel(op: Pin<&mut OperationWrapper>);
+        #[cfg(feature = "async")]
         #[allow(dead_code)]
         fn operation_wait_for_completion(op: Pin<&mut OperationWrapper>, timeout_ms: u64) -> bool;
         
@@ -83,6 +91,7 @@ mod ffi {
         fn rpc_arg_bool(rpc: Pin<&mut RpcWrapper>, name: String, value: bool) -> Result<()>;
         
         fn rpc_execute_sync(rpc: Pin<&mut RpcWrapper>, timeout: f64) -> Result<UniquePtr<ValueWrapper>>;
+        #[cfg(feature = "async")]
         #[allow(dead_code)]
         fn rpc_execute_async(rpc: Pin<&mut RpcWrapper>, timeout: f64) -> Result<UniquePtr<OperationWrapper>>;
         

@@ -1239,3 +1239,6 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+mod async_optional_test;  // Include the async optional test module

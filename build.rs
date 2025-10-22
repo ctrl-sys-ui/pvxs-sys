@@ -87,6 +87,11 @@ fn main() {
     // Build the C++ bridge using cxx
     let mut build = cxx_build::bridge("src/bridge.rs");
     
+    // Check if async feature is enabled
+    if cfg!(feature = "async") {
+        build.define("PVXS_ASYNC_ENABLED", "1");
+    }
+    
     // Platform-specific compiler and OS includes
     let (compiler_dir, os_dir) = if cfg!(target_os = "windows") {
         ("msvc", "WIN32")

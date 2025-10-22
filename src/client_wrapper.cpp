@@ -77,6 +77,7 @@ std::string ValueWrapper::to_string() const {
 // ============================================================================
 // OperationWrapper implementation
 // ============================================================================
+#ifdef PVXS_ASYNC_ENABLED
 
 std::unique_ptr<ValueWrapper> OperationWrapper::wait(double timeout) const {
     if (!op_) {
@@ -151,6 +152,35 @@ bool OperationWrapper::wait_for_completion(uint64_t timeout_ms) {
     }
 }
 
+#else // !PVXS_ASYNC_ENABLED
+
+// Stub implementations when async is disabled
+std::unique_ptr<ValueWrapper> OperationWrapper::wait(double timeout) const {
+    throw PvxsError("Async operations are not enabled. Compile with --features async to use async functionality.");
+}
+
+bool OperationWrapper::cancel() const {
+    throw PvxsError("Async operations are not enabled. Compile with --features async to use async functionality.");
+}
+
+std::string OperationWrapper::name() const {
+    throw PvxsError("Async operations are not enabled. Compile with --features async to use async functionality.");
+}
+
+bool OperationWrapper::is_done() const {
+    throw PvxsError("Async operations are not enabled. Compile with --features async to use async functionality.");
+}
+
+std::unique_ptr<ValueWrapper> OperationWrapper::get_result() {
+    throw PvxsError("Async operations are not enabled. Compile with --features async to use async functionality.");
+}
+
+bool OperationWrapper::wait_for_completion(uint64_t timeout_ms) {
+    throw PvxsError("Async operations are not enabled. Compile with --features async to use async functionality.");
+}
+
+#endif // PVXS_ASYNC_ENABLED
+
 // ============================================================================
 // ContextWrapper implementation
 // ============================================================================
@@ -178,6 +208,7 @@ std::unique_ptr<ValueWrapper> ContextWrapper::get_sync(
     }
 }
 
+#ifdef PVXS_ASYNC_ENABLED
 std::unique_ptr<OperationWrapper> ContextWrapper::get_async(
     const std::string& pv_name,
     double timeout) {
@@ -217,6 +248,27 @@ std::unique_ptr<OperationWrapper> ContextWrapper::info_async(
         throw PvxsError(std::string("Error in info_async for '") + pv_name + "': " + e.what());
     }
 }
+#else // !PVXS_ASYNC_ENABLED
+
+std::unique_ptr<OperationWrapper> ContextWrapper::get_async(
+    const std::string& pv_name,
+    double timeout) {
+    throw PvxsError("Async operations are not enabled. Compile with --features async to use async functionality.");
+}
+
+std::unique_ptr<OperationWrapper> ContextWrapper::put_double_async(
+    const std::string& pv_name,
+    double value,
+    double timeout) {
+    throw PvxsError("Async operations are not enabled. Compile with --features async to use async functionality.");
+}
+
+std::unique_ptr<OperationWrapper> ContextWrapper::info_async(
+    const std::string& pv_name,
+    double timeout) {
+    throw PvxsError("Async operations are not enabled. Compile with --features async to use async functionality.");
+}
+#endif // PVXS_ASYNC_ENABLED
 
 void ContextWrapper::put_double(
     const std::string& pv_name,
@@ -334,6 +386,7 @@ rust::String value_get_field_string(const ValueWrapper& val, rust::String field_
 // Async operation functions for Rust FFI
 // ============================================================================
 
+#ifdef PVXS_ASYNC_ENABLED
 std::unique_ptr<OperationWrapper> context_get_async(
     ContextWrapper& ctx,
     rust::Str pv_name,
@@ -355,21 +408,61 @@ std::unique_ptr<OperationWrapper> context_info_async(
     double timeout) {
     return ctx.info_async(std::string(pv_name), timeout);
 }
+#else // !PVXS_ASYNC_ENABLED
+
+std::unique_ptr<OperationWrapper> context_get_async(
+    ContextWrapper& ctx,
+    rust::Str pv_name,
+    double timeout) {
+    throw PvxsError("Async operations are not enabled. Compile with --features async to use async functionality.");
+}
+
+std::unique_ptr<OperationWrapper> context_put_double_async(
+    ContextWrapper& ctx,
+    rust::Str pv_name,
+    double value,
+    double timeout) {
+    throw PvxsError("Async operations are not enabled. Compile with --features async to use async functionality.");
+}
+
+std::unique_ptr<OperationWrapper> context_info_async(
+    ContextWrapper& ctx,
+    rust::Str pv_name,
+    double timeout) {
+    throw PvxsError("Async operations are not enabled. Compile with --features async to use async functionality.");
+}
+#endif // PVXS_ASYNC_ENABLED
 
 bool operation_is_done(const OperationWrapper& op) {
+#ifdef PVXS_ASYNC_ENABLED
     return op.is_done();
+#else
+    throw PvxsError("Async operations are not enabled. Compile with --features async to use async functionality.");
+#endif
 }
 
 std::unique_ptr<ValueWrapper> operation_get_result(OperationWrapper& op) {
+#ifdef PVXS_ASYNC_ENABLED
     return op.get_result();
+#else
+    throw PvxsError("Async operations are not enabled. Compile with --features async to use async functionality.");
+#endif
 }
 
 void operation_cancel(OperationWrapper& op) {
+#ifdef PVXS_ASYNC_ENABLED
     op.cancel();
+#else
+    throw PvxsError("Async operations are not enabled. Compile with --features async to use async functionality.");
+#endif
 }
 
 bool operation_wait_for_completion(OperationWrapper& op, uint64_t timeout_ms) {
+#ifdef PVXS_ASYNC_ENABLED
     return op.wait_for_completion(timeout_ms);
+#else
+    throw PvxsError("Async operations are not enabled. Compile with --features async to use async functionality.");
+#endif
 }
 
 // ============================================================================
@@ -421,6 +514,7 @@ std::unique_ptr<ValueWrapper> RpcWrapper::execute_sync(double timeout) {
     }
 }
 
+#ifdef PVXS_ASYNC_ENABLED
 std::unique_ptr<OperationWrapper> RpcWrapper::execute_async(double timeout) {
     try {
         auto builder = context_.rpc(pv_name_);
@@ -433,6 +527,12 @@ std::unique_ptr<OperationWrapper> RpcWrapper::execute_async(double timeout) {
         throw PvxsError(std::string("Error in RPC execute_async for '") + pv_name_ + "': " + e.what());
     }
 }
+#else // !PVXS_ASYNC_ENABLED
+
+std::unique_ptr<OperationWrapper> RpcWrapper::execute_async(double timeout) {
+    throw PvxsError("Async operations are not enabled. Compile with --features async to use async functionality.");
+}
+#endif // PVXS_ASYNC_ENABLED
 
 // ============================================================================
 // Bridge functions for RPC
@@ -465,7 +565,11 @@ std::unique_ptr<ValueWrapper> rpc_execute_sync(RpcWrapper& rpc, double timeout) 
 }
 
 std::unique_ptr<OperationWrapper> rpc_execute_async(RpcWrapper& rpc, double timeout) {
+#ifdef PVXS_ASYNC_ENABLED
     return rpc.execute_async(timeout);
+#else
+    throw PvxsError("Async operations are not enabled. Compile with --features async to use async functionality.");
+#endif
 }
 
 // ============================================================================
