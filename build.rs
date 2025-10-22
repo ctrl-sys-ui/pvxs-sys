@@ -69,8 +69,8 @@ fn main() {
     println!("cargo:rerun-if-changed=src/lib.rs");
     println!("cargo:rerun-if-changed=src/bridge.rs");
     println!("cargo:rerun-if-changed=include/wrapper.h");
-    println!("cargo:rerun-if-changed=src/wrapper.cpp");
-    println!("cargo:rerun-if-changed=src/bridge.rs");
+    println!("cargo:rerun-if-changed=src/client_wrapper.cpp");
+    println!("cargo:rerun-if-changed=src/server_wrapper.cpp");
     println!("cargo:rerun-if-env-changed=EPICS_BASE");
     println!("cargo:rerun-if-env-changed=EPICS_HOST_ARCH");
     println!("cargo:rerun-if-env-changed=EPICS_PVXS");
@@ -87,6 +87,11 @@ fn main() {
     // Build the C++ bridge using cxx
     let mut build = cxx_build::bridge("src/bridge.rs");
     
+    // Check if async feature is enabled
+    if cfg!(feature = "async") {
+        build.define("PVXS_ASYNC_ENABLED", "1");
+    }
+    
     // Platform-specific compiler and OS includes
     let (compiler_dir, os_dir) = if cfg!(target_os = "windows") {
         ("msvc", "WIN32")
@@ -102,7 +107,8 @@ fn main() {
     let include_dir = std::env::current_dir().unwrap().join("include");
     
     build
-        .file("src/wrapper.cpp")
+        .file("src/client_wrapper.cpp")
+        .file("src/server_wrapper.cpp")
         .include(&include_dir)  // Add include directory first so wrapper.h is found
         .include(&epics_include)
         .include(epics_include.join("compiler").join(compiler_dir))

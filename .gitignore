@@ -25,6 +25,4 @@ Thumbs.db
 *.lib
 
 # EPICS
-*.db
-*.dbd
 O.*/

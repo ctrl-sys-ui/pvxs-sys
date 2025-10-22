@@ -1,10 +1,12 @@
 # epics-pvxs-sys
 
-Low-level FFI bindings for the [EPICS PVXS](https://github.com/epics-base/pvxs) (PVAccess) library.
+Complete low-level FFI bindings for the [EPICS PVXS](https://github.com/epics-base/pvxs) (PVAccess) library.
 
 > **Note**: This is a `-sys` crate providing raw FFI bindings. For a high-level, idiomatic Rust API, use the `epics-pvxs` crate (coming soon).
 
 This crate provides safe Rust bindings around the PVXS C++ library using the `cxx` crate. PVXS implements the PVAccess network protocol used in EPICS (Experimental Physics and Industrial Control System).
+
+**🎉 Now includes complete EPICS server implementation!** Create your own EPICS servers with full network discovery, multiple PV types, and real-time value updates.
 
 ## Features
 
@@ -14,9 +16,10 @@ This crate provides safe Rust bindings around the PVXS C++ library using the `cx
 - ✅ **INFO Operations** - Query PV type information
 - ✅ **Async Support** - Async/await support using Tokio
 - ✅ **Monitor/Subscription** - Real-time PV monitoring
+- ✅ **Server API** - Complete PVXS server implementation with SharedPV and StaticSource
 - ✅ **Thread-safe Examples** - Multiple concurrency patterns demonstrated
-- 🚧 **Server API** - Coming soon
-- 🚧 **RPC Support** - Remote procedure calls (in development)
+- ✅ **RPC Support** - Remote procedure calls
+- ✅ **Network Discovery** - Full EPICS discovery and broadcasting support
 
 ## Crate Structure
 
@@ -24,6 +27,30 @@ This is a `-sys` crate following Rust conventions:
 
 - **`epics-pvxs-sys`** (this crate) - Low-level FFI bindings
 - **`epics-pvxs`** (planned) - High-level, idiomatic Rust API
+
+## Architecture
+
+This crate provides a complete EPICS PVXS implementation with separate client and server capabilities:
+
+### Client Architecture
+- **Safe FFI Wrappers** - Memory-safe C++ bindings using `cxx` crate
+- **Context Management** - Thread-safe client contexts with connection pooling
+- **Operation Types** - Synchronous and asynchronous GET/PUT/INFO operations  
+- **Monitoring** - Real-time PV subscription and change notifications
+- **RPC Support** - Remote procedure call client implementation
+
+### Server Architecture  
+- **ServerWrapper** - Complete PVXS server with network discovery and broadcasting
+- **SharedPV** - Individual process variables with mailbox (read/write) and readonly modes
+- **StaticSource** - Logical grouping of PVs into device/system hierarchies
+- **Value Management** - Proper PVXS value structure handling with `cloneEmpty()` for updates
+- **Network Discovery** - Full EPICS beacon and search response functionality
+
+### Build System
+- **Modular C++ Sources** - Separate `client_wrapper.cpp` and `server_wrapper.cpp` implementations
+- **Shared Header** - Common `wrapper.h` for both client and server functionality
+- **FFI Bridge** - Complete Rust-C++ type mapping with `cxx-bridge`
+- **Cross-platform** - Windows (MSVC), Linux (GCC), and macOS (Clang) support
 
 ## Prerequisites
 
@@ -140,7 +167,7 @@ fn main() -> Result<(), PvxsError> {
     let mut ctx = Context::from_env()?;
     
     // Read a PV value with 5 second timeout
-    let value = ctx.get("my:pv:name", 5.0)?;
+    let value = ctx.get("TEST:DOUBLE", 5.0)?;
     
     // Access the main value field
     let v = value.get_field_double("value")?;
@@ -159,7 +186,7 @@ fn main() -> Result<(), PvxsError> {
     let mut ctx = Context::from_env()?;
     
     // Write a double value with 5 second timeout
-    ctx.put_double("my:pv:name", 42.0, 5.0)?;
+    ctx.put_double("TEST:DOUBLE", 42.0, 5.0)?;
     println!("Value written successfully!");
     
     Ok(())
@@ -175,12 +202,57 @@ fn main() -> Result<(), PvxsError> {
     let mut ctx = Context::from_env()?;
     
     // Get type information without reading data
-    let info = ctx.info("my:pv:name", 5.0)?;
+    let info = ctx.info("TEST:DOUBLE", 5.0)?;
     println!("PV structure:\n{}", info);
     
     Ok(())
 }
 ```
+
+### Creating an EPICS Server
+
+```rust
+use epics_pvxs_sys::bridge::*;
+use std::time::Duration;
+use std::thread;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Create server from environment (enables network discovery)
+    let mut server = server_create_from_env()?;
+    
+    // Create and configure PVs
+    let mut counter_pv = shared_pv_create_mailbox()?;
+    let mut temp_pv = shared_pv_create_readonly()?;
+    
+    shared_pv_open_int32(counter_pv.pin_mut(), 0)?;
+    shared_pv_open_double(temp_pv.pin_mut(), 23.5)?;
+    
+    // Add PVs to server
+    server_add_pv(server.pin_mut(), "example:counter".to_string(), counter_pv.pin_mut())?;
+    server_add_pv(server.pin_mut(), "example:temperature".to_string(), temp_pv.pin_mut())?;
+    
+    // Start server
+    server_start(server.pin_mut())?;
+    println!("Server running on TCP port {}", server_get_tcp_port(&server));
+    
+    // Update values periodically
+    let mut counter = 0;
+    loop {
+        shared_pv_post_int32(counter_pv.pin_mut(), counter)?;
+        shared_pv_post_double(temp_pv.pin_mut(), 23.5 + (counter as f64 * 0.1))?;
+        counter += 1;
+        
+        thread::sleep(Duration::from_secs(1));
+    }
+}
+```
+
+**Server Features:**
+- **Network Discovery** - Automatic EPICS client discovery and connection
+- **Multiple PV Types** - Support for double, int32, string, and complex structures  
+- **SharedPV** - Mailbox (read/write) and readonly PV types
+- **StaticSource** - Organize PVs into logical device groups
+- **Real-time Updates** - Dynamic value posting with proper PVXS structure handling
 
 ## Building
 
@@ -216,19 +288,16 @@ cargo build
 cargo build --examples
 
 # Run the simple_get example (requires running IOC with test PV)
-cargo run --example simple_get -- TEST:PV1
+cargo run --example simple_get -- TEST:DOUBLE
 
 # Run the simple_put example
-cargo run --example simple_put -- TEST:PV1 42.5
+cargo run --example simple_put -- TEST:DOUBLE 42.5
 
 # Run the simple_info example (query PV type information)
-cargo run --example simple_info -- TEST:PV1
-
-# Run the thread_safe example (demonstrates concurrent PV access)
-cargo run --example thread_safe -- TEST:PV1 TEST:PV2
+cargo run --example simple_info -- TEST:DOUBLE
 
 # Run the async example (requires async feature)
-cargo run --features async --example async_operations -- TEST:PV1
+cargo run --features async --example simple_async -- TEST:COUNTER
 
 # Run the RPC example (demonstrates remote procedure calls)
 cargo run --example rpc_example -- service:function arg1=value1 arg2=42.0
@@ -236,45 +305,89 @@ cargo run --example rpc_example -- service:function arg1=value1 arg2=42.0
 
 ## Testing
 
+### Setting up Test IOC
+
+This repository includes a comprehensive test database (`test.db`) with various PV types for testing. To use it:
+
+```bash
+# Start the soft IOC with the test database
+softIocPVA test.db
+
+# In another terminal, list available PVs
+pvlist
+
+# Test individual PVs
+pvget TEST:DOUBLE
+pvput TEST:DOUBLE 456.789
+pvmonitor TEST:COUNTER
+```
+
+**Note**: The test database creates auto-updating PVs (like `TEST:COUNTER` and `TEST:SINEWAVE`) that change automatically, making them ideal for monitoring examples.
+
+### Available Test PVs
+
+The `test.db` database provides these PVs for testing:
+
+- **Basic Data Types**: `TEST:DOUBLE`, `TEST:INTEGER`, `TEST:STRING`, `TEST:ENUM`
+- **Auto-updating PVs**: `TEST:COUNTER`, `TEST:RANDOM`, `TEST:SINEWAVE`, `TEST:TEMPERATURE`
+- **Setpoints**: `TEST:TEMP_SETPOINT`, `TEST:PRESSURE_SETPOINT`
+- **Status/Control**: `TEST:STATUS`, `TEST:ENABLE`
+- **Arrays**: `TEST:WAVEFORM`, `TEST:SUBARRAY`
+- **Binary/Bits**: `TEST:BITS_IN`, `TEST:BITS_OUT`
+- **Motor Simulation**: `TEST:MOTOR_POS`, `TEST:MOTOR_VEL`
+- **Alarm Testing**: `TEST:ALARM_CYCLE`, `TEST:INIT_ALARM`
+- **Special Cases**: `TEST:LONG_STRING`, `TEST:TIMESTAMP`
+- **Calculations**: `TEST:CALC1`, `TEST:CALC2`
+
 ### Available Examples
 
 This repository includes several examples demonstrating different functionality:
 
+#### Client Examples
 - **`simple_get.rs`** - Basic PV value retrieval
 - **`simple_put.rs`** - PV value setting  
 - **`simple_info.rs`** - PV metadata inspection
 - **`simple_monitor.rs`** - Basic PV monitoring
-- **`monitor_test.rs`** - Advanced monitoring with callbacks
-- **`thread_safe.rs`** - Thread safety demonstration
-- **`async_operations.rs`** - Asynchronous operations (requires `async` feature)
+- **`simple_async.rs`** - Asynchronous operations (requires `async` feature)
 - **`rpc_example.rs`** - Remote procedure call demonstration
+
+#### Server Examples
+- **`simple_server.rs`** - Basic PVXS server with multiple PV types
+- **`advanced_server.rs`** - Complex server with StaticSource, multiple device groups, and real-time simulation
 
 ### Running Examples
 
 ```bash
+# Client Examples - Test against existing EPICS servers
 # Test basic GET operation
-cargo run --example simple_get -- TEST:PV_Double
+cargo run --example simple_get -- TEST:DOUBLE
 
 # Test PUT operation  
-cargo run --example simple_put -- TEST:PV_Double 123.456
+cargo run --example simple_put -- TEST:DOUBLE 123.456
 
 # Test structure discovery
-cargo run --example simple_info -- TEST:PV_RichInfo
+cargo run --example simple_info -- TEST:TEMPERATURE
 
 # Test monitoring
-cargo run --example simple_monitor -- TEST:PV_Double
-
-# Test advanced monitoring
-cargo run --example monitor_test -- TEST:PV1 TEST:PV2
-
-# Test thread safety
-cargo run --example thread_safe -- TEST:PV_Thread1 TEST:PV_Thread2
+cargo run --example simple_monitor -- TEST:COUNTER
 
 # Test async operations (requires async feature)
-cargo run --features async --example async_operations -- TEST:PV_Double
+cargo run --features async --example simple_async -- TEST:COUNTER
 
 # Run the RPC example (demonstrates remote procedure calls)
 cargo run --example rpc_example -- service:function arg1=value1 arg2=42.0
+
+# Server Examples - Create your own EPICS servers
+# Run a simple server with basic PVs
+cargo run --example simple_server
+
+# Run an advanced server with multiple device groups
+cargo run --example advanced_server
+
+# Test server PVs from another terminal
+cargo run --example simple_get -- example:counter
+cargo run --example simple_get -- device1:temp1
+cargo run --example simple_put -- device2:position 10.5
 ```
 
 ### Linux/macOS Examples
@@ -284,12 +397,11 @@ cargo run --example rpc_example -- service:function arg1=value1 arg2=42.0
 cargo build --examples
 
 # Run examples
-cargo run --example simple_get -- my:pv:name
-cargo run --example simple_put -- my:pv:name 42.5
-cargo run --example simple_info -- my:pv:name
-cargo run --example simple_monitor -- my:pv:name
-cargo run --example thread_safe -- my:pv:name1 my:pv:name2
-cargo run --features async --example async_operations -- my:pv:name
+cargo run --example simple_get -- TEST:DOUBLE
+cargo run --example simple_put -- TEST:DOUBLE 42.5
+cargo run --example simple_info -- TEST:TEMPERATURE
+cargo run --example simple_monitor -- TEST:COUNTER
+cargo run --features async --example simple_async -- TEST:COUNTER
 ```
 
 ## Project Structure
@@ -301,26 +413,27 @@ epics-pvxs-sys/
 ├── build-pvxs-only.ps1         # Automated PVXS build script for Windows
 ├── BUILDING_PVXS_WINDOWS.md    # Detailed Windows build guide
 ├── include/
-│   └── adapter.h               # C++ adapter header
+│   └── wrapper.h               # C++ wrapper header (shared by client & server)
 ├── src/
 │   ├── lib.rs                  # Main Rust API (safe, idiomatic)
 │   ├── bridge.rs               # CXX bridge definitions
-│   └── adapter.cpp             # C++ adapter implementation
+│   ├── client_wrapper.cpp      # C++ client wrapper implementation  
+│   └── server_wrapper.cpp      # C++ server wrapper implementation
 ├── examples/
 │   ├── simple_get.rs           # GET operation example
 │   ├── simple_put.rs           # PUT operation example
 │   ├── simple_info.rs          # INFO operation example (query PV structure)
 │   ├── simple_monitor.rs       # Basic PV monitoring
-│   ├── monitor_test.rs         # Advanced monitoring with callbacks
-│   ├── thread_safe.rs          # Thread-safety demonstration
-│   ├── async_operations.rs     # Async/await demonstration (requires 'async' feature)
-│   └── rpc_example.rs          # RPC demonstration
+│   ├── simple_async.rs         # Async/await demonstration (requires 'async' feature)
+│   ├── rpc_example.rs          # RPC demonstration
+│   ├── simple_server.rs        # Basic EPICS server example
+│   └── advanced_server.rs      # Advanced server with StaticSource and multiple devices
 └── README.md                   # This file
 ```
 
 ## Architecture
 
-The crate uses a three-layer architecture:
+The crate uses a four-layer architecture with modular client/server separation:
 
 ```text
 ┌─────────────────────────────────────┐
@@ -328,31 +441,37 @@ The crate uses a three-layer architecture:
 │   - Context, Value                  │
 │   - Result<T, E>, PvxsError         │
 └─────────────────────────────────────┘
-              ↓
+                    ↓
 ┌─────────────────────────────────────┐
 │   CXX Bridge (src/bridge.rs)        │  ← Type-safe FFI boundary
 │   - Opaque C++ types                │
 │   - Function declarations           │
 └─────────────────────────────────────┘
-              ↓
-┌─────────────────────────────────────┐
-│   C++ Adapter (adapter.{h,cpp})     │  ← Simplifies C++ patterns
-│   - ContextWrapper                  │
-│   - ValueWrapper                    │
-└─────────────────────────────────────┘
-              ↓
+                    ↓
+┌──────────────────┐  ┌──────────────────┐
+│   Client Adapter │  │   Server Adapter │  ← Parallel C++ adapters
+│ (client_wrapper. │  │ (server_wrapper. │    sharing wrapper.h
+│  cpp)            │  │  cpp)            │
+│ - ContextWrapper │  │ - ServerWrapper  │
+│ - ValueWrapper   │  │ - SharedPVWrapper│
+│ - MonitorWrapper │  │ - StaticSource...│
+└──────────────────┘  └──────────────────┘
+              ↓              ↓
 ┌─────────────────────────────────────┐
 │   PVXS C++ Library                  │  ← Original EPICS PVXS
 │   - pvxs::client::Context           │
-│   - pvxs::Value                     │
+│   - pvxs::server::Server             │
+│   - pvxs::Value, pvxs::SharedPV     │
 └─────────────────────────────────────┘
 ```
 
 ### Why This Architecture?
 
 1. **CXX Bridge**: Provides type-safe FFI without manual `unsafe` blocks
-2. **C++ Adapter**: Handles complex C++ patterns (callbacks, shared_ptr, templates)
-3. **Rust API**: Provides idiomatic Rust interface with proper error handling
+2. **Modular C++ Adapters**: Separate client and server implementations for better organization
+3. **Client Adapter**: Handles client patterns (callbacks, connection management, monitoring)
+4. **Server Adapter**: Handles server patterns (SharedPV templates, value posting, network discovery)
+5. **Rust API**: Provides idiomatic Rust interface with proper error handling
 
 ## Common PV Field Names
 

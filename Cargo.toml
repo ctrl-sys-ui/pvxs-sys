@@ -47,9 +47,7 @@ name = "simple_async"
 path = "examples/simple_async.rs"
 required-features = ["async"]
 
-[[example]]
-name = "rpc_example"
-path = "examples/rpc_example.rs"
+# TODO: RPC examples removed - real RPC implementation needed
 
 [[example]]
 name = "simple_monitor"

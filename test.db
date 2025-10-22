@@ -1,0 +1,328 @@
+# test.db - Comprehensive EPICS IOC Database for Testing epics-pvxs-sys
+# Created: 2025-10-16
+# Purpose: Provides a variety of PV types for testing Rust PVXS bindings
+#
+# To run this database:
+#   softIocPVA test.db
+#
+# This creates PVs that can be accessed via PVAccess for testing:
+#   - Different data types (double, long, string, enum)
+#   - Read-only and read-write PVs
+#   - PVs with alarms and timestamps
+#   - Counter and random value generators
+#   - Engineering units and limits
+
+# =============================================================================
+# Basic Data Types - Read/Write PVs
+# =============================================================================
+
+# Double precision floating point
+record(ao, "TEST:DOUBLE") {
+    field(DESC, "Test double value")
+    field(VAL,  "123.456")
+    field(PREC, "3")
+    field(EGU,  "volts")
+    field(DRVH, "1000")
+    field(DRVL, "-1000")
+    field(HOPR, "500")
+    field(LOPR, "-500")
+    field(HIHI, "400")
+    field(HIGH, "300")
+    field(LOW,  "-300")
+    field(LOLO, "-400")
+    field(HHSV, "MAJOR")
+    field(HSV,  "MINOR")
+    field(LSV,  "MINOR")
+    field(LLSV, "MAJOR")
+}
+
+# Integer (long)
+record(longout, "TEST:INTEGER") {
+    field(DESC, "Test integer value")
+    field(VAL,  "42")
+    field(EGU,  "counts")
+    field(DRVH, "1000000")
+    field(DRVL, "-1000000")
+    field(HOPR, "100000")
+    field(LOPR, "-100000")
+}
+
+# String
+record(stringout, "TEST:STRING") {
+    field(DESC, "Test string value")
+    field(VAL,  "Hello PVXS")
+}
+
+# Enumeration
+record(mbbo, "TEST:ENUM") {
+    field(DESC, "Test enumeration")
+    field(ZRST, "IDLE")
+    field(ONST, "RUNNING")
+    field(TWST, "STOPPED")
+    field(THST, "ERROR")
+    field(VAL,  "0")
+}
+
+# =============================================================================
+# Read-Only PVs with Calculated/Generated Values
+# =============================================================================
+
+# Counter that increments every second
+record(calc, "TEST:COUNTER") {
+    field(DESC, "Auto-incrementing counter")
+    field(CALC, "A+1")
+    field(INPA, "TEST:COUNTER.VAL")
+    field(SCAN, "1 second")
+    field(EGU,  "counts")
+}
+
+# Random number generator (0-100)
+record(calc, "TEST:RANDOM") {
+    field(DESC, "Random number 0-100")
+    field(CALC, "RNDM*100")
+    field(SCAN, "2 second")
+    field(PREC, "2")
+    field(EGU,  "percent")
+}
+
+# Sine wave generator
+record(calc, "TEST:SINEWAVE") {
+    field(DESC, "Sine wave generator")
+    field(CALC, "50*SIN(A*PI/180)+50")
+    field(INPA, "TEST:COUNTER.VAL")
+    field(SCAN, "1 second")
+    field(PREC, "3")
+    field(EGU,  "units")
+    field(HOPR, "100")
+    field(LOPR, "0")
+}
+
+# =============================================================================
+# Temperature Simulation with Alarms
+# =============================================================================
+
+# Simulated temperature that varies with alarms
+record(calc, "TEST:TEMPERATURE") {
+    field(DESC, "Simulated temperature")
+    field(CALC, "20+15*SIN(A*PI/30)")
+    field(INPA, "TEST:COUNTER.VAL")
+    field(SCAN, "1 second")
+    field(PREC, "1")
+    field(EGU,  "deg C")
+    field(HOPR, "50")
+    field(LOPR, "-10")
+    field(HIHI, "40")
+    field(HIGH, "35")
+    field(LOW,  "5")
+    field(LOLO, "0")
+    field(HHSV, "MAJOR")
+    field(HSV,  "MINOR") 
+    field(LSV,  "MINOR")
+    field(LLSV, "MAJOR")
+}
+
+# =============================================================================
+# Setpoint PVs (Read/Write)
+# =============================================================================
+
+# Temperature setpoint
+record(ao, "TEST:TEMP_SETPOINT") {
+    field(DESC, "Temperature setpoint")
+    field(VAL,  "25.0")
+    field(PREC, "1")
+    field(EGU,  "deg C")
+    field(DRVH, "100")
+    field(DRVL, "0")
+    field(HOPR, "50")
+    field(LOPR, "0")
+}
+
+# Pressure setpoint
+record(ao, "TEST:PRESSURE_SETPOINT") {
+    field(DESC, "Pressure setpoint")
+    field(VAL,  "14.7")
+    field(PREC, "2")
+    field(EGU,  "psi")
+    field(DRVH, "100")
+    field(DRVL, "0")
+    field(HOPR, "50")
+    field(LOPR, "0")
+}
+
+# =============================================================================
+# Status and Control PVs
+# =============================================================================
+
+# System status enumeration
+record(mbbi, "TEST:STATUS") {
+    field(DESC, "System status")
+    field(INP,  "TEST:ENUM.VAL")
+    field(ZRST, "IDLE")
+    field(ONST, "RUNNING")
+    field(TWST, "STOPPED")
+    field(THST, "ERROR")
+    field(ZRSV, "NO_ALARM")
+    field(ONSV, "NO_ALARM") 
+    field(TWSV, "MINOR")
+    field(THSV, "MAJOR")
+    field(SCAN, "1 second")
+}
+
+# Enable/Disable control
+record(bo, "TEST:ENABLE") {
+    field(DESC, "System enable")
+    field(ZNAM, "DISABLED")
+    field(ONAM, "ENABLED")
+    field(VAL,  "1")
+}
+
+# =============================================================================
+# Array PVs for Testing Arrays
+# =============================================================================
+
+# Waveform record with double array
+record(waveform, "TEST:WAVEFORM") {
+    field(DESC, "Test waveform data")
+    field(FTVL, "DOUBLE")
+    field(NELM, "10")
+    field(EGU,  "volts")
+}
+
+# Subarray record
+record(subArray, "TEST:SUBARRAY") {
+    field(DESC, "Test subarray")
+    field(INP,  "TEST:WAVEFORM")
+    field(FTVL, "DOUBLE")
+    field(MALM, "5")
+    field(NELM, "5")
+    field(INDX, "0")
+}
+
+# =============================================================================
+# Binary/Bit PVs
+# =============================================================================
+
+# Binary input (read-only status bits)
+record(mbbi, "TEST:BITS_IN") {
+    field(DESC, "Input status bits")
+    field(INP,  "TEST:COUNTER.VAL")
+    field(NOBT, "8")
+    field(SCAN, "1 second")
+}
+
+# Binary output (control bits)
+record(mbbo, "TEST:BITS_OUT") {
+    field(DESC, "Output control bits")
+    field(NOBT, "8")
+    field(VAL,  "0")
+}
+
+# =============================================================================
+# Motor Simulation Records
+# =============================================================================
+
+# Motor position
+record(ao, "TEST:MOTOR_POS") {
+    field(DESC, "Motor position")
+    field(VAL,  "0.0")
+    field(PREC, "3")
+    field(EGU,  "mm")
+    field(DRVH, "100")
+    field(DRVL, "-100")
+    field(HOPR, "50")
+    field(LOPR, "-50")
+}
+
+# Motor velocity
+record(ao, "TEST:MOTOR_VEL") {
+    field(DESC, "Motor velocity")
+    field(VAL,  "1.0")
+    field(PREC, "2")
+    field(EGU,  "mm/s")
+    field(DRVH, "10")
+    field(DRVL, "0.1")
+    field(HOPR, "5")
+    field(LOPR, "0")
+}
+
+# =============================================================================
+# Alarm Test PVs
+# =============================================================================
+
+# PV that cycles through alarm states
+record(calc, "TEST:ALARM_CYCLE") {
+    field(DESC, "Cycling alarm states")
+    field(CALC, "(A%20)")
+    field(INPA, "TEST:COUNTER.VAL")
+    field(SCAN, "1 second")
+    field(HIHI, "18")
+    field(HIGH, "15")
+    field(LOW,  "5")
+    field(LOLO, "2")
+    field(HHSV, "MAJOR")
+    field(HSV,  "MINOR")
+    field(LSV,  "MINOR") 
+    field(LLSV, "MAJOR")
+}
+
+# =============================================================================
+# Special Test Cases
+# =============================================================================
+
+# PV with long string (using stringout instead of lso)
+record(stringout, "TEST:LONG_STRING") {
+    field(DESC, "Long string test")
+    field(VAL,  "Test string for PVXS bindings")
+}
+
+# PV with timestamp that updates frequently
+record(stringin, "TEST:TIMESTAMP") {
+    field(DESC, "Timestamp test")
+    field(VAL,  "2024-01-01 00:00:00")
+    field(SCAN, "1 second")
+}
+
+# PV that starts in alarm state
+record(ai, "TEST:INIT_ALARM") {
+    field(DESC, "Initially in alarm")
+    field(VAL,  "999")
+    field(HIHI, "100")
+    field(HHSV, "MAJOR")
+    field(STAT, "HIHI")
+    field(SEVR, "MAJOR")
+}
+
+# =============================================================================
+# Calculation Chain for Complex Testing
+# =============================================================================
+
+# First calculation
+record(calc, "TEST:CALC1") {
+    field(DESC, "First calculation")
+    field(CALC, "A*2+B")
+    field(INPA, "TEST:TEMPERATURE.VAL")
+    field(INPB, "TEST:TEMP_SETPOINT.VAL")
+    field(SCAN, "1 second")
+    field(PREC, "2")
+}
+
+# Second calculation depends on first
+record(calc, "TEST:CALC2") {
+    field(DESC, "Second calculation")
+    field(CALC, "A/10+C")
+    field(INPA, "TEST:CALC1.VAL")
+    field(INPC, "TEST:COUNTER.VAL")
+    field(SCAN, "1 second")
+    field(PREC, "3")
+}
+
+# =============================================================================
+# End of Database
+# =============================================================================
+
+# Note: After loading this database with 'softIocPVA test.db':
+# - All PVs will be available via PVAccess
+# - Use 'pvlist' to see all available PVs
+# - Use 'pvget TEST:DOUBLE' to read values
+# - Use 'pvput TEST:DOUBLE 456.789' to write values
+# - Use 'pvmonitor TEST:COUNTER' to monitor changing values

@@ -44,12 +44,12 @@
 //! - PVXS library (set `PVXS_DIR` or built within EPICS)
 //! - `EPICS_HOST_ARCH` environment variable (auto-detected if not set)
 
-mod bridge;
+pub mod bridge;
 
 use cxx::UniquePtr;
 use std::fmt;
 
-pub use bridge::{ContextWrapper, ValueWrapper, RpcWrapper, MonitorWrapper};
+pub use bridge::{ContextWrapper, ValueWrapper, RpcWrapper, MonitorWrapper, ServerWrapper, SharedPVWrapper, StaticSourceWrapper};
 
 // Re-export for convenience
 pub type Result<T> = std::result::Result<T, PvxsError>;
@@ -220,7 +220,7 @@ impl Context {
     /// let result = rpc.execute(5.0).expect("RPC execution failed");
     /// ```
     pub fn rpc(&mut self, pv_name: &str) -> Result<Rpc> {
-        let inner = bridge::context_rpc_create(self.inner.pin_mut(), pv_name)?;
+        let inner = bridge::context_rpc_create(self.inner.pin_mut(), pv_name.to_string())?;
         Ok(Rpc { inner })
     }
 
@@ -254,7 +254,7 @@ impl Context {
     /// monitor.stop();
     /// ```
     pub fn monitor(&mut self, pv_name: &str) -> Result<Monitor> {
-        let inner = bridge::context_monitor_create(self.inner.pin_mut(), pv_name)?;
+        let inner = bridge::context_monitor_create(self.inner.pin_mut(), pv_name.to_string())?;
         Ok(Monitor { inner })
     }
 }
@@ -398,7 +398,7 @@ impl Value {
     /// Returns an error if the field doesn't exist or cannot be
     /// converted to a double.
     pub fn get_field_double(&self, field_name: &str) -> Result<f64> {
-        Ok(bridge::value_get_field_double(&self.inner, field_name)?)
+        Ok(bridge::value_get_field_double(&self.inner, field_name.to_string())?)
     }
     
     /// Get a field value as an i32
@@ -408,7 +408,7 @@ impl Value {
     /// Returns an error if the field doesn't exist or cannot be
     /// converted to an i32.
     pub fn get_field_int32(&self, field_name: &str) -> Result<i32> {
-        Ok(bridge::value_get_field_int32(&self.inner, field_name)?)
+        Ok(bridge::value_get_field_int32(&self.inner, field_name.to_string())?)
     }
     
     /// Get a field value as a String
@@ -418,7 +418,7 @@ impl Value {
     /// Returns an error if the field doesn't exist or cannot be
     /// converted to a string.
     pub fn get_field_string(&self, field_name: &str) -> Result<String> {
-        Ok(bridge::value_get_field_string(&self.inner, field_name)?)
+        Ok(bridge::value_get_field_string(&self.inner, field_name.to_string())?)
     }
 }
 
@@ -692,7 +692,7 @@ impl Rpc {
     /// rpc.arg_string("filename", "/path/to/file.txt");
     /// ```
     pub fn arg_string(&mut self, name: &str, value: &str) -> Result<&mut Self> {
-        bridge::rpc_arg_string(self.inner.pin_mut(), name, value)?;
+        bridge::rpc_arg_string(self.inner.pin_mut(), name.to_string(), value.to_string())?;
         Ok(self)
     }
     
@@ -703,7 +703,7 @@ impl Rpc {
     /// * `name` - The argument name
     /// * `value` - The double value
     pub fn arg_double(&mut self, name: &str, value: f64) -> Result<&mut Self> {
-        bridge::rpc_arg_double(self.inner.pin_mut(), name, value)?;
+        bridge::rpc_arg_double(self.inner.pin_mut(), name.to_string(), value)?;
         Ok(self)
     }
     
@@ -714,7 +714,7 @@ impl Rpc {
     /// * `name` - The argument name
     /// * `value` - The int32 value
     pub fn arg_int32(&mut self, name: &str, value: i32) -> Result<&mut Self> {
-        bridge::rpc_arg_int32(self.inner.pin_mut(), name, value)?;
+        bridge::rpc_arg_int32(self.inner.pin_mut(), name.to_string(), value)?;
         Ok(self)
     }
     
@@ -725,7 +725,7 @@ impl Rpc {
     /// * `name` - The argument name
     /// * `value` - The boolean value
     pub fn arg_bool(&mut self, name: &str, value: bool) -> Result<&mut Self> {
-        bridge::rpc_arg_bool(self.inner.pin_mut(), name, value)?;
+        bridge::rpc_arg_bool(self.inner.pin_mut(), name.to_string(), value)?;
         Ok(self)
     }
     
@@ -796,6 +796,431 @@ impl Rpc {
     }
 }
 
+/// A PVXS server for hosting process variables
+/// 
+/// The Server allows you to create and manage EPICS process variables,
+/// making them available to clients over the network.
+/// 
+/// # Example
+/// 
+/// ```no_run
+/// use epics_pvxs_sys::Server;
+/// 
+/// let mut server = Server::from_env()?; // Create server from environment
+/// //let mut server = Server::create_isolated()?; // Create an isolated server
+/// 
+/// let mut pv = server.create_pv_double("test:pv", 42.0)?;
+/// server.add_pv("test:pv", &mut pv)?;
+/// 
+/// server.start()?;
+/// println!("Server running on port {}", server.tcp_port());
+/// 
+/// server.stop()?;
+/// # Ok::<(), epics_pvxs_sys::PvxsError>(())
+/// ```
+pub struct Server {
+    inner: UniquePtr<ServerWrapper>,
+}
+
+impl Server {
+    /// Create a server from environment variables
+    /// 
+    /// Reads configuration from EPICS environment variables for network setup.
+    /// 
+    /// # Errors
+    /// 
+    /// Returns an error if the server cannot be created or configured.
+    pub fn from_env() -> Result<Self> {
+        let inner = bridge::server_create_from_env()?;
+        Ok(Self { inner })
+    }
+    
+    /// Create an isolated server for testing
+    /// 
+    /// Creates a server that operates in isolation, using system-assigned ports
+    /// and avoiding conflicts with other servers. Ideal for unit tests.
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// use epics_pvxs_sys::Server;
+    /// 
+    /// let mut server = Server::create_isolated()?;
+    /// server.start()?;
+    /// println!("Isolated server started on TCP port {}", server.tcp_port());
+    /// server.stop()?;
+    /// # Ok::<(), epics_pvxs_sys::PvxsError>(())
+    /// ```
+    pub fn create_isolated() -> Result<Self> {
+        let inner = bridge::server_create_isolated()?;
+        Ok(Self { inner })
+    }
+    
+    /// Start the server
+    /// 
+    /// Begins listening for client connections and serving PVs.
+    /// 
+    /// # Errors
+    /// 
+    /// Returns an error if the server cannot be started (e.g., port conflicts).
+    pub fn start(&mut self) -> Result<()> {
+        bridge::server_start(self.inner.pin_mut())?;
+        Ok(())
+    }
+    
+    /// Stop the server
+    /// 
+    /// Stops listening for connections and shuts down the server.
+    /// 
+    /// # Errors
+    /// 
+    /// Returns an error if the server cannot be stopped cleanly.
+    pub fn stop(&mut self) -> Result<()> {
+        bridge::server_stop(self.inner.pin_mut())?;
+        Ok(())
+    }
+    
+    /// Add a PV to the server
+    /// 
+    /// Makes a process variable available to clients under the given name.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `name` - The PV name that clients will use
+    /// * `pv` - The SharedPV to add
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// # use epics_pvxs_sys::Server;
+    /// # let mut server = Server::create_isolated().unwrap();
+    /// let mut pv = server.create_pv_double("counter", 0.0)?;
+    /// server.add_pv("test:counter", &mut pv)?;
+    /// # Ok::<(), epics_pvxs_sys::PvxsError>(())
+    /// ```
+    pub fn add_pv(&mut self, name: &str, pv: &mut SharedPV) -> Result<()> {
+        bridge::server_add_pv(self.inner.pin_mut(), name.to_string(), pv.inner.pin_mut())?;
+        Ok(())
+    }
+    
+    /// Remove a PV from the server
+    /// 
+    /// Removes the PV with the given name from the server.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `name` - The name of the PV to remove
+    pub fn remove_pv(&mut self, name: &str) -> Result<()> {
+        bridge::server_remove_pv(self.inner.pin_mut(), name.to_string())?;
+        Ok(())
+    }
+    
+    /// Add a static source to the server
+    /// 
+    /// Static sources provide collections of PVs with a common configuration.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `name` - Name for this source
+    /// * `source` - The StaticSource to add
+    /// * `order` - Priority order (lower numbers have higher priority)
+    pub fn add_source(&mut self, name: &str, source: &mut StaticSource, order: i32) -> Result<()> {
+        bridge::server_add_source(self.inner.pin_mut(), name.to_string(), source.inner.pin_mut(), order)?;
+        Ok(())
+    }
+    
+    /// Get the TCP port the server is listening on
+    /// 
+    /// Returns 0 if the server is not started.
+    pub fn tcp_port(&self) -> u16 {
+        bridge::server_get_tcp_port(&self.inner)
+    }
+    
+    /// Get the UDP port the server is using
+    /// 
+    /// Returns 0 if the server is not started.
+    pub fn udp_port(&self) -> u16 {
+        bridge::server_get_udp_port(&self.inner)
+    }
+    
+    /// Create a new mailbox SharedPV with a double value
+    /// 
+    /// Mailbox PVs allow both reading and writing by clients.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `_name` - Name for debugging/logging (not the PV name)
+    /// * `initial_value` - Initial value for the PV
+    pub fn create_pv_double(&self, _name: &str, initial_value: f64) -> Result<SharedPV> {
+        let mut pv = SharedPV::create_mailbox()?;
+        pv.open_double(initial_value)?;
+        Ok(pv)
+    }
+    
+    /// Create a new mailbox SharedPV with an int32 value
+    /// 
+    /// # Arguments
+    /// 
+    /// * `_name` - Name for debugging/logging (not the PV name)  
+    /// * `initial_value` - Initial value for the PV
+    pub fn create_pv_int32(&self, _name: &str, initial_value: i32) -> Result<SharedPV> {
+        let mut pv = SharedPV::create_mailbox()?;
+        pv.open_int32(initial_value)?;
+        Ok(pv)
+    }
+    
+    /// Create a new mailbox SharedPV with a string value
+    /// 
+    /// # Arguments
+    /// 
+    /// * `_name` - Name for debugging/logging (not the PV name)
+    /// * `initial_value` - Initial value for the PV
+    pub fn create_pv_string(&self, _name: &str, initial_value: &str) -> Result<SharedPV> {
+        let mut pv = SharedPV::create_mailbox()?;
+        pv.open_string(initial_value)?;
+        Ok(pv)
+    }
+    
+    /// Create a new readonly SharedPV with a double value
+    /// 
+    /// Readonly PVs only allow reading by clients.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `_name` - Name for debugging/logging (not the PV name)
+    /// * `initial_value` - Initial value for the PV
+    pub fn create_readonly_pv_double(&self, _name: &str, initial_value: f64) -> Result<SharedPV> {
+        let mut pv = SharedPV::create_readonly()?;
+        pv.open_double(initial_value)?;
+        Ok(pv)
+    }
+}
+
+/// A shared process variable that can be hosted by a server
+/// 
+/// SharedPVs represent individual process variables with typed values
+/// that can be accessed by EPICS clients.
+/// 
+/// # Example
+/// 
+/// ```no_run
+/// use epics_pvxs_sys::SharedPV;
+/// 
+/// let mut pv = SharedPV::create_mailbox()?;
+/// pv.open_double(42.5)?;
+/// 
+/// // Update the value
+/// pv.post_double(99.9)?;
+/// 
+/// // Get current value
+/// let value = pv.fetch()?;
+/// println!("Current value: {}", value);
+/// # Ok::<(), epics_pvxs_sys::PvxsError>(())
+/// ```
+pub struct SharedPV {
+    inner: UniquePtr<SharedPVWrapper>,
+}
+
+impl SharedPV {
+    /// Create a mailbox SharedPV
+    /// 
+    /// Mailbox PVs support both read and write operations by clients.
+    pub fn create_mailbox() -> Result<Self> {
+        let inner = bridge::shared_pv_create_mailbox()?;
+        Ok(Self { inner })
+    }
+    
+    /// Create a readonly SharedPV
+    /// 
+    /// Readonly PVs only support read operations by clients.
+    pub fn create_readonly() -> Result<Self> {
+        let inner = bridge::shared_pv_create_readonly()?;
+        Ok(Self { inner })
+    }
+    
+    /// Open the PV with a double value
+    /// 
+    /// # Arguments
+    /// 
+    /// * `initial_value` - The initial value for the PV
+    pub fn open_double(&mut self, initial_value: f64) -> Result<()> {
+        bridge::shared_pv_open_double(self.inner.pin_mut(), initial_value)?;
+        Ok(())
+    }
+    
+    /// Open the PV with an int32 value
+    /// 
+    /// # Arguments
+    /// 
+    /// * `initial_value` - The initial value for the PV
+    pub fn open_int32(&mut self, initial_value: i32) -> Result<()> {
+        bridge::shared_pv_open_int32(self.inner.pin_mut(), initial_value)?;
+        Ok(())
+    }
+    
+    /// Open the PV with a string value
+    /// 
+    /// # Arguments
+    /// 
+    /// * `initial_value` - The initial value for the PV
+    pub fn open_string(&mut self, initial_value: &str) -> Result<()> {
+        bridge::shared_pv_open_string(self.inner.pin_mut(), initial_value.to_string())?;
+        Ok(())
+    }
+    
+    /// Check if the PV is open
+    pub fn is_open(&self) -> bool {
+        bridge::shared_pv_is_open(&self.inner)
+    }
+    
+    /// Close the PV
+    pub fn close(&mut self) -> Result<()> {
+        bridge::shared_pv_close(self.inner.pin_mut())?;
+        Ok(())
+    }
+    
+    /// Post a new double value to the PV
+    /// 
+    /// This updates the PV value and notifies connected clients.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `value` - The new value to post
+    pub fn post_double(&mut self, value: f64) -> Result<()> {
+        bridge::shared_pv_post_double(self.inner.pin_mut(), value)?;
+        Ok(())
+    }
+    
+    /// Post a new int32 value to the PV
+    /// 
+    /// # Arguments
+    /// 
+    /// * `value` - The new value to post
+    pub fn post_int32(&mut self, value: i32) -> Result<()> {
+        bridge::shared_pv_post_int32(self.inner.pin_mut(), value)?;
+        Ok(())
+    }
+    
+    /// Post a new string value to the PV
+    /// 
+    /// # Arguments
+    /// 
+    /// * `value` - The new value to post
+    pub fn post_string(&mut self, value: &str) -> Result<()> {
+        bridge::shared_pv_post_string(self.inner.pin_mut(), value.to_string())?;
+        Ok(())
+    }
+    
+    /// Post a new double value to the PV with alarm information
+    /// 
+    /// This updates the PV value and alarm fields, then notifies connected clients.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `value` - The new value to post
+    /// * `severity` - Alarm severity (0=NO_ALARM, 1=MINOR, 2=MAJOR, 3=INVALID)
+    /// * `status` - Alarm status code (0=NO_ALARM, various status codes)
+    /// * `message` - Alarm message string
+    pub fn post_double_with_alarm(&mut self, value: f64, severity: i32, status: i32, message: &str) -> Result<()> {
+        bridge::shared_pv_post_double_with_alarm(self.inner.pin_mut(), value, severity, status, message.to_string())?;
+        Ok(())
+    }
+    
+    /// Post a new int32 value to the PV with alarm information
+    /// 
+    /// # Arguments
+    /// 
+    /// * `value` - The new value to post
+    /// * `severity` - Alarm severity (0=NO_ALARM, 1=MINOR, 2=MAJOR, 3=INVALID)
+    /// * `status` - Alarm status code (0=NO_ALARM, various status codes)
+    /// * `message` - Alarm message string
+    pub fn post_int32_with_alarm(&mut self, value: i32, severity: i32, status: i32, message: &str) -> Result<()> {
+        bridge::shared_pv_post_int32_with_alarm(self.inner.pin_mut(), value, severity, status, message.to_string())?;
+        Ok(())
+    }
+    
+    /// Post a new string value to the PV with alarm information
+    /// 
+    /// # Arguments
+    /// 
+    /// * `value` - The new value to post
+    /// * `severity` - Alarm severity (0=NO_ALARM, 1=MINOR, 2=MAJOR, 3=INVALID)
+    /// * `status` - Alarm status code (0=NO_ALARM, various status codes)
+    /// * `message` - Alarm message string
+    pub fn post_string_with_alarm(&mut self, value: &str, severity: i32, status: i32, message: &str) -> Result<()> {
+        bridge::shared_pv_post_string_with_alarm(self.inner.pin_mut(), value.to_string(), severity, status, message.to_string())?;
+        Ok(())
+    }
+    
+    /// Fetch the current value of the PV
+    /// 
+    /// Returns the current value as a Value that can be inspected.
+    pub fn fetch(&self) -> Result<Value> {
+        let inner = bridge::shared_pv_fetch(&self.inner)?;
+        Ok(Value { inner })
+    }
+}
+
+/// A static source for organizing collections of PVs
+/// 
+/// StaticSource allows grouping related PVs together with common
+/// configuration and management.
+/// 
+/// # Example
+/// 
+/// ```no_run
+/// use epics_pvxs_sys::{StaticSource, SharedPV};
+/// 
+/// let mut source = StaticSource::create()?;
+/// 
+/// let mut temp_pv = SharedPV::create_readonly()?;
+/// temp_pv.open_double(23.5)?;
+/// 
+/// source.add_pv("temperature", &mut temp_pv)?;
+/// 
+/// // Add source to server with priority 0
+/// // server.add_source("sensors", &mut source, 0)?;
+/// # Ok::<(), epics_pvxs_sys::PvxsError>(())
+/// ```
+pub struct StaticSource {
+    inner: UniquePtr<StaticSourceWrapper>,
+}
+
+impl StaticSource {
+    /// Create a new StaticSource
+    pub fn create() -> Result<Self> {
+        let inner = bridge::static_source_create()?;
+        Ok(Self { inner })
+    }
+    
+    /// Add a PV to this source
+    /// 
+    /// # Arguments
+    /// 
+    /// * `name` - The PV name within this source
+    /// * `pv` - The SharedPV to add
+    pub fn add_pv(&mut self, name: &str, pv: &mut SharedPV) -> Result<()> {
+        bridge::static_source_add_pv(self.inner.pin_mut(), name.to_string(), pv.inner.pin_mut())?;
+        Ok(())
+    }
+    
+    /// Remove a PV from this source
+    /// 
+    /// # Arguments
+    /// 
+    /// * `name` - The name of the PV to remove
+    pub fn remove_pv(&mut self, name: &str) -> Result<()> {
+        bridge::static_source_remove_pv(self.inner.pin_mut(), name.to_string())?;
+        Ok(())
+    }
+    
+    /// Close all PVs in this source
+    pub fn close_all(&mut self) -> Result<()> {
+        bridge::static_source_close_all(self.inner.pin_mut())?;
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -814,3 +1239,6 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+mod async_optional_test;  // Include the async optional test module
