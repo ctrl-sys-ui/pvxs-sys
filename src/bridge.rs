@@ -36,6 +36,32 @@ mod ffi {
             pv_name: &str,
             timeout: f64,
         ) -> Result<UniquePtr<ValueWrapper>>;
+
+        // Value inspection
+        fn value_is_valid(val: &ValueWrapper) -> bool;
+        fn value_to_string(val: &ValueWrapper) -> String;
+        fn value_get_field_double(val: &ValueWrapper, field_name: String) -> Result<f64>;
+        fn value_get_field_int32(val: &ValueWrapper, field_name: String) -> Result<i32>;
+        fn value_get_field_string(val: &ValueWrapper, field_name: String) -> Result<String>;
+        fn value_get_field_enum(val: &ValueWrapper, field_name: String) -> Result<i16>;
+        fn value_get_field_double_array(val: &ValueWrapper, field_name: String) -> Result<Vec<f64>>;
+        fn value_get_field_int32_array(val: &ValueWrapper, field_name: String) -> Result<Vec<i32>>;
+        fn value_get_field_enum_array(val: &ValueWrapper, field_name: String) -> Result<Vec<i16>>;
+        fn value_get_field_string_array(val: &ValueWrapper, field_name: String) -> Result<Vec<String>>;
+        
+        // Monitor operations
+        fn context_monitor_create(
+            ctx: Pin<&mut ContextWrapper>,
+            pv_name: String,
+        ) -> Result<UniquePtr<MonitorWrapper>>;
+        fn monitor_start(monitor: Pin<&mut MonitorWrapper>);
+        fn monitor_stop(monitor: Pin<&mut MonitorWrapper>);
+        fn monitor_is_running(monitor: &MonitorWrapper) -> bool;
+        fn monitor_has_update(monitor: &MonitorWrapper) -> bool;
+        fn monitor_get_update(monitor: Pin<&mut MonitorWrapper>, timeout: f64) -> Result<UniquePtr<ValueWrapper>>;
+        fn monitor_try_get_update(monitor: Pin<&mut MonitorWrapper>) -> Result<UniquePtr<ValueWrapper>>;
+        fn monitor_is_connected(monitor: &MonitorWrapper) -> bool;
+        fn monitor_get_name(monitor: &MonitorWrapper) -> String;
         
         // Async operations using PVXS RPC (only available with async feature)
         #[cfg(feature = "async")]
@@ -95,26 +121,7 @@ mod ffi {
         #[allow(dead_code)]
         fn rpc_execute_async(rpc: Pin<&mut RpcWrapper>, timeout: f64) -> Result<UniquePtr<OperationWrapper>>;
         
-        // Value inspection
-        fn value_is_valid(val: &ValueWrapper) -> bool;
-        fn value_to_string(val: &ValueWrapper) -> String;
-        fn value_get_field_double(val: &ValueWrapper, field_name: String) -> Result<f64>;
-        fn value_get_field_int32(val: &ValueWrapper, field_name: String) -> Result<i32>;
-        fn value_get_field_string(val: &ValueWrapper, field_name: String) -> Result<String>;
         
-        // Monitor operations
-        fn context_monitor_create(
-            ctx: Pin<&mut ContextWrapper>,
-            pv_name: String,
-        ) -> Result<UniquePtr<MonitorWrapper>>;
-        fn monitor_start(monitor: Pin<&mut MonitorWrapper>);
-        fn monitor_stop(monitor: Pin<&mut MonitorWrapper>);
-        fn monitor_is_running(monitor: &MonitorWrapper) -> bool;
-        fn monitor_has_update(monitor: &MonitorWrapper) -> bool;
-        fn monitor_get_update(monitor: Pin<&mut MonitorWrapper>, timeout: f64) -> Result<UniquePtr<ValueWrapper>>;
-        fn monitor_try_get_update(monitor: Pin<&mut MonitorWrapper>) -> Result<UniquePtr<ValueWrapper>>;
-        fn monitor_is_connected(monitor: &MonitorWrapper) -> bool;
-        fn monitor_get_name(monitor: &MonitorWrapper) -> String;
         
         // ====================================================================
         // Server-side types and operations
