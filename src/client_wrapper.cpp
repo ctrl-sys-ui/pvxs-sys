@@ -217,7 +217,7 @@ namespace pvxs_wrapper {
         }
     }
 
-    void ContextWrapper::put_double(
+    void ContextWrapper::put(
         const std::string& pv_name,
         double value,
         double timeout) {
@@ -228,11 +228,11 @@ namespace pvxs_wrapper {
                 return std::move(val);
             }).exec()->wait(timeout);
         } catch (const std::exception& e) {
-            throw PvxsError(std::string("Error in put_double for '") + pv_name + "': " + e.what());
+            throw PvxsError(std::string("Error in put for '") + pv_name + "': " + e.what());
         }
     }
 
-    void ContextWrapper::put_int32(
+    void ContextWrapper::put(
         const std::string& pv_name,
         int32_t value,
         double timeout) {
@@ -243,7 +243,117 @@ namespace pvxs_wrapper {
                 return std::move(val);
             }).exec()->wait(timeout);
         } catch (const std::exception& e) {
-            throw PvxsError(std::string("Error in put_int32 for '") + pv_name + "': " + e.what());
+            throw PvxsError(std::string("Error in put for '") + pv_name + "': " + e.what());
+        }
+    }
+
+    void ContextWrapper::put(
+        const std::string& pv_name,
+        const std::string& value,
+        double timeout) {
+        
+        try {
+            context_.put(pv_name).build([&value](pvxs::Value&& val) {
+                val["value"] = value;
+                return std::move(val);
+            }).exec()->wait(timeout);
+        } catch (const std::exception& e) {
+            throw PvxsError(std::string("Error in put for '") + pv_name + "': " + e.what());
+        }
+    }
+
+    void ContextWrapper::put(
+        const std::string& pv_name,
+        int16_t value,
+        double timeout) {
+        
+        try {
+            context_.put(pv_name).build([value](pvxs::Value&& val) {
+                val["value"] = value;
+                return std::move(val);
+            }).exec()->wait(timeout);
+        } catch (const std::exception& e) {
+            throw PvxsError(std::string("Error in put for '") + pv_name + "': " + e.what());
+        }
+    }
+
+    void ContextWrapper::put(
+        const std::string& pv_name,
+        const rust::Vec<double>& value,
+        double timeout) {
+        
+        try {
+            context_.put(pv_name).build([&value](pvxs::Value&& val) {
+                // Convert rust::Vec to pvxs::shared_array
+                pvxs::shared_array<double> arr(value.size());
+                for (size_t i = 0; i < value.size(); ++i) {
+                    arr[i] = value[i];
+                }
+                val["value"] = arr.freeze();
+                return std::move(val);
+            }).exec()->wait(timeout);
+        } catch (const std::exception& e) {
+            throw PvxsError(std::string("Error in put for '") + pv_name + "': " + e.what());
+        }
+    }
+
+    void ContextWrapper::put(
+        const std::string& pv_name,
+        const rust::Vec<int32_t>& value,
+        double timeout) {
+        
+        try {
+            context_.put(pv_name).build([&value](pvxs::Value&& val) {
+                // Convert rust::Vec to pvxs::shared_array
+                pvxs::shared_array<int32_t> arr(value.size());
+                for (size_t i = 0; i < value.size(); ++i) {
+                    arr[i] = value[i];
+                }
+                val["value"] = arr.freeze();
+                return std::move(val);
+            }).exec()->wait(timeout);
+        } catch (const std::exception& e) {
+            throw PvxsError(std::string("Error in put for '") + pv_name + "': " + e.what());
+        }
+    }
+
+    void ContextWrapper::put(
+        const std::string& pv_name,
+        const rust::Vec<int16_t>& value,
+        double timeout) {
+        
+        try {
+            context_.put(pv_name).build([&value](pvxs::Value&& val) {
+                // Convert rust::Vec to pvxs::shared_array
+                pvxs::shared_array<int16_t> arr(value.size());
+                for (size_t i = 0; i < value.size(); ++i) {
+                    arr[i] = value[i];
+                }
+                val["value"] = arr.freeze();
+                return std::move(val);
+            }).exec()->wait(timeout);
+        } catch (const std::exception& e) {
+            throw PvxsError(std::string("Error in put for '") + pv_name + "': " + e.what());
+        }
+    }
+
+    void ContextWrapper::put(
+        const std::string& pv_name,
+        const rust::Vec<rust::String>& value,
+        double timeout) {
+        
+        try {
+            context_.put(pv_name).build([&value](pvxs::Value&& val) {
+                // Convert rust::Vec<rust::String> to pvxs::shared_array<std::string>
+                pvxs::shared_array<std::string> arr(value.size());
+                for (size_t i = 0; i < value.size(); ++i) {
+                    arr[i] = std::string(value[i]);
+                }
+                val["value"] = arr.freeze();
+                return std::move(val);
+            }).exec()->wait(timeout);
+        } catch (const std::exception& e) {
+            throw PvxsError(std::string("Error in put for '") + pv_name + "': " + e.what());
         }
     }
 
@@ -295,10 +405,66 @@ namespace pvxs_wrapper {
         rust::Str pv_name,
         double value,
         double timeout) {
-        ctx.put_double(std::string(pv_name), value, timeout);
+        ctx.put(std::string(pv_name), value, timeout);
     }
 
-    std::unique_ptr<ValueWrapper> context_info_sync(
+    void context_put_int32(
+        ContextWrapper& ctx,
+        rust::Str pv_name,
+        int32_t value,
+        double timeout) {
+        ctx.put(std::string(pv_name), value, timeout);
+    }
+
+    void context_put_string(
+        ContextWrapper& ctx,
+        rust::Str pv_name,
+        rust::String value,
+        double timeout) {
+        ctx.put(std::string(pv_name), std::string(value), timeout);
+    }
+
+    void context_put_enum(
+        ContextWrapper& ctx,
+        rust::Str pv_name,
+        int16_t value,
+        double timeout) {
+        ctx.put(std::string(pv_name), value, timeout);
+    }
+
+    void context_put_double_array(
+        ContextWrapper& ctx,
+        rust::Str pv_name,
+        rust::Vec<double> value,
+        double timeout) {
+        ctx.put(std::string(pv_name), value, timeout);
+    }
+
+    void context_put_int32_array(
+        ContextWrapper& ctx,
+        rust::Str pv_name,
+        rust::Vec<int32_t> value,
+        double timeout) {
+        ctx.put(std::string(pv_name), value, timeout);
+    }
+
+    void context_put_enum_array(
+        ContextWrapper& ctx,
+        rust::Str pv_name,
+        rust::Vec<int16_t> value,
+        double timeout) {
+        ctx.put(std::string(pv_name), value, timeout);
+    }
+
+    void context_put_string_array(
+        ContextWrapper& ctx,
+        rust::Str pv_name,
+        rust::Vec<rust::String> value,
+        double timeout) {
+        ctx.put(std::string(pv_name), value, timeout);
+    }
+
+    std::unique_ptr<ValueWrapper> context_info(
         ContextWrapper& ctx,
         rust::Str pv_name,
         double timeout) {

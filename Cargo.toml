@@ -30,29 +30,6 @@ cxx-build = "1.0.120"
 name = "epics_pvxs_sys"
 path = "src/lib.rs"
 
-[[example]]
-name = "simple_get"
-path = "examples/simple_get.rs"
-
-[[example]]
-name = "simple_put"
-path = "examples/simple_put.rs"
-
-[[example]]
-name = "simple_info"
-path = "examples/simple_info.rs"
-
-[[example]]
-name = "simple_async"
-path = "examples/simple_async.rs"
-required-features = ["async"]
-
-# TODO: RPC examples removed - real RPC implementation needed
-
-[[example]]
-name = "simple_monitor"
-path = "examples/simple_monitor.rs"
-
 [package.metadata.docs.rs]
 # Environment variables needed for docs.rs builds
 rustdoc-args = ["--cfg", "docsrs"]

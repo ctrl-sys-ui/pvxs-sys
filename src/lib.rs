@@ -170,12 +170,215 @@ impl Context {
     /// ```no_run
     /// # use epics_pvxs_sys::Context;
     /// # let mut ctx = Context::from_env().unwrap();
-    /// ctx.put_double("my:pv:name", 42.0, 5.0).expect("PUT failed");
+    /// ctx.put_double("my:pv:double", 42.0, 5.0).expect("PUT failed");
     /// ```
     pub fn put_double(&mut self, pv_name: &str, value: f64, timeout: f64) -> Result<()> {
         bridge::context_put_double(self.inner.pin_mut(), pv_name, value, timeout)?;
         Ok(())
     }
+
+    /// Perform a synchronous PUT operation with an int32 value
+    /// 
+    /// Sets the "value" field of a process variable to an int32.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `pv_name` - The name of the process variable
+    /// * `value` - The value to write
+    /// * `timeout` - Maximum time to wait in seconds
+    /// # Errors
+    /// 
+    /// Returns an error if:
+    /// - The PV doesn't exist or is read-only
+    /// - The operation times out
+    /// - The value type doesn't match
+    /// # Example
+    /// 
+    /// ```no_run
+    /// # use epics_pvxs_sys::Context;
+    /// # let mut ctx = Context::from_env().unwrap();
+    /// ctx.put_int32("my:pv:int", 42, 5.0).expect("PUT failed");
+    /// ```
+    pub fn put_int32(&mut self, pv_name: &str, value: i32, timeout: f64) -> Result<()> {
+        bridge::context_put_int32(self.inner.pin_mut(), pv_name, value, timeout)?;
+        Ok(())
+    }
+
+    /// Perform a synchronous PUT operation with a string value
+    /// 
+    /// Sets the "value" field of a process variable to a string.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `pv_name` - The name of the process variable
+    /// * `value` - The value to write
+    /// * `timeout` - Maximum time to wait in seconds
+    /// 
+    /// # Errors
+    /// 
+    /// Returns an error if:
+    /// - The PV doesn't exist or is read-only
+    /// - The operation times out
+    /// - The value type doesn't match
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// # use epics_pvxs_sys::Context;
+    /// # let mut ctx = Context::from_env().unwrap();
+    /// ctx.put_string("my:pv:string", "Hello, EPICS!", 5.0).expect("PUT failed");
+    /// ```
+    pub fn put_string(&mut self, pv_name: &str, value: &str, timeout: f64) -> Result<()> {
+        bridge::context_put_string(self.inner.pin_mut(), pv_name, value.to_string(), timeout)?;
+        Ok(())
+    }
+
+    /// Perform a synchronous PUT operation with an enum value
+    /// 
+    /// Sets the "value" field of a process variable to an enum (i16).
+    /// 
+    /// # Arguments
+    /// 
+    /// * `pv_name` - The name of the process variable
+    /// * `value` - The enum value to write
+    /// * `timeout` - Maximum time to wait in seconds
+    /// 
+    /// # Errors
+    /// 
+    /// Returns an error if:
+    /// - The PV doesn't exist or is read-only
+    /// - The operation times out
+    /// - The value is not a valid enum choice
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// # use epics_pvxs_sys::Context;
+    /// # let mut ctx = Context::from_env().unwrap();
+    /// ctx.put_enum("my:pv:enum", 2, 5.0).expect("PUT failed");
+    /// ```
+    pub fn put_enum(&mut self, pv_name: &str, value: i16, timeout: f64) -> Result<()> {
+        bridge::context_put_enum(self.inner.pin_mut(), pv_name, value, timeout)?;
+        Ok(())
+    }
+
+    /// Perform a synchronous PUT operation with a double array
+    /// 
+    /// Sets the "value" field of a process variable to an array of doubles.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `pv_name` - The name of the process variable
+    /// * `value` - The array of values to write
+    /// * `timeout` - Maximum time to wait in seconds
+    /// 
+    /// # Errors
+    /// 
+    /// Returns an error if:
+    /// - The PV doesn't exist or is read-only
+    /// - The operation times out
+    /// - The value type doesn't match
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// # use epics_pvxs_sys::Context;
+    /// # let mut ctx = Context::from_env().unwrap();
+    /// ctx.put_double_array("my:pv:array", vec![1.0, 2.0, 3.0], 5.0).expect("PUT failed");
+    /// ```
+    pub fn put_double_array(&mut self, pv_name: &str, value: Vec<f64>, timeout: f64) -> Result<()> {
+        bridge::context_put_double_array(self.inner.pin_mut(), pv_name, value, timeout)?;
+        Ok(())
+    }
+
+    /// Perform a synchronous PUT operation with an int32 array
+    /// 
+    /// Sets the "value" field of a process variable to an array of int32s.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `pv_name` - The name of the process variable
+    /// * `value` - The array of values to write
+    /// * `timeout` - Maximum time to wait in seconds
+    /// 
+    /// # Errors
+    /// 
+    /// Returns an error if:
+    /// - The PV doesn't exist or is read-only
+    /// - The operation times out
+    /// - The value type doesn't match
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// # use epics_pvxs_sys::Context;
+    /// # let mut ctx = Context::from_env().unwrap();
+    /// ctx.put_int32_array("my:pv:array", vec![10, 20, 30], 5.0).expect("PUT failed");
+    /// ```
+    pub fn put_int32_array(&mut self, pv_name: &str, value: Vec<i32>, timeout: f64) -> Result<()> {
+        bridge::context_put_int32_array(self.inner.pin_mut(), pv_name, value, timeout)?;
+        Ok(())
+    }
+
+    /// Perform a synchronous PUT operation with an enum array
+    /// 
+    /// Sets the "value" field of a process variable to an array of enums (i16).
+    /// 
+    /// # Arguments
+    /// 
+    /// * `pv_name` - The name of the process variable
+    /// * `value` - The array of enum values to write
+    /// * `timeout` - Maximum time to wait in seconds
+    /// 
+    /// # Errors
+    /// 
+    /// Returns an error if:
+    /// - The PV doesn't exist or is read-only
+    /// - The operation times out
+    /// - Any value is not a valid enum choice
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// # use epics_pvxs_sys::Context;
+    /// # let mut ctx = Context::from_env().unwrap();
+    /// ctx.put_enum_array("my:pv:array", vec![0, 1, 2], 5.0).expect("PUT failed");
+    /// ```
+    pub fn put_enum_array(&mut self, pv_name: &str, value: Vec<i16>, timeout: f64) -> Result<()> {
+        bridge::context_put_enum_array(self.inner.pin_mut(), pv_name, value, timeout)?;
+        Ok(())
+    }
+
+    /// Perform a synchronous PUT operation with a string array
+    /// 
+    /// Sets the "value" field of a process variable to an array of strings.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `pv_name` - The name of the process variable
+    /// * `value` - The array of string values to write
+    /// * `timeout` - Maximum time to wait in seconds
+    /// 
+    /// # Errors
+    /// 
+    /// Returns an error if:
+    /// - The PV doesn't exist or is read-only
+    /// - The operation times out
+    /// - The value type doesn't match
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// # use epics_pvxs_sys::Context;
+    /// # let mut ctx = Context::from_env().unwrap();
+    /// ctx.put_string_array("my:pv:array", vec!["one".to_string(), "two".to_string()], 5.0).expect("PUT failed");
+    /// ```
+    pub fn put_string_array(&mut self, pv_name: &str, value: Vec<String>, timeout: f64) -> Result<()> {
+        bridge::context_put_string_array(self.inner.pin_mut(), pv_name, value, timeout)?;
+        Ok(())
+    }
+
+
     
     /// Get type information about a process variable
     /// 
@@ -196,7 +399,7 @@ impl Context {
     /// println!("PV structure: {}", info);
     /// ```
     pub fn info(&mut self, pv_name: &str, timeout: f64) -> Result<Value> {
-        let inner = bridge::context_info_sync(self.inner.pin_mut(), pv_name, timeout)?;
+        let inner = bridge::context_info(self.inner.pin_mut(), pv_name, timeout)?;
         Ok(Value { inner })
     }
     

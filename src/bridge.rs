@@ -31,7 +31,56 @@ mod ffi {
             timeout: f64,
         ) -> Result<()>;
         
-        fn context_info_sync(
+        fn context_put_int32(
+            ctx: Pin<&mut ContextWrapper>,
+            pv_name: &str,
+            value: i32,
+            timeout: f64,
+        ) -> Result<()>;
+        
+        fn context_put_string(
+            ctx: Pin<&mut ContextWrapper>,
+            pv_name: &str,
+            value: String,
+            timeout: f64,
+        ) -> Result<()>;
+        
+        fn context_put_enum(
+            ctx: Pin<&mut ContextWrapper>,
+            pv_name: &str,
+            value: i16,
+            timeout: f64,
+        ) -> Result<()>;
+        
+        fn context_put_double_array(
+            ctx: Pin<&mut ContextWrapper>,
+            pv_name: &str,
+            value: Vec<f64>,
+            timeout: f64,
+        ) -> Result<()>;
+        
+        fn context_put_int32_array(
+            ctx: Pin<&mut ContextWrapper>,
+            pv_name: &str,
+            value: Vec<i32>,
+            timeout: f64,
+        ) -> Result<()>;
+        
+        fn context_put_enum_array(
+            ctx: Pin<&mut ContextWrapper>,
+            pv_name: &str,
+            value: Vec<i16>,
+            timeout: f64,
+        ) -> Result<()>;
+        
+        fn context_put_string_array(
+            ctx: Pin<&mut ContextWrapper>,
+            pv_name: &str,
+            value: Vec<String>,
+            timeout: f64,
+        ) -> Result<()>;
+        
+        fn context_info(
             ctx: Pin<&mut ContextWrapper>,
             pv_name: &str,
             timeout: f64,

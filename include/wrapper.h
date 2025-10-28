@@ -172,10 +172,28 @@ namespace pvxs_wrapper
         std::unique_ptr<OperationWrapper> info_async(const std::string &pv_name, double timeout);
 
         // Perform a PUT operation (simplified - just set a double value)
-        void put_double(const std::string &pv_name, double value, double timeout);
+        void put(const std::string &pv_name, double value, double timeout);
 
         // Perform a PUT operation (simplified - just set an int32 value)
-        void put_int32(const std::string &pv_name, int32_t value, double timeout);
+        void put(const std::string &pv_name, int32_t value, double timeout);
+
+        // Perform a PUT operation (simplified - just set a string value)
+        void put(const std::string &pv_name, const std::string &value, double timeout);
+
+        // Perform a PUT operation (simplified - just set an enum value)
+        void put(const std::string &pv_name, int16_t value, double timeout);
+
+        // Perform a PUT operation (simplified - just set a double array)
+        void put(const std::string &pv_name, const rust::Vec<double> &value, double timeout);
+
+        // Perform a PUT operation (simplified - just set an int32 array)
+        void put(const std::string &pv_name, const rust::Vec<int32_t> &value, double timeout);
+
+        // Perform a PUT operation (simplified - just set an enum array)
+        void put(const std::string &pv_name, const rust::Vec<int16_t> &value, double timeout);
+
+        // Perform a PUT operation (simplified - just set a string array)
+        void put(const std::string &pv_name, const rust::Vec<rust::String> &value, double timeout);
 
         // Get type information (INFO operation)
         std::unique_ptr<ValueWrapper> info(const std::string &pv_name, double timeout);
@@ -236,7 +254,42 @@ namespace pvxs_wrapper
         rust::Str pv_name,
         double value,
         double timeout);
-    std::unique_ptr<ValueWrapper> context_info_sync(
+    void context_put_int32(
+        ContextWrapper &ctx,
+        rust::Str pv_name,
+        int32_t value,
+        double timeout);
+    void context_put_string(
+        ContextWrapper &ctx,
+        rust::Str pv_name,
+        rust::String value,
+        double timeout);
+    void context_put_enum(
+        ContextWrapper &ctx,
+        rust::Str pv_name,
+        int16_t value,
+        double timeout);
+    void context_put_double_array(
+        ContextWrapper &ctx,
+        rust::Str pv_name,
+        rust::Vec<double> value,
+        double timeout);
+    void context_put_int32_array(
+        ContextWrapper &ctx,
+        rust::Str pv_name,
+        rust::Vec<int32_t> value,
+        double timeout);
+    void context_put_enum_array(
+        ContextWrapper &ctx,
+        rust::Str pv_name,
+        rust::Vec<int16_t> value,
+        double timeout);
+    void context_put_string_array(
+        ContextWrapper &ctx,
+        rust::Str pv_name,
+        rust::Vec<rust::String> value,
+        double timeout);
+    std::unique_ptr<ValueWrapper> context_info(
         ContextWrapper &ctx,
         rust::Str pv_name,
         double timeout);
