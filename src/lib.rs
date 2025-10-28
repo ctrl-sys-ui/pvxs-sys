@@ -13,7 +13,10 @@
 //! - **GET operations**: Read process variable values
 //! - **PUT operations**: Write process variable values  
 //! - **INFO operations**: Query PV type information
+//! - **MONITOR operations**: Subscribe to value changes with callbacks
+//! - **MonitorBuilder**: Advanced monitor configuration with PVXS-style API
 //! - **Array support**: Read/write arrays of double, int32, enum, and string values
+//! - **Server support**: Create and manage PVAccess servers
 //! - Thread-safe client context
 //! 
 //! ## Basic Example
@@ -35,6 +38,42 @@
 //!     // Write a new value
 //!     ctx.put_double("my:pv:name", 42.0, 5.0)?;
 //!     
+//!     Ok(())
+//! }
+//! ```
+//! 
+//! ## Monitor Example with MonitorBuilder
+//! 
+//! ```no_run
+//! use epics_pvxs_sys::{Context, PvxsError};
+//! 
+//! fn main() -> Result<(), PvxsError> {
+//!     let mut ctx = Context::from_env()?;
+//!     
+//!     // Create a monitor with advanced configuration
+//!     let mut monitor = ctx.monitor_builder("my:pv:name")?
+//!         .mask_connected(false)      // Don't include connection events
+//!         .mask_disconnected(true)    // Include disconnection events
+//!         .exec()?;
+//!     
+//!     monitor.start();
+//!     
+//!     // PVXS-style event processing
+//!     loop {
+//!         match monitor.pop() {
+//!             Ok(Some(value)) => {
+//!                 println!("Update: {}", value);
+//!                 // Process the value...
+//!             },
+//!             Ok(None) => break, // Queue empty
+//!             Err(e) => {
+//!                 println!("Event: {}", e); // Connection events, errors
+//!                 break;
+//!             }
+//!         }
+//!     }
+//!     
+//!     monitor.stop();
 //!     Ok(())
 //! }
 //! ```
@@ -76,7 +115,7 @@ pub mod bridge;
 use cxx::UniquePtr;
 use std::fmt;
 
-pub use bridge::{ContextWrapper, ValueWrapper, RpcWrapper, MonitorWrapper, ServerWrapper, SharedPVWrapper, StaticSourceWrapper};
+pub use bridge::{ContextWrapper, ValueWrapper, RpcWrapper, MonitorWrapper, MonitorBuilderWrapper, ServerWrapper, SharedPVWrapper, StaticSourceWrapper};
 
 // Re-export for convenience
 pub type Result<T> = std::result::Result<T, PvxsError>;
@@ -486,6 +525,36 @@ impl Context {
     pub fn monitor(&mut self, pv_name: &str) -> Result<Monitor> {
         let inner = bridge::context_monitor_create(self.inner.pin_mut(), pv_name.to_string())?;
         Ok(Monitor { inner })
+    }
+
+    /// Create a MonitorBuilder for advanced monitor configuration
+    /// 
+    /// Returns a builder that allows configuring event masks and callbacks before
+    /// creating the monitor subscription.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `pv_name` - Name of the process variable to monitor
+    /// 
+    /// # Returns
+    /// 
+    /// A `MonitorBuilder` instance for configuring the monitor.
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// use epics_pvxs_sys::Context;
+    /// 
+    /// let mut ctx = Context::from_env().expect("Context creation failed");
+    /// let monitor = ctx.monitor_builder("TEST:PV_Double")
+    ///     .mask_connected(false)
+    ///     .mask_disconnected(true)
+    ///     .exec()
+    ///     .expect("Monitor creation failed");
+    /// ```
+    pub fn monitor_builder(&mut self, pv_name: &str) -> Result<MonitorBuilder> {
+        let inner = bridge::context_monitor_builder_create(self.inner.pin_mut(), pv_name.to_string())?;
+        Ok(MonitorBuilder { inner })
     }
 }
 
@@ -994,6 +1063,51 @@ impl Monitor {
         }
     }
     
+    /// Pop the next update from the subscription queue (PVXS-style)
+    /// 
+    /// This follows the PVXS pattern where `pop()` returns a Value if available,
+    /// or throws specific exceptions for connection events.
+    /// 
+    /// # Returns
+    /// 
+    /// A `Value` if an update is available, `None` if the queue is empty.
+    /// 
+    /// # Errors
+    /// 
+    /// May return errors for connection events (Connected, Disconnect, Finished)
+    /// or other subscription-related issues.
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// # use epics_pvxs_sys::Context;
+    /// # let mut ctx = Context::from_env().unwrap();
+    /// # let mut monitor = ctx.monitor("MY:PV").unwrap();
+    /// # monitor.start();
+    /// loop {
+    ///     match monitor.pop() {
+    ///         Ok(Some(value)) => println!("Update: {}", value),
+    ///         Ok(None) => break, // Queue empty
+    ///         Err(e) => {
+    ///             println!("Event or error: {}", e);
+    ///             break;
+    ///         }
+    ///     }
+    /// }
+    /// ```
+    pub fn pop(&mut self) -> Result<Option<Value>> {
+        match bridge::monitor_pop(self.inner.pin_mut()) {
+            Ok(value_wrapper) => {
+                if value_wrapper.is_null() {
+                    Ok(None)
+                } else {
+                    Ok(Some(Value { inner: value_wrapper }))
+                }
+            },
+            Err(e) => Err(e.into()),
+        }
+    }
+    
     /// Check if the monitor is connected to the PV
     /// 
     /// # Returns
@@ -1033,6 +1147,152 @@ impl Monitor {
     /// ```
     pub fn name(&self) -> String {
         bridge::monitor_get_name(&self.inner)
+    }
+}
+
+/// MonitorBuilder provides a builder pattern for creating monitors with advanced configuration
+/// 
+/// This follows the PVXS MonitorBuilder pattern, allowing configuration of event masks
+/// and callbacks before creating the subscription.
+/// 
+/// # Example
+/// 
+/// ```no_run
+/// use epics_pvxs_sys::Context;
+/// 
+/// let mut ctx = Context::from_env()?;
+/// let monitor = ctx.monitor_builder("MY:PV")
+///     .mask_connected(false)
+///     .mask_disconnected(true)
+///     .exec()?;
+/// # Ok::<(), epics_pvxs_sys::PvxsError>(())
+/// ```
+pub struct MonitorBuilder {
+    inner: UniquePtr<bridge::MonitorBuilderWrapper>,
+}
+
+impl MonitorBuilder {
+    /// Configure whether to include Connected events in the queue
+    /// 
+    /// # Arguments
+    /// 
+    /// * `mask` - true to include Connected events (default: true)
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// # use epics_pvxs_sys::Context;
+    /// # let mut ctx = Context::from_env().unwrap();
+    /// let monitor = ctx.monitor_builder("MY:PV")
+    ///     .mask_connected(false) // Don't include connection events
+    ///     .exec()?;
+    /// # Ok::<(), epics_pvxs_sys::PvxsError>(())
+    /// ```
+    pub fn mask_connected(mut self, mask: bool) -> Self {
+        // Ignore errors for now - these should rarely fail
+        let _ = bridge::monitor_builder_mask_connected(self.inner.pin_mut(), mask);
+        self
+    }
+    
+    /// Configure whether to include Disconnected events in the queue
+    /// 
+    /// # Arguments
+    /// 
+    /// * `mask` - true to include Disconnected events (default: false)
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// # use epics_pvxs_sys::Context;
+    /// # let mut ctx = Context::from_env().unwrap();
+    /// let monitor = ctx.monitor_builder("MY:PV")
+    ///     .mask_disconnected(true) // Include disconnection events
+    ///     .exec()?;
+    /// # Ok::<(), epics_pvxs_sys::PvxsError>(())
+    /// ```
+    pub fn mask_disconnected(mut self, mask: bool) -> Self {
+        // Ignore errors for now - these should rarely fail
+        let _ = bridge::monitor_builder_mask_disconnected(self.inner.pin_mut(), mask);
+        self
+    }
+    
+    /// Set an event callback function that will be invoked when the subscription queue becomes not-empty
+    /// 
+    /// This follows the PVXS pattern where the callback is invoked when events are available,
+    /// not for each individual event. The callback should then use `pop()` to retrieve events.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `callback` - Function to be called when events are available
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// # use epics_pvxs_sys::Context;
+    /// # let mut ctx = Context::from_env().unwrap();
+    /// 
+    /// extern "C" fn my_callback() {
+    ///     println!("Events available in subscription queue!");
+    /// }
+    /// 
+    /// let monitor = ctx.monitor_builder("MY:PV")
+    ///     .event(my_callback)
+    ///     .exec()?;
+    /// # Ok::<(), epics_pvxs_sys::PvxsError>(())
+    /// ```
+    pub fn event(mut self, callback: extern "C" fn()) -> Self {
+        // Convert function pointer to usize for C++
+        let callback_ptr = callback as usize;
+        
+        // Set the callback in C++
+        let _ = bridge::monitor_builder_set_event_callback(self.inner.pin_mut(), callback_ptr);
+        self
+    }
+    
+    /// Execute and create the monitor subscription
+    /// 
+    /// Creates the actual monitor subscription with the configured settings.
+    /// 
+    /// # Returns
+    /// 
+    /// A `Monitor` instance ready for use.
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// # use epics_pvxs_sys::Context;
+    /// # let mut ctx = Context::from_env().unwrap();
+    /// let monitor = ctx.monitor_builder("MY:PV")
+    ///     .mask_connected(false)
+    ///     .exec()?;
+    /// # Ok::<(), epics_pvxs_sys::PvxsError>(())
+    /// ```
+    pub fn exec(mut self) -> Result<Monitor> {
+        let inner = bridge::monitor_builder_exec(self.inner.pin_mut())?;
+        Ok(Monitor { inner })
+    }
+    
+    /// Execute with an event callback (for future implementation)
+    /// 
+    /// This is a placeholder for future callback support. Currently behaves
+    /// the same as `exec()`.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `callback_id` - Identifier for the callback (currently unused)
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// # use epics_pvxs_sys::Context;
+    /// # let mut ctx = Context::from_env().unwrap();
+    /// let monitor = ctx.monitor_builder("MY:PV")
+    ///     .exec_with_callback(123)?;
+    /// # Ok::<(), epics_pvxs_sys::PvxsError>(())
+    /// ```
+    pub fn exec_with_callback(mut self, callback_id: u64) -> Result<Monitor> {
+        let inner = bridge::monitor_builder_exec_with_callback(self.inner.pin_mut(), callback_id)?;
+        Ok(Monitor { inner })
     }
 }
 

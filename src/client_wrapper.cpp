@@ -385,6 +385,14 @@ namespace pvxs_wrapper {
         }
     }
 
+    std::unique_ptr<MonitorBuilderWrapper> ContextWrapper::monitor_builder(const std::string& pv_name) {
+        try {
+            return std::make_unique<MonitorBuilderWrapper>(context_, pv_name);
+        } catch (const std::exception& e) {
+            throw PvxsError(std::string("Error creating monitor builder for '") + pv_name + "': " + e.what());
+        }
+    }
+
     // ============================================================================
     // Factory functions for Rust FFI
     // ============================================================================

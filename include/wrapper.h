@@ -22,6 +22,8 @@ namespace pvxs_wrapper
     class ServerWrapper;
     class SharedPVWrapper;
     class StaticSourceWrapper;
+    class MonitorWrapper;
+    class MonitorBuilderWrapper;
 
     /// Exception wrapper for Rust-friendly error handling
     class PvxsError : public std::runtime_error
@@ -112,6 +114,7 @@ namespace pvxs_wrapper
         pvxs::client::Context &context_;
         std::shared_ptr<pvxs::client::Subscription> monitor_;
         std::string pv_name_;
+        void (*rust_callback_)() = nullptr;  // Function pointer to Rust callback (no parameters)
 
     public:
         MonitorWrapper() = delete; // Must have context and PV name
@@ -119,6 +122,8 @@ namespace pvxs_wrapper
             : context_(ctx), pv_name_(pv_name) {}
         explicit MonitorWrapper(std::shared_ptr<pvxs::client::Subscription> &&monitor, const std::string &pv_name, pvxs::client::Context &ctx)
             : context_(ctx), monitor_(std::move(monitor)), pv_name_(pv_name) {}
+        explicit MonitorWrapper(std::shared_ptr<pvxs::client::Subscription> &&monitor, const std::string &pv_name, pvxs::client::Context &ctx, void (*callback)())
+            : context_(ctx), monitor_(std::move(monitor)), pv_name_(pv_name), rust_callback_(callback) {}
 
         // Start monitoring
         void start();
@@ -143,6 +148,44 @@ namespace pvxs_wrapper
 
         // Get connection status
         bool is_connected() const;
+        
+        // Pop next value from subscription queue (PVXS-style)
+        std::unique_ptr<ValueWrapper> pop();
+    };
+
+    /// Builder pattern for creating monitors with callbacks (PVXS-style)
+    class MonitorBuilderWrapper
+    {
+    private:
+        pvxs::client::Context &context_;
+        std::string pv_name_;
+        bool mask_connected_ = true;
+        bool mask_disconnected_ = false;
+        uint64_t callback_id_ = 0;
+        void (*rust_callback_)() = nullptr;  // Function pointer to Rust callback (no parameters)
+
+    public:
+        MonitorBuilderWrapper() = delete;
+        MonitorBuilderWrapper(pvxs::client::Context &ctx, const std::string &pv_name)
+            : context_(ctx), pv_name_(pv_name) {}
+
+        // Configure whether to include Connected events in queue
+        void mask_connected(bool mask);
+        
+        // Configure whether to include Disconnected events in queue  
+        void mask_disconnected(bool mask);
+        
+        // Set event callback function pointer
+        void set_event_callback(void (*callback)());
+        
+        // Execute and return a subscription without callback
+        std::unique_ptr<MonitorWrapper> exec();
+        
+        // Execute and return a subscription with event callback
+        std::unique_ptr<MonitorWrapper> exec_with_callback(uint64_t callback_id);
+        
+        // Get PV name
+        std::string name() const { return pv_name_; }
     };
 
     /// Wraps pvxs::client::Context for safe Rust access
@@ -203,6 +246,9 @@ namespace pvxs_wrapper
 
         // Create Monitor
         std::unique_ptr<MonitorWrapper> monitor(const std::string &pv_name);
+        
+        // Create MonitorBuilder (PVXS-style)
+        std::unique_ptr<MonitorBuilderWrapper> monitor_builder(const std::string &pv_name);
     };
 
     /// Wraps RPC operations for safe Rust access
@@ -339,6 +385,19 @@ namespace pvxs_wrapper
     std::unique_ptr<ValueWrapper> monitor_try_get_update(MonitorWrapper &monitor);
     bool monitor_is_connected(const MonitorWrapper &monitor);
     rust::String monitor_get_name(const MonitorWrapper &monitor);
+    std::unique_ptr<ValueWrapper> monitor_pop(MonitorWrapper &monitor);
+
+    // MonitorBuilder operations for Rust
+    std::unique_ptr<MonitorBuilderWrapper> context_monitor_builder_create(
+        ContextWrapper &ctx,
+        rust::String pv_name);
+    void monitor_builder_mask_connected(MonitorBuilderWrapper &builder, bool mask);
+    void monitor_builder_mask_disconnected(MonitorBuilderWrapper &builder, bool mask);
+    void monitor_builder_set_event_callback(MonitorBuilderWrapper &builder, uintptr_t callback_ptr);
+    std::unique_ptr<MonitorWrapper> monitor_builder_exec(MonitorBuilderWrapper &builder);
+    std::unique_ptr<MonitorWrapper> monitor_builder_exec_with_callback(
+        MonitorBuilderWrapper &builder,
+        uint64_t callback_id);
 
     // ============================================================================
     // Server-side wrappers
