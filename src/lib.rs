@@ -13,16 +13,17 @@
 //! - **GET operations**: Read process variable values
 //! - **PUT operations**: Write process variable values  
 //! - **INFO operations**: Query PV type information
+//! - **Array support**: Read/write arrays of double, int32, enum, and string values
 //! - Thread-safe client context
 //! 
-//! ## Example
+//! ## Basic Example
 //! 
 //! ```no_run
 //! use epics_pvxs_sys::{Context, PvxsError};
 //! 
 //! fn main() -> Result<(), PvxsError> {
 //!     // Create a client context from environment variables
-//!     let ctx = Context::from_env()?;
+//!     let mut ctx = Context::from_env()?;
 //!     
 //!     // Read a PV value (timeout after 5 seconds)
 //!     let value = ctx.get("my:pv:name", 5.0)?;
@@ -33,6 +34,32 @@
 //!     
 //!     // Write a new value
 //!     ctx.put_double("my:pv:name", 42.0, 5.0)?;
+//!     
+//!     Ok(())
+//! }
+//! ```
+//! 
+//! ## Array Example
+//! 
+//! ```no_run
+//! use epics_pvxs_sys::{Context, PvxsError};
+//! 
+//! fn main() -> Result<(), PvxsError> {
+//!     let mut ctx = Context::from_env()?;
+//!     
+//!     // Read a waveform array
+//!     let value = ctx.get("waveform:pv", 5.0)?;
+//!     let array = value.get_field_double_array("value")?;
+//!     println!("Waveform has {} points", array.len());
+//!     
+//!     // Read enum choices
+//!     let enum_pv = ctx.get("enum:pv", 5.0)?;
+//!     let choices = enum_pv.get_field_string_array("value.choices")?;
+//!     let index = enum_pv.get_field_enum("value.index")?;
+//!     println!("Current choice: '{}'", choices[index as usize]);
+//!     
+//!     // Write an array
+//!     ctx.put_double_array("array:pv", vec![1.0, 2.0, 3.0], 5.0)?;
 //!     
 //!     Ok(())
 //! }
@@ -575,7 +602,7 @@ impl Context {
 /// 
 /// ```no_run
 /// # use epics_pvxs_sys::{Context, Value};
-/// # let ctx = Context::from_env().unwrap();
+/// # let mut ctx = Context::from_env().unwrap();
 /// let value: Value = ctx.get("my:pv:name", 5.0).unwrap();
 /// 
 /// // Access different field types
@@ -636,40 +663,125 @@ impl Value {
 
     /// Get a field value as an array of doubles
     /// 
+    /// Extracts a field containing an array of double-precision floating point values.
+    /// Commonly used for waveform data, measurement arrays, or multi-point setpoints.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `field_name` - The field path (e.g., "value", "waveform.data")
+    /// 
     /// # Errors
     /// 
     /// Returns an error if the field doesn't exist or cannot be
     /// converted to an array of doubles.
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// # use epics_pvxs_sys::Context;
+    /// # let mut ctx = Context::from_env().unwrap();
+    /// let value = ctx.get("waveform:double:pv", 5.0).unwrap();
+    /// let array = value.get_field_double_array("value").unwrap();
+    /// println!("Double array length: {}", array.len());
+    /// for (i, val) in array.iter().enumerate().take(5) {
+    ///     println!("  [{}] = {}", i, val);
+    /// }
+    /// ```
     pub fn get_field_double_array(&self, field_name: &str) -> Result<Vec<f64>> {
         Ok(bridge::value_get_field_double_array(&self.inner, field_name.to_string())?)
     }
 
     /// Get a field value as an array of int32
     /// 
+    /// Extracts a field containing an array of 32-bit signed integers.
+    /// Often used for status arrays, configuration parameters, or indexed data.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `field_name` - The field path (e.g., "value", "status.codes")
+    /// 
     /// # Errors
     /// 
     /// Returns an error if the field doesn't exist or cannot be
     /// converted to an array of int32.
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// # use epics_pvxs_sys::Context;
+    /// # let mut ctx = Context::from_env().unwrap();
+    /// let value = ctx.get("array:int32:pv", 5.0).unwrap();
+    /// let array = value.get_field_int32_array("value").unwrap();
+    /// println!("Int32 array length: {}", array.len());
+    /// for (i, val) in array.iter().enumerate().take(5) {
+    ///     println!("  [{}] = {}", i, val);
+    /// }
+    /// ```
     pub fn get_field_int32_array(&self, field_name: &str) -> Result<Vec<i32>> {
         Ok(bridge::value_get_field_int32_array(&self.inner, field_name.to_string())?)
     }
 
     /// Get a field value as an array of enums (int16)
     /// 
+    /// Extracts a field containing an array of enumerated values.
+    /// Each enum is represented as a 16-bit signed integer index.
+    /// Use in conjunction with choices arrays to map indices to string labels.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `field_name` - The field path (e.g., "value", "states.index")
+    /// 
     /// # Errors
     /// 
     /// Returns an error if the field doesn't exist or cannot be
     /// converted to an array of enums.
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// # use epics_pvxs_sys::Context;
+    /// # let mut ctx = Context::from_env().unwrap();
+    /// let value = ctx.get("enum:array:pv", 5.0).unwrap();
+    /// let indices = value.get_field_enum_array("value").unwrap();
+    /// let choices = value.get_field_string_array("value.choices").unwrap();
+    /// 
+    /// for (i, &index) in indices.iter().enumerate().take(5) {
+    ///     if (index as usize) < choices.len() {
+    ///         println!("  [{}] = {} ('{}')", i, index, choices[index as usize]);
+    ///     }
+    /// }
+    /// ```
     pub fn get_field_enum_array(&self, field_name: &str) -> Result<Vec<i16>> {
         Ok(bridge::value_get_field_enum_array(&self.inner, field_name.to_string())?)
     }
 
     /// Get a field value as an array of strings
     /// 
+    /// Extracts a field containing an array of string values.
+    /// Commonly used for enum choices, device names, status messages, or text lists.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `field_name` - The field path (e.g., "value.choices", "devices.names")
+    /// 
     /// # Errors
     /// 
     /// Returns an error if the field doesn't exist or cannot be
     /// converted to an array of strings.
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// # use epics_pvxs_sys::Context;
+    /// # let mut ctx = Context::from_env().unwrap();
+    /// // Get enum choices for an NTEnum PV
+    /// let value = ctx.get("enum:pv", 5.0).unwrap();
+    /// let choices = value.get_field_string_array("value.choices").unwrap();
+    /// println!("Available choices:");
+    /// for (i, choice) in choices.iter().enumerate() {
+    ///     println!("  [{}] = '{}'", i, choice);
+    /// }
+    /// ```
     pub fn get_field_string_array(&self, field_name: &str) -> Result<Vec<String>> {
         Ok(bridge::value_get_field_string_array(&self.inner, field_name.to_string())?)
     }
@@ -1473,25 +1585,3 @@ impl StaticSource {
         Ok(())
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_context_creation() {
-        // This test requires EPICS environment to be set up
-        // In a real environment, this should succeed
-        let result = Context::from_env();
-        
-        // We can't assert success without a running EPICS environment
-        // but we can check that the function doesn't panic
-        match result {
-            Ok(_) => println!("Context created successfully"),
-            Err(e) => println!("Expected error without EPICS environment: {}", e),
-        }
-    }
-}
-
-//#[cfg(test)]
-//mod async_optional_test;  // Include the async optional test module

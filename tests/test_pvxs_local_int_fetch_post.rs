@@ -23,17 +23,18 @@ fn test_pv_local_fetch_post(){
         Err(e) => panic!("Failed to post double value: {:?}", e),
     }
 
-    // Post a string to similate value being invalid... negative test
-    match srv_pv_loc_int.post_string("invalid") {
-        Ok(_) => panic!("Expected error when posting string to int pv, but got Ok"),
-        Err(_) => assert!(true), // Expected error
-    }
-
     // Fetch again to verify the clipped value
     match srv_pv_loc_int.fetch() {
         Ok(value) => assert!(value.get_field_int32("value").unwrap() == 3),
         Err(e) => panic!("Failed to fetch value: {:?}", e),
     }
+
+    // Post a string to similate value being invalid... negative test
+    match srv_pv_loc_int.post_string("invalid") {
+        Ok(_) => panic!("Expected error when posting string to int pv, but got Ok"),
+        Err(_) => assert!(true), // Expected error
+    }
+    
     // Now set a new value and do a server side post
     let new_value = 200;
     match srv_pv_loc_int.post_int32(new_value) {
