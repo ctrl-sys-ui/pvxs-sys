@@ -160,7 +160,7 @@ namespace pvxs_wrapper
             : context_(std::move(ctx)) {}
 
         // Perform a GET operation (synchronous version for simplicity)
-        std::unique_ptr<ValueWrapper> get_sync(const std::string &pv_name, double timeout);
+        std::unique_ptr<ValueWrapper> get(const std::string &pv_name, double timeout);
 
         // Start an async GET operation
         std::unique_ptr<OperationWrapper> get_async(const std::string &pv_name, double timeout);
@@ -178,7 +178,7 @@ namespace pvxs_wrapper
         void put_int32(const std::string &pv_name, int32_t value, double timeout);
 
         // Get type information (INFO operation)
-        std::unique_ptr<ValueWrapper> info_sync(const std::string &pv_name, double timeout);
+        std::unique_ptr<ValueWrapper> info(const std::string &pv_name, double timeout);
 
         // Create RPC builder
         std::unique_ptr<class RpcWrapper> rpc_create(const std::string &pv_name);
@@ -227,7 +227,7 @@ namespace pvxs_wrapper
 
     std::unique_ptr<ValueWrapper> rpc_execute_sync(RpcWrapper &rpc, double timeout);
     std::unique_ptr<OperationWrapper> rpc_execute_async(RpcWrapper &rpc, double timeout);
-    std::unique_ptr<ValueWrapper> context_get_sync(
+    std::unique_ptr<ValueWrapper> context_get(
         ContextWrapper &ctx,
         rust::Str pv_name,
         double timeout);

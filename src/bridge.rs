@@ -18,7 +18,7 @@ mod ffi {
         // Context creation and operations
         fn create_context_from_env() -> Result<UniquePtr<ContextWrapper>>;
         
-        fn context_get_sync(
+        fn context_get(
             ctx: Pin<&mut ContextWrapper>,
             pv_name: &str,
             timeout: f64,

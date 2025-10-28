@@ -76,7 +76,7 @@ std::unique_ptr<ValueWrapper> get_sync(
 mod ffi {
     unsafe extern "C++" {
         type ContextWrapper;
-        fn context_get_sync(...) -> Result<UniquePtr<ValueWrapper>>;
+        fn context_get(...) -> Result<UniquePtr<ValueWrapper>>;
     }
 }
 ```
@@ -100,7 +100,7 @@ pub struct Context {
 
 impl Context {
     pub fn get(&self, pv_name: &str, timeout: f64) -> Result<Value> {
-        let inner = bridge::context_get_sync(&self.inner, pv_name, timeout)?;
+        let inner = bridge::context_get(&self.inner, pv_name, timeout)?;
         Ok(Value { inner })
     }
 }

@@ -144,7 +144,7 @@ impl Context {
     /// println!("Value: {}", value);
     /// ```
     pub fn get(&mut self, pv_name: &str, timeout: f64) -> Result<Value> {
-        let inner = bridge::context_get_sync(self.inner.pin_mut(), pv_name, timeout)?;
+        let inner = bridge::context_get(self.inner.pin_mut(), pv_name, timeout)?;
         Ok(Value { inner })
     }
     

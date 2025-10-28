@@ -204,7 +204,7 @@ namespace pvxs_wrapper {
         }
     }
 
-    std::unique_ptr<ValueWrapper> ContextWrapper::get_sync(
+    std::unique_ptr<ValueWrapper> ContextWrapper::get(
         const std::string& pv_name, 
         double timeout) {
         
@@ -213,7 +213,7 @@ namespace pvxs_wrapper {
             auto result = op->wait(timeout);
             return std::make_unique<ValueWrapper>(std::move(result));
         } catch (const std::exception& e) {
-            throw PvxsError(std::string("Error in get_sync for '") + pv_name + "': " + e.what());
+            throw PvxsError(std::string("Error in get for '") + pv_name + "': " + e.what());
         }
     }
 
@@ -247,7 +247,7 @@ namespace pvxs_wrapper {
         }
     }
 
-    std::unique_ptr<ValueWrapper> ContextWrapper::info_sync(
+    std::unique_ptr<ValueWrapper> ContextWrapper::info(
         const std::string& pv_name,
         double timeout) {
         
@@ -255,7 +255,7 @@ namespace pvxs_wrapper {
             auto result = context_.info(pv_name).exec()->wait(timeout);
             return std::make_unique<ValueWrapper>(std::move(result));
         } catch (const std::exception& e) {
-            throw PvxsError(std::string("Error in info_sync for '") + pv_name + "': " + e.what());
+            throw PvxsError(std::string("Error in info for '") + pv_name + "': " + e.what());
         }
     }
 
@@ -283,11 +283,11 @@ namespace pvxs_wrapper {
         return ContextWrapper::from_env();
     }
 
-    std::unique_ptr<ValueWrapper> context_get_sync(
+    std::unique_ptr<ValueWrapper> context_get(
         ContextWrapper& ctx,
         rust::Str pv_name,
         double timeout) {
-        return ctx.get_sync(std::string(pv_name), timeout);
+        return ctx.get(std::string(pv_name), timeout);
     }
 
     void context_put_double(
@@ -302,7 +302,7 @@ namespace pvxs_wrapper {
         ContextWrapper& ctx,
         rust::Str pv_name,
         double timeout) {
-        return ctx.info_sync(std::string(pv_name), timeout);
+        return ctx.info(std::string(pv_name), timeout);
     }
 
     // ============================================================================
