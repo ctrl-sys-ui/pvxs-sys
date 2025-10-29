@@ -10,6 +10,11 @@ namespace pvxs_wrapper {
     void MonitorWrapper::start() {
         if (!monitor_) {
             try {
+                // Create a Connect object to track connection state
+                // connect() returns a shared_ptr<Connect>
+                connect_ = context_.connect(pv_name_).exec();
+                
+                // Create the subscription
                 auto sub = context_.monitor(pv_name_).maskConnected(true).maskDisconnected(true).exec();
                 monitor_ = std::move(sub);
             } catch (const std::exception& e) {
@@ -21,6 +26,9 @@ namespace pvxs_wrapper {
     void MonitorWrapper::stop() {
         if (monitor_) {
             monitor_.reset();
+        }
+        if (connect_) {
+            connect_.reset();
         }
     }
 
@@ -104,8 +112,17 @@ namespace pvxs_wrapper {
     }
 
     bool MonitorWrapper::is_connected() const {
-        // This is a simplified implementation
-        return monitor_ != nullptr;
+        // Use the Connect object to check actual connection state
+        if (!connect_) {
+            return false;
+        }
+        
+        try {
+            // The Connect object tracks channel connection state
+            return connect_->connected();
+        } catch (const std::exception& e) {
+            return false;
+        }
     }
 
     // ============================================================================
@@ -176,6 +193,9 @@ namespace pvxs_wrapper {
                 .maskConnected(mask_connected_)
                 .maskDisconnected(mask_disconnected_);
             
+            // Create Connect object for tracking connection state
+            auto connect = context_.connect(pv_name_).exec();
+            
             // If we have a callback, set up the PVXS event handler and call exec in the chain
             if (rust_callback_) {
                 // Capture the callback in a lambda for PVXS
@@ -185,16 +205,20 @@ namespace pvxs_wrapper {
                     callback_ptr();
                 }).exec();
                 
-                // Create wrapper with the subscription and callback
-                return std::make_unique<MonitorWrapper>(
+                // Create wrapper with the subscription, connect, and callback
+                auto wrapper = std::make_unique<MonitorWrapper>(
                     std::move(subscription), pv_name_, context_, rust_callback_);
+                wrapper->set_connect(std::move(connect));
+                return wrapper;
             } else {
                 // No callback, just exec directly
                 auto subscription = builder.exec();
                 
-                // Create wrapper with the subscription
-                return std::make_unique<MonitorWrapper>(
+                // Create wrapper with the subscription and connect
+                auto wrapper = std::make_unique<MonitorWrapper>(
                     std::move(subscription), pv_name_, context_, nullptr);
+                wrapper->set_connect(std::move(connect));
+                return wrapper;
             }
         } catch (const std::exception& e) {
             throw PvxsError(std::string("Error creating monitor for '") + pv_name_ + "': " + e.what());

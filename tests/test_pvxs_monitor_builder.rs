@@ -1,6 +1,6 @@
 // test_pvxs_monitor_builder.rs - Test MonitorBuilder and callback functionality
 
-use epics_pvxs_sys::{Context, PvxsError, Server, SharedPV};
+use epics_pvxs_sys::{Context, Monitor, PvxsError, Server, SharedPV};
 use std::thread;
 use std::time::Duration;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -12,13 +12,13 @@ static COUNTER_TEST_CALLBACK_COUNTER: AtomicUsize = AtomicUsize::new(0);
 // Callback function for testing
 extern "C" fn test_event_callback() {
     CALLBACK_COUNTER.fetch_add(1, Ordering::SeqCst);
-    println!("🔔 Callback invoked! Total calls: {}", CALLBACK_COUNTER.load(Ordering::SeqCst));
+    println!("  - Callback invoked! Total calls: {}", CALLBACK_COUNTER.load(Ordering::SeqCst));
 }
 
 // Callback function specifically for counter test
 extern "C" fn counter_test_callback() {
     let count = COUNTER_TEST_CALLBACK_COUNTER.fetch_add(1, Ordering::SeqCst) + 1;
-    println!("🔔 COUNTER CALLBACK #{}: Server value changed!", count);
+    println!("  - COUNTER CALLBACK #{}: Server value changed!", count);
 }
 
 /// Test basic MonitorBuilder creation and configuration
@@ -27,30 +27,93 @@ fn test_monitor_builder_creation() -> Result<(), PvxsError> {
     // Create isolated server for testing
     let mut server = Server::create_isolated()?;
     let mut shared_pv = SharedPV::create_mailbox()?;
+    let pv_name = "test:pv:double";
     
     // Open with initial double value
     shared_pv.open_double(1.0)?;
-    server.add_pv("TEST:MonitorBuilder:Double", &mut shared_pv)?;
-    
-    // Start server
-    server.start()?;
-    
-    // Give server time to start
-    thread::sleep(Duration::from_millis(100));
+    server.add_pv(pv_name, &mut shared_pv)?;
+    // INTENTIONALLY NOT starting server to test monitor creation on non-existent PV
     
     // Create client context
     let mut ctx = Context::from_env()?;
     
     // Test MonitorBuilder creation and configuration
-    let _monitor = ctx.monitor_builder("TEST:MonitorBuilder:Double")?
-        .mask_connected(false)        // Don't include connection events
-        .mask_disconnected(true)      // Include disconnection events
-        .exec()?;
+    // This should succeed - creating a monitor for a PV that doesn't exist yet
+    let _monitor: Result<Monitor, PvxsError> = ctx.monitor_builder(pv_name)?
+        .mask_connected(true)        
+        .mask_disconnected(true)     
+        .exec();
     
-    println!("✓ MonitorBuilder created and configured successfully");
+    match _monitor {
+        Ok(mut monitor) => {
+            assert_eq!(monitor.name(), pv_name, "Monitor should have correct PV name");
+            
+            // Start the monitor
+            monitor.start();
+            // Give the monitor some time to attempt connection
+            thread::sleep(Duration::from_millis(500));
+            
+            // is_connected() now properly checks connection status using Connect object
+            assert_eq!(monitor.is_connected(), false, 
+                "Monitor should not be connected - server not started yet");
+            
+            // start server (isolated server - won't accept external connections)
+            server.start()?;
+            thread::sleep(Duration::from_millis(500));
+            assert_eq!(monitor.is_connected(), false, 
+                "Monitor should not connect to isolated server");
+            
+            monitor.stop();
+        },
+        Err(e) => {
+            return Err(e);
+        }
+    }
+    // Clean up and stop this server
+    let _ = server.stop();
+
+    // Now start a new server from_env to test actual connection
+    server = Server::from_env()?;
+    shared_pv = SharedPV::create_mailbox()?;
+    shared_pv.open_double(1.0)?;
+    server.add_pv(pv_name, &mut shared_pv)?;
+    server.start()?;
     
-    // Clean up
-    server.stop()?;
+    // Test MonitorBuilder creation again - this time server is running
+    let _monitor: Result<Monitor, PvxsError> = ctx.monitor_builder(pv_name)?
+        .mask_connected(true)        
+        .mask_disconnected(true)     
+        .exec();
+    match _monitor {
+        Ok(mut monitor) => {
+            // Start the monitor
+            monitor.start();
+            // Give more time for connection to establish
+            thread::sleep(Duration::from_millis(2000));
+            
+            // is_connected() now properly uses Connect object to check actual connection
+            assert_eq!(monitor.is_connected(), true, 
+                "Monitor should be connected to from_env server");
+            
+            // stop the server
+            let _ = server.stop();
+            thread::sleep(Duration::from_millis(1000));
+            
+            // After stopping server, should detect disconnection
+            assert_eq!(monitor.is_connected(), false, 
+                "Monitor should be disconnected after server stop");
+            
+            // start the server again
+            server.start()?;
+            // Give more time for reconnection (might take longer than initial connection)
+            thread::sleep(Duration::from_millis(5000));
+            assert_eq!(monitor.is_connected(), true, 
+                "Monitor should reconnect after server restart");
+        },
+        Err(e) => {
+            return Err(e);
+        }
+    }
     Ok(())
 }
 
@@ -211,9 +274,9 @@ fn test_monitor_builder_with_callback() -> Result<(), PvxsError> {
     
     // Create monitor with actual Rust callback function
     let mut monitor = ctx.monitor_builder("TEST:MonitorBuilder:Callback")?
-        .mask_connected(false)   // Allow connection events - callback should fire for these
-        .mask_disconnected(false) // Allow disconnection events
-        .event(test_event_callback)  // Set the actual callback
+        .connection_events(true)      // Include connection events in queue
+        .disconnection_events(true)   // Include disconnection events in queue
+        .event(test_event_callback)   // Set the actual callback
         .exec()?;
     
     println!("✓ Monitor created with Rust callback function");
@@ -510,10 +573,10 @@ fn test_monitor_builder_with_server_side_counter() -> Result<(), PvxsError> {
     
     let mut ctx = Context::from_env()?;
     
-    // Create monitor with callback - allow connection events to see if they trigger callbacks
+    // Create monitor with callback - enable connection/disconnection events
     let mut monitor = ctx.monitor_builder("TEST:MonitorBuilder:Counter")?
-        .mask_connected(false)   // Allow connection events
-        .mask_disconnected(false) // Allow disconnection events  
+        .connection_events(true)      // Include connection events in queue
+        .disconnection_events(true)   // Include disconnection events in queue
         .event(counter_test_callback)  // Set the callback
         .exec()?;
     

@@ -113,6 +113,7 @@ namespace pvxs_wrapper
     private:
         pvxs::client::Context &context_;
         std::shared_ptr<pvxs::client::Subscription> monitor_;
+        std::shared_ptr<pvxs::client::Connect> connect_;  // Track connection state
         std::string pv_name_;
         void (*rust_callback_)() = nullptr;  // Function pointer to Rust callback (no parameters)
 
@@ -148,6 +149,11 @@ namespace pvxs_wrapper
 
         // Get connection status
         bool is_connected() const;
+        
+        // Set the Connect object (used by MonitorBuilder)
+        void set_connect(std::shared_ptr<pvxs::client::Connect> &&connect) {
+            connect_ = std::move(connect);
+        }
         
         // Pop next value from subscription queue (PVXS-style)
         std::unique_ptr<ValueWrapper> pop();

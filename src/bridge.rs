@@ -114,18 +114,12 @@ mod ffi {
         fn monitor_pop(monitor: Pin<&mut MonitorWrapper>) -> Result<UniquePtr<ValueWrapper>>;
         
         // MonitorBuilder operations
-        fn context_monitor_builder_create(
-            ctx: Pin<&mut ContextWrapper>,
-            pv_name: String,
-        ) -> Result<UniquePtr<MonitorBuilderWrapper>>;
+        fn context_monitor_builder_create(ctx: Pin<&mut ContextWrapper>, pv_name: String) -> Result<UniquePtr<MonitorBuilderWrapper>>;
         fn monitor_builder_mask_connected(builder: Pin<&mut MonitorBuilderWrapper>, mask: bool) -> Result<()>;
         fn monitor_builder_mask_disconnected(builder: Pin<&mut MonitorBuilderWrapper>, mask: bool) -> Result<()>;
         fn monitor_builder_set_event_callback(builder: Pin<&mut MonitorBuilderWrapper>, callback_ptr: usize) -> Result<()>;
         fn monitor_builder_exec(builder: Pin<&mut MonitorBuilderWrapper>) -> Result<UniquePtr<MonitorWrapper>>;
-        fn monitor_builder_exec_with_callback(
-            builder: Pin<&mut MonitorBuilderWrapper>,
-            callback_id: u64,
-        ) -> Result<UniquePtr<MonitorWrapper>>;
+        fn monitor_builder_exec_with_callback(builder: Pin<&mut MonitorBuilderWrapper>, callback_id: u64) -> Result<UniquePtr<MonitorWrapper>>;
         
         // Async operations using PVXS RPC (only available with async feature)
         #[cfg(feature = "async")]
