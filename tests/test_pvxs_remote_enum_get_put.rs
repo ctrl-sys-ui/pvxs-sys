@@ -36,6 +36,8 @@ fn test_pv_remote_enum_get_put() {
             let retrieved_choices = value.get_field_string_array("value.choices").unwrap();
             assert_eq!(retrieved_choices.len(), choices.len());
             assert_eq!(retrieved_choices[0], "DISABLED");
+            assert_eq!(retrieved_choices[1], "ENABLED");
+            assert_eq!(retrieved_choices[2], "TESTING");
         },
         Err(e) => panic!("Failed to get value from remote pv: {:?}", e),
     }
