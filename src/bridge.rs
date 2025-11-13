@@ -17,74 +17,15 @@ mod ffi {
         
         // Context creation and operations
         fn create_context_from_env() -> Result<UniquePtr<ContextWrapper>>;
-        
-        fn context_get(
-            ctx: Pin<&mut ContextWrapper>,
-            pv_name: &str,
-            timeout: f64,
-        ) -> Result<UniquePtr<ValueWrapper>>;
-        
-        fn context_put_double(
-            ctx: Pin<&mut ContextWrapper>,
-            pv_name: &str,
-            value: f64,
-            timeout: f64,
-        ) -> Result<()>;
-        
-        fn context_put_int32(
-            ctx: Pin<&mut ContextWrapper>,
-            pv_name: &str,
-            value: i32,
-            timeout: f64,
-        ) -> Result<()>;
-        
-        fn context_put_string(
-            ctx: Pin<&mut ContextWrapper>,
-            pv_name: &str,
-            value: String,
-            timeout: f64,
-        ) -> Result<()>;
-        
-        fn context_put_enum(
-            ctx: Pin<&mut ContextWrapper>,
-            pv_name: &str,
-            value: i16,
-            timeout: f64,
-        ) -> Result<()>;
-        
-        fn context_put_double_array(
-            ctx: Pin<&mut ContextWrapper>,
-            pv_name: &str,
-            value: Vec<f64>,
-            timeout: f64,
-        ) -> Result<()>;
-        
-        fn context_put_int32_array(
-            ctx: Pin<&mut ContextWrapper>,
-            pv_name: &str,
-            value: Vec<i32>,
-            timeout: f64,
-        ) -> Result<()>;
-        
-        fn context_put_enum_array(
-            ctx: Pin<&mut ContextWrapper>,
-            pv_name: &str,
-            value: Vec<i16>,
-            timeout: f64,
-        ) -> Result<()>;
-        
-        fn context_put_string_array(
-            ctx: Pin<&mut ContextWrapper>,
-            pv_name: &str,
-            value: Vec<String>,
-            timeout: f64,
-        ) -> Result<()>;
-        
-        fn context_info(
-            ctx: Pin<&mut ContextWrapper>,
-            pv_name: &str,
-            timeout: f64,
-        ) -> Result<UniquePtr<ValueWrapper>>;
+        fn context_get(ctx: Pin<&mut ContextWrapper>, pv_name: &str, timeout: f64,) -> Result<UniquePtr<ValueWrapper>>;
+        fn context_put_double(ctx: Pin<&mut ContextWrapper>, pv_name: &str, value: f64, timeout: f64,) -> Result<()>;
+        fn context_put_int32(ctx: Pin<&mut ContextWrapper>, pv_name: &str, value: i32, timeout: f64,) -> Result<()>;
+        fn context_put_string(ctx: Pin<&mut ContextWrapper>, pv_name: &str, value: String, timeout: f64,) -> Result<()>;
+        fn context_put_enum(ctx: Pin<&mut ContextWrapper>, pv_name: &str, value: i16, timeout: f64,) -> Result<()>;
+        fn context_put_double_array(ctx: Pin<&mut ContextWrapper>, pv_name: &str, value: Vec<f64>, timeout: f64,) -> Result<()>;
+        fn context_put_int32_array(ctx: Pin<&mut ContextWrapper>, pv_name: &str, value: Vec<i32>, timeout: f64,) -> Result<()>;
+        fn context_put_string_array(ctx: Pin<&mut ContextWrapper>, pv_name: &str, value: Vec<String>, timeout: f64,) -> Result<()>;
+        fn context_info(ctx: Pin<&mut ContextWrapper>, pv_name: &str, timeout: f64,) -> Result<UniquePtr<ValueWrapper>>;
 
         // Value inspection
         fn value_is_valid(val: &ValueWrapper) -> bool;
@@ -95,14 +36,10 @@ mod ffi {
         fn value_get_field_enum(val: &ValueWrapper, field_name: String) -> Result<i16>;
         fn value_get_field_double_array(val: &ValueWrapper, field_name: String) -> Result<Vec<f64>>;
         fn value_get_field_int32_array(val: &ValueWrapper, field_name: String) -> Result<Vec<i32>>;
-        fn value_get_field_enum_array(val: &ValueWrapper, field_name: String) -> Result<Vec<i16>>;
         fn value_get_field_string_array(val: &ValueWrapper, field_name: String) -> Result<Vec<String>>;
         
         // Monitor operations
-        fn context_monitor_create(
-            ctx: Pin<&mut ContextWrapper>,
-            pv_name: String,
-        ) -> Result<UniquePtr<MonitorWrapper>>;
+        fn context_monitor_create(ctx: Pin<&mut ContextWrapper>, pv_name: String,) -> Result<UniquePtr<MonitorWrapper>>;
         fn monitor_start(monitor: Pin<&mut MonitorWrapper>);
         fn monitor_stop(monitor: Pin<&mut MonitorWrapper>);
         fn monitor_is_running(monitor: &MonitorWrapper) -> bool;
@@ -124,28 +61,15 @@ mod ffi {
         // Async operations using PVXS RPC (only available with async feature)
         #[cfg(feature = "async")]
         #[allow(dead_code)]
-        fn context_get_async(
-            ctx: Pin<&mut ContextWrapper>,
-            pv_name: &str,
-            timeout: f64,
-        ) -> Result<UniquePtr<OperationWrapper>>;
+        fn context_get_async(ctx: Pin<&mut ContextWrapper>, pv_name: &str, timeout: f64,) -> Result<UniquePtr<OperationWrapper>>;
         
         #[cfg(feature = "async")]
         #[allow(dead_code)]
-        fn context_put_double_async(
-            ctx: Pin<&mut ContextWrapper>,
-            pv_name: &str,
-            value: f64,
-            timeout: f64,
-        ) -> Result<UniquePtr<OperationWrapper>>;
+        fn context_put_double_async(ctx: Pin<&mut ContextWrapper>, pv_name: &str, value: f64, timeout: f64,) -> Result<UniquePtr<OperationWrapper>>;
         
         #[cfg(feature = "async")]
         #[allow(dead_code)]
-        fn context_info_async(
-            ctx: Pin<&mut ContextWrapper>,
-            pv_name: &str,
-            timeout: f64,
-        ) -> Result<UniquePtr<OperationWrapper>>;
+        fn context_info_async(ctx: Pin<&mut ContextWrapper>, pv_name: &str, timeout: f64,) -> Result<UniquePtr<OperationWrapper>>;
         
         // Operation polling and completion (only available with async feature)
         #[cfg(feature = "async")]
@@ -210,11 +134,13 @@ mod ffi {
         fn shared_pv_open_double(pv: Pin<&mut SharedPVWrapper>, initial_value: f64) -> Result<()>;
         fn shared_pv_open_int32(pv: Pin<&mut SharedPVWrapper>, initial_value: i32) -> Result<()>;
         fn shared_pv_open_string(pv: Pin<&mut SharedPVWrapper>, initial_value: String) -> Result<()>;
+        fn shared_pv_open_enum(pv: Pin<&mut SharedPVWrapper>, choices: Vec<String>, selected_value: i16) -> Result<()>;
         fn shared_pv_is_open(pv: &SharedPVWrapper) -> bool;
         fn shared_pv_close(pv: Pin<&mut SharedPVWrapper>) -> Result<()>;
         fn shared_pv_post_double(pv: Pin<&mut SharedPVWrapper>, value: f64) -> Result<()>;
         fn shared_pv_post_int32(pv: Pin<&mut SharedPVWrapper>, value: i32) -> Result<()>;
         fn shared_pv_post_string(pv: Pin<&mut SharedPVWrapper>, value: String) -> Result<()>;
+        fn shared_pv_post_enum(pv: Pin<&mut SharedPVWrapper>, value: i16) -> Result<()>;
         fn shared_pv_post_double_with_alarm(pv: Pin<&mut SharedPVWrapper>, value: f64, severity: i32, status: i32, message: String) -> Result<()>;
         fn shared_pv_post_int32_with_alarm(pv: Pin<&mut SharedPVWrapper>, value: i32, severity: i32, status: i32, message: String) -> Result<()>;
         fn shared_pv_post_string_with_alarm(pv: Pin<&mut SharedPVWrapper>, value: String, severity: i32, status: i32, message: String) -> Result<()>;

@@ -297,69 +297,22 @@ namespace pvxs_wrapper
 
     std::unique_ptr<ValueWrapper> rpc_execute_sync(RpcWrapper &rpc, double timeout);
     std::unique_ptr<OperationWrapper> rpc_execute_async(RpcWrapper &rpc, double timeout);
-    std::unique_ptr<ValueWrapper> context_get(
-        ContextWrapper &ctx,
-        rust::Str pv_name,
-        double timeout);
-    void context_put_double(
-        ContextWrapper &ctx,
-        rust::Str pv_name,
-        double value,
-        double timeout);
-    void context_put_int32(
-        ContextWrapper &ctx,
-        rust::Str pv_name,
-        int32_t value,
-        double timeout);
-    void context_put_string(
-        ContextWrapper &ctx,
-        rust::Str pv_name,
-        rust::String value,
-        double timeout);
-    void context_put_enum(
-        ContextWrapper &ctx,
-        rust::Str pv_name,
-        int16_t value,
-        double timeout);
-    void context_put_double_array(
-        ContextWrapper &ctx,
-        rust::Str pv_name,
-        rust::Vec<double> value,
-        double timeout);
-    void context_put_int32_array(
-        ContextWrapper &ctx,
-        rust::Str pv_name,
-        rust::Vec<int32_t> value,
-        double timeout);
-    void context_put_enum_array(
-        ContextWrapper &ctx,
-        rust::Str pv_name,
-        rust::Vec<int16_t> value,
-        double timeout);
-    void context_put_string_array(
-        ContextWrapper &ctx,
-        rust::Str pv_name,
-        rust::Vec<rust::String> value,
-        double timeout);
-    std::unique_ptr<ValueWrapper> context_info(
-        ContextWrapper &ctx,
-        rust::Str pv_name,
-        double timeout);
-
+    std::unique_ptr<ValueWrapper> context_get(ContextWrapper &ctx, rust::Str pv_name, double timeout);
+    void context_put_double(ContextWrapper &ctx, rust::Str pv_name, double value, double timeout);
+    void context_put_int32(ContextWrapper &ctx, rust::Str pv_name, int32_t value, double timeout);
+    void context_put_string(ContextWrapper &ctx, rust::Str pv_name, rust::String value, double timeout);
+    void context_put_enum(ContextWrapper &ctx, rust::Str pv_name, int16_t value, double timeout);
+    void context_put_double_array(ContextWrapper &ctx, rust::Str pv_name, rust::Vec<double> value, double timeout);
+    void context_put_int32_array(ContextWrapper &ctx, rust::Str pv_name, rust::Vec<int32_t> value, double timeout);
+    void context_put_string_array(ContextWrapper &ctx, rust::Str pv_name, rust::Vec<int16_t> value, double timeout);
+    void context_put_string_array(ContextWrapper &ctx, rust::Str pv_name, rust::Vec<int16_t> value, double timeout);
+    void context_put_string_array(ContextWrapper &ctx, rust::Str pv_name, rust::Vec<rust::String> value, double timeout);
+    std::unique_ptr<ValueWrapper> context_info(ContextWrapper &ctx, rust::Str pv_name, double timeout);
+    // ============================================================================
     // Async operations for Rust
-    std::unique_ptr<OperationWrapper> context_get_async(
-        ContextWrapper &ctx,
-        rust::Str pv_name,
-        double timeout);
-    std::unique_ptr<OperationWrapper> context_put_double_async(
-        ContextWrapper &ctx,
-        rust::Str pv_name,
-        double value,
-        double timeout);
-    std::unique_ptr<OperationWrapper> context_info_async(
-        ContextWrapper &ctx,
-        rust::Str pv_name,
-        double timeout);
+    std::unique_ptr<OperationWrapper> context_get_async(ContextWrapper &ctx, rust::Str pv_name, double timeout);
+    std::unique_ptr<OperationWrapper> context_put_double_async(ContextWrapper &ctx, rust::Str pv_name, double value, double timeout);
+    std::unique_ptr<OperationWrapper> context_info_async(ContextWrapper &ctx, rust::Str pv_name, double timeout);
 
     // Operation management for Rust
     bool operation_is_done(const OperationWrapper &op);
@@ -376,13 +329,10 @@ namespace pvxs_wrapper
     int16_t value_get_field_enum(const ValueWrapper &val, rust::String field_name);
     rust::Vec<double> value_get_field_double_array(const ValueWrapper &val, rust::String field_name);
     rust::Vec<int32_t> value_get_field_int32_array(const ValueWrapper &val, rust::String field_name);
-    rust::Vec<int16_t> value_get_field_enum_array(const ValueWrapper &val, rust::String field_name);
     rust::Vec<rust::String> value_get_field_string_array(const ValueWrapper &val, rust::String field_name);
 
     // Monitor operations for Rust
-    std::unique_ptr<MonitorWrapper> context_monitor_create(
-        ContextWrapper &ctx,
-        rust::String pv_name);
+    std::unique_ptr<MonitorWrapper> context_monitor_create(ContextWrapper &ctx, rust::String pv_name);
     void monitor_start(MonitorWrapper &monitor);
     void monitor_stop(MonitorWrapper &monitor);
     bool monitor_is_running(const MonitorWrapper &monitor);
@@ -394,16 +344,12 @@ namespace pvxs_wrapper
     std::unique_ptr<ValueWrapper> monitor_pop(MonitorWrapper &monitor);
 
     // MonitorBuilder operations for Rust
-    std::unique_ptr<MonitorBuilderWrapper> context_monitor_builder_create(
-        ContextWrapper &ctx,
-        rust::String pv_name);
+    std::unique_ptr<MonitorBuilderWrapper> context_monitor_builder_create(ContextWrapper &ctx, rust::String pv_name);
     void monitor_builder_mask_connected(MonitorBuilderWrapper &builder, bool mask);
     void monitor_builder_mask_disconnected(MonitorBuilderWrapper &builder, bool mask);
     void monitor_builder_set_event_callback(MonitorBuilderWrapper &builder, uintptr_t callback_ptr);
     std::unique_ptr<MonitorWrapper> monitor_builder_exec(MonitorBuilderWrapper &builder);
-    std::unique_ptr<MonitorWrapper> monitor_builder_exec_with_callback(
-        MonitorBuilderWrapper &builder,
-        uint64_t callback_id);
+    std::unique_ptr<MonitorWrapper> monitor_builder_exec_with_callback(MonitorBuilderWrapper &builder, uint64_t callback_id);
 
     // ============================================================================
     // Server-side wrappers
@@ -531,11 +477,13 @@ namespace pvxs_wrapper
     void shared_pv_open_double(SharedPVWrapper &pv, double initial_value);
     void shared_pv_open_int32(SharedPVWrapper &pv, int32_t initial_value);
     void shared_pv_open_string(SharedPVWrapper &pv, rust::String initial_value);
+    void shared_pv_open_enum(SharedPVWrapper &pv, rust::Vec<rust::String> enum_choices, int16_t selected_choice);
     bool shared_pv_is_open(const SharedPVWrapper &pv);
     void shared_pv_close(SharedPVWrapper &pv);
     void shared_pv_post_double(SharedPVWrapper &pv, double value);
     void shared_pv_post_int32(SharedPVWrapper &pv, int32_t value);
     void shared_pv_post_string(SharedPVWrapper &pv, rust::String value);
+    void shared_pv_post_enum(SharedPVWrapper &pv, int16_t value);
     void shared_pv_post_double_with_alarm(SharedPVWrapper &pv, double value, int32_t severity, int32_t status, rust::String message);
     void shared_pv_post_int32_with_alarm(SharedPVWrapper &pv, int32_t value, int32_t severity, int32_t status, rust::String message);
     void shared_pv_post_string_with_alarm(SharedPVWrapper &pv, rust::String value, int32_t severity, int32_t status, rust::String message);

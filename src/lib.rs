@@ -386,35 +386,6 @@ impl Context {
         Ok(())
     }
 
-    /// Perform a synchronous PUT operation with an enum array
-    /// 
-    /// Sets the "value" field of a process variable to an array of enums (i16).
-    /// 
-    /// # Arguments
-    /// 
-    /// * `pv_name` - The name of the process variable
-    /// * `value` - The array of enum values to write
-    /// * `timeout` - Maximum time to wait in seconds
-    /// 
-    /// # Errors
-    /// 
-    /// Returns an error if:
-    /// - The PV doesn't exist or is read-only
-    /// - The operation times out
-    /// - Any value is not a valid enum choice
-    /// 
-    /// # Example
-    /// 
-    /// ```no_run
-    /// # use epics_pvxs_sys::Context;
-    /// # let mut ctx = Context::from_env().unwrap();
-    /// ctx.put_enum_array("my:pv:array", vec![0, 1, 2], 5.0).expect("PUT failed");
-    /// ```
-    pub fn put_enum_array(&mut self, pv_name: &str, value: Vec<i16>, timeout: f64) -> Result<()> {
-        bridge::context_put_enum_array(self.inner.pin_mut(), pv_name, value, timeout)?;
-        Ok(())
-    }
-
     /// Perform a synchronous PUT operation with a string array
     /// 
     /// Sets the "value" field of a process variable to an array of strings.
@@ -788,40 +759,6 @@ impl Value {
     /// ```
     pub fn get_field_int32_array(&self, field_name: &str) -> Result<Vec<i32>> {
         Ok(bridge::value_get_field_int32_array(&self.inner, field_name.to_string())?)
-    }
-
-    /// Get a field value as an array of enums (int16)
-    /// 
-    /// Extracts a field containing an array of enumerated values.
-    /// Each enum is represented as a 16-bit signed integer index.
-    /// Use in conjunction with choices arrays to map indices to string labels.
-    /// 
-    /// # Arguments
-    /// 
-    /// * `field_name` - The field path (e.g., "value", "states.index")
-    /// 
-    /// # Errors
-    /// 
-    /// Returns an error if the field doesn't exist or cannot be
-    /// converted to an array of enums.
-    /// 
-    /// # Example
-    /// 
-    /// ```no_run
-    /// # use epics_pvxs_sys::Context;
-    /// # let mut ctx = Context::from_env().unwrap();
-    /// let value = ctx.get("enum:array:pv", 5.0).unwrap();
-    /// let indices = value.get_field_enum_array("value").unwrap();
-    /// let choices = value.get_field_string_array("value.choices").unwrap();
-    /// 
-    /// for (i, &index) in indices.iter().enumerate().take(5) {
-    ///     if (index as usize) < choices.len() {
-    ///         println!("  [{}] = {} ('{}')", i, index, choices[index as usize]);
-    ///     }
-    /// }
-    /// ```
-    pub fn get_field_enum_array(&self, field_name: &str) -> Result<Vec<i16>> {
-        Ok(bridge::value_get_field_enum_array(&self.inner, field_name.to_string())?)
     }
 
     /// Get a field value as an array of strings
@@ -1657,6 +1594,20 @@ impl Server {
         pv.open_string(initial_value)?;
         Ok(pv)
     }
+
+    /// Create a new mailbox SharedPV with an enum value
+    /// 
+    /// # Arguments
+    /// 
+    /// * `_name` - Name for debugging/logging (not the PV name)
+    /// * `choices` - List of string choices for the enum
+    /// * `selected_index` - Initial selected index (0-based)
+    pub fn create_pv_enum(&self, _name: &str, choices: Vec<&str>, selected_index: i16) -> Result<SharedPV> {
+        let mut pv = SharedPV::create_mailbox()?;
+        let choices_vec: Vec<String> = choices.iter().map(|s| s.to_string()).collect();
+        bridge::shared_pv_open_enum(pv.inner.pin_mut(), choices_vec, selected_index)?;
+        Ok(pv)
+    }
     
     /// Create a new readonly SharedPV with a double value
     /// 
@@ -1785,6 +1736,18 @@ impl SharedPV {
     /// * `value` - The new value to post
     pub fn post_string(&mut self, value: &str) -> Result<()> {
         bridge::shared_pv_post_string(self.inner.pin_mut(), value.to_string())?;
+        Ok(())
+    }
+    
+    /// Post a new enum value to the PV
+    /// 
+    /// Updates the enum index (value.index field) and notifies connected clients.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `value` - The enum index to post (should be valid for the choices array)
+    pub fn post_enum(&mut self, value: i16) -> Result<()> {
+        bridge::shared_pv_post_enum(self.inner.pin_mut(), value)?;
         Ok(())
     }
     

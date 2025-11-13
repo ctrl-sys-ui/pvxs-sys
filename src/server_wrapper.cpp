@@ -276,6 +276,60 @@ void shared_pv_open_string(SharedPVWrapper& pv, rust::String initial_value) {
     }
 }
 
+void shared_pv_open_enum(SharedPVWrapper& pv, rust::Vec<rust::String> enum_choices, int16_t selected_choice) {
+    try {
+        auto enums = pvxs::nt::NTEnum{}.create();
+
+        // Set the selected index
+        enums["value.index"] = selected_choice;
+
+        // Build a shared_array for the choices
+        pvxs::shared_array<const std::string> choices_array;
+        {
+            // Create a temporary vector and convert to shared_array
+            std::vector<std::string> temp_vec;
+            temp_vec.reserve(enum_choices.size());
+            for (const auto& choice : enum_choices) {
+                temp_vec.emplace_back(std::string(choice));
+            }
+            choices_array = pvxs::shared_array<const std::string>(temp_vec.begin(), temp_vec.end());
+        }
+        
+        // Try to assign the shared_array
+        enums["value.choices"].from(choices_array);
+
+        // Add an onPut handler to validate enum indices
+        auto onPut = [choices_array](pvxs::server::SharedPV& spv, std::unique_ptr<pvxs::server::ExecOp>&& op, pvxs::Value&& value) {
+            try {
+                // Check if value.index is being set
+                auto new_index = value["value.index"].as<int16_t>();
+                
+                // Validate the index
+                if (new_index < 0) {
+                    op->error("Enum index cannot be negative");
+                    return;
+                }
+                if (static_cast<size_t>(new_index) >= choices_array.size()) {
+                    op->error("Enum index " + std::to_string(new_index) + " is out of range (max: " + std::to_string(choices_array.size() - 1) + ")");
+                    return;
+                }
+                
+                // If validation passes, apply the update
+                spv.post(std::move(value));
+                op->reply();
+            } catch (const std::exception& e) {
+                op->error(std::string("Error validating enum PUT: ") + e.what());
+            }
+        };
+
+        ValueWrapper wrapper(std::move(enums));
+        pv.open(wrapper);
+        pv.get().onPut(onPut);
+    } catch (const std::exception& e) {
+        throw PvxsError(std::string("Error opening SharedPV with enum value: ") + e.what());
+    }
+}
+
 bool shared_pv_is_open(const SharedPVWrapper& pv) {
     return pv.is_open();
 }
@@ -320,6 +374,33 @@ void shared_pv_post_string(SharedPVWrapper& pv, rust::String value) {
         pv.post_value(wrapper);
     } catch (const std::exception& e) {
         throw PvxsError(std::string("Error posting string value to SharedPV: ") + e.what());
+    }
+}
+
+void shared_pv_post_enum(SharedPVWrapper& pv, int16_t value) {
+    try {
+        // Get the current template to validate against choices
+        auto current = pv.get_template();
+        
+        // Validate the enum index is within valid range
+        if (value < 0) {
+            throw PvxsError("Enum index cannot be negative");
+        }
+        
+        // Get the choices array to validate the index
+        auto choices = current["value.choices"].as<pvxs::shared_array<const std::string>>();
+        if (static_cast<size_t>(value) >= choices.size()) {
+            throw PvxsError("Enum index " + std::to_string(value) + " is out of range (max: " + std::to_string(choices.size() - 1) + ")");
+        }
+        
+        // Use cloneEmpty() to get correct structure, then set the enum index
+        auto update = current.cloneEmpty();
+        update["value.index"] = value;
+        
+        ValueWrapper wrapper(std::move(update));
+        pv.post_value(wrapper);
+    } catch (const std::exception& e) {
+        throw PvxsError(std::string("Error posting enum value to SharedPV: ") + e.what());
     }
 }
 

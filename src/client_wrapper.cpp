@@ -268,8 +268,9 @@ namespace pvxs_wrapper {
         double timeout) {
         
         try {
+            // For enums, we need to set value.index, not just value
             context_.put(pv_name).build([value](pvxs::Value&& val) {
-                val["value"] = value;
+                val["value.index"] = value;
                 return std::move(val);
             }).exec()->wait(timeout);
         } catch (const std::exception& e) {
@@ -401,81 +402,43 @@ namespace pvxs_wrapper {
         return ContextWrapper::from_env();
     }
 
-    std::unique_ptr<ValueWrapper> context_get(
-        ContextWrapper& ctx,
-        rust::Str pv_name,
-        double timeout) {
+    std::unique_ptr<ValueWrapper> context_get(ContextWrapper& ctx, rust::Str pv_name, double timeout) {
         return ctx.get(std::string(pv_name), timeout);
     }
 
-    void context_put_double(
-        ContextWrapper& ctx,
-        rust::Str pv_name,
-        double value,
-        double timeout) {
+    void context_put_double(ContextWrapper& ctx, rust::Str pv_name, double value, double timeout) {
         ctx.put(std::string(pv_name), value, timeout);
     }
 
-    void context_put_int32(
-        ContextWrapper& ctx,
-        rust::Str pv_name,
-        int32_t value,
-        double timeout) {
+    void context_put_int32(ContextWrapper& ctx, rust::Str pv_name, int32_t value, double timeout) { 
         ctx.put(std::string(pv_name), value, timeout);
     }
 
-    void context_put_string(
-        ContextWrapper& ctx,
-        rust::Str pv_name,
-        rust::String value,
-        double timeout) {
+    void context_put_string(ContextWrapper& ctx, rust::Str pv_name, int32_t value, double timeout) {
+        ctx.put(std::string(pv_name), value, timeout);
+    }
+
+    void context_put_string(ContextWrapper& ctx, rust::Str pv_name, rust::String value, double timeout) {
         ctx.put(std::string(pv_name), std::string(value), timeout);
     }
 
-    void context_put_enum(
-        ContextWrapper& ctx,
-        rust::Str pv_name,
-        int16_t value,
-        double timeout) {
+    void context_put_enum(ContextWrapper& ctx, rust::Str pv_name, int16_t value, double timeout) {
         ctx.put(std::string(pv_name), value, timeout);
     }
 
-    void context_put_double_array(
-        ContextWrapper& ctx,
-        rust::Str pv_name,
-        rust::Vec<double> value,
-        double timeout) {
+    void context_put_double_array(ContextWrapper& ctx, rust::Str pv_name, rust::Vec<double> value, double timeout) {
         ctx.put(std::string(pv_name), value, timeout);
     }
 
-    void context_put_int32_array(
-        ContextWrapper& ctx,
-        rust::Str pv_name,
-        rust::Vec<int32_t> value,
-        double timeout) {
+    void context_put_int32_array(ContextWrapper& ctx, rust::Str pv_name, rust::Vec<int32_t> value, double timeout) {
         ctx.put(std::string(pv_name), value, timeout);
     }
 
-    void context_put_enum_array(
-        ContextWrapper& ctx,
-        rust::Str pv_name,
-        rust::Vec<int16_t> value,
-        double timeout) {
+    void context_put_string_array(ContextWrapper& ctx, rust::Str pv_name, rust::Vec<rust::String> value, double timeout) {
         ctx.put(std::string(pv_name), value, timeout);
     }
 
-    void context_put_string_array(
-        ContextWrapper& ctx,
-        rust::Str pv_name,
-        rust::Vec<rust::String> value,
-        double timeout) {
-        ctx.put(std::string(pv_name), value, timeout);
-    }
-
-    std::unique_ptr<ValueWrapper> context_info(
-        ContextWrapper& ctx,
-        rust::Str pv_name,
-        double timeout) {
+    std::unique_ptr<ValueWrapper> context_info(ContextWrapper& ctx, rust::Str pv_name, double timeout) {
         return ctx.info(std::string(pv_name), timeout);
     }
 
