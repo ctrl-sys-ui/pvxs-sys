@@ -487,6 +487,7 @@ namespace pvxs_wrapper
     void shared_pv_post_double_with_alarm(SharedPVWrapper &pv, double value, int32_t severity, int32_t status, rust::String message);
     void shared_pv_post_int32_with_alarm(SharedPVWrapper &pv, int32_t value, int32_t severity, int32_t status, rust::String message);
     void shared_pv_post_string_with_alarm(SharedPVWrapper &pv, rust::String value, int32_t severity, int32_t status, rust::String message);
+    void shared_pv_post_enum_with_alarm(SharedPVWrapper &pv, int16_t value, int32_t severity, int32_t status, rust::String message);
     std::unique_ptr<ValueWrapper> shared_pv_fetch(const SharedPVWrapper &pv);
 
     // StaticSource creation and operations

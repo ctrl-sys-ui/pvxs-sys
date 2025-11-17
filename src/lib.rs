@@ -1759,7 +1759,7 @@ impl SharedPV {
     /// 
     /// * `value` - The new value to post
     /// * `severity` - Alarm severity (0=NO_ALARM, 1=MINOR, 2=MAJOR, 3=INVALID)
-    /// * `status` - Alarm status code (0=NO_ALARM, various status codes)
+    /// * `status` - Alarm status code (0=NO_ALARM, 1=DEVICE, 2=DRIVER, 3=RECORD, 4=DATABASE, 5=CONFIGURATION, 6=UNDEFINED, 7=CLIENT)
     /// * `message` - Alarm message string
     pub fn post_double_with_alarm(&mut self, value: f64, severity: i32, status: i32, message: &str) -> Result<()> {
         bridge::shared_pv_post_double_with_alarm(self.inner.pin_mut(), value, severity, status, message.to_string())?;
@@ -1772,7 +1772,7 @@ impl SharedPV {
     /// 
     /// * `value` - The new value to post
     /// * `severity` - Alarm severity (0=NO_ALARM, 1=MINOR, 2=MAJOR, 3=INVALID)
-    /// * `status` - Alarm status code (0=NO_ALARM, various status codes)
+    /// * `status` - Alarm status code (0=NO_ALARM, 1=DEVICE, 2=DRIVER, 3=RECORD, 4=DATABASE, 5=CONFIGURATION, 6=UNDEFINED, 7=CLIENT)
     /// * `message` - Alarm message string
     pub fn post_int32_with_alarm(&mut self, value: i32, severity: i32, status: i32, message: &str) -> Result<()> {
         bridge::shared_pv_post_int32_with_alarm(self.inner.pin_mut(), value, severity, status, message.to_string())?;
@@ -1785,10 +1785,23 @@ impl SharedPV {
     /// 
     /// * `value` - The new value to post
     /// * `severity` - Alarm severity (0=NO_ALARM, 1=MINOR, 2=MAJOR, 3=INVALID)
-    /// * `status` - Alarm status code (0=NO_ALARM, various status codes)
+    /// * `status` - Alarm status code (0=NO_ALARM, 1=DEVICE, 2=DRIVER, 3=RECORD, 4=DATABASE, 5=CONFIGURATION, 6=UNDEFINED, 7=CLIENT)
     /// * `message` - Alarm message string
     pub fn post_string_with_alarm(&mut self, value: &str, severity: i32, status: i32, message: &str) -> Result<()> {
         bridge::shared_pv_post_string_with_alarm(self.inner.pin_mut(), value.to_string(), severity, status, message.to_string())?;
+        Ok(())
+    }
+
+    /// Post a new enum value to the PV with alarm information
+    /// 
+    /// # Arguments
+    /// 
+    /// * `value` - The enum index to post (should be valid for the choices array)
+    /// * `severity` - Alarm severity (0=NO_ALARM, 1=MINOR, 2=MAJOR, 3=INVALID)
+    /// * `status` - Alarm status code (0=NO_ALARM, 1=DEVICE, 2=DRIVER, 3=RECORD, 4=DATABASE, 5=CONFIGURATION, 6=UNDEFINED, 7=CLIENT)
+    /// * `message` - Alarm message string
+    pub fn post_enum_with_alarm(&mut self, value: i16, severity: i32, status: i32, message: &str) -> Result<()> {
+        bridge::shared_pv_post_enum_with_alarm(self.inner.pin_mut(), value, severity, status, message.to_string())?;
         Ok(())
     }
     
