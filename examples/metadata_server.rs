@@ -7,7 +7,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Starting EPICS PVA server with rich NTScalar metadata...");
     
     // Create server with isolated configuration
-    let mut server = Server::create_isolated()?;
+    let mut server = Server::from_env()?;
     println!("Server created in isolated mode");
     
     // Create a static source
@@ -21,7 +21,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             limit_low: 0,
             limit_high: 100,
             description: "Temperature sensor reading".to_string(),
-            units: "°C".to_string(),
+            units: "DegC".to_string(),
             precision: 2,
         })
         .control(ControlMetadata {

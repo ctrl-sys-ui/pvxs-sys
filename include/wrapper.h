@@ -476,8 +476,77 @@ namespace pvxs_wrapper
     std::unique_ptr<SharedPVWrapper> shared_pv_create_mailbox();
     std::unique_ptr<SharedPVWrapper> shared_pv_create_readonly();
     void shared_pv_open_double(SharedPVWrapper &pv, double initial_value);
-    struct NTScalarMetadata; // Forward declare struct defined by cxx::bridge. This has optional fields which cannot be defined here and will be generated at compile time.
-    void shared_pv_open_double_with_metadata(SharedPVWrapper& pv, double initial_value, NTScalarMetadata metadata);
+    
+    // NTScalar metadata structures with C++ optional for optional fields
+    struct NTScalarAlarm {
+        int32_t severity;
+        int32_t status;
+        rust::String message;
+    };
+    
+    struct NTScalarTime {
+        int64_t seconds_past_epoch;
+        int32_t nanoseconds;
+        int32_t user_tag;
+    };
+    
+    struct NTScalarDisplay {
+        int64_t limit_low;
+        int64_t limit_high;
+        rust::String description;
+        rust::String units;
+        int32_t precision;
+    };
+    
+    struct NTScalarControl {
+        double limit_low;
+        double limit_high;
+        double min_step;
+    };
+    
+    struct NTScalarValueAlarm {
+        bool active;
+        double low_alarm_limit;
+        double low_warning_limit;
+        double high_warning_limit;
+        double high_alarm_limit;
+        int32_t low_alarm_severity;
+        int32_t low_warning_severity;
+        int32_t high_warning_severity;
+        int32_t high_alarm_severity;
+        uint8_t hysteresis;
+    };
+    
+    struct NTScalarMetadata {
+        NTScalarAlarm alarm;
+        NTScalarTime time_stamp;
+        std::optional<NTScalarDisplay> display;
+        std::optional<NTScalarControl> control;
+        std::optional<NTScalarValueAlarm> value_alarm;
+        bool has_form;
+    };
+    
+    // Builder functions for metadata construction from Rust
+    std::unique_ptr<NTScalarAlarm> create_alarm(int32_t severity, int32_t status, rust::String message);
+    std::unique_ptr<NTScalarTime> create_time(int64_t seconds_past_epoch, int32_t nanoseconds, int32_t user_tag);
+    std::unique_ptr<NTScalarDisplay> create_display(int64_t limit_low, int64_t limit_high, rust::String description, rust::String units, int32_t precision);
+    std::unique_ptr<NTScalarControl> create_control(double limit_low, double limit_high, double min_step);
+    std::unique_ptr<NTScalarValueAlarm> create_value_alarm(bool active, double low_alarm_limit, double low_warning_limit, 
+                                                            double high_warning_limit, double high_alarm_limit,
+                                                            int32_t low_alarm_severity, int32_t low_warning_severity,
+                                                            int32_t high_warning_severity, int32_t high_alarm_severity, uint8_t hysteresis);
+    
+    // Helper functions to build metadata with different combinations of optional fields
+    std::unique_ptr<NTScalarMetadata> create_metadata_no_optional(const NTScalarAlarm& alarm, const NTScalarTime& time_stamp, bool has_form);
+    std::unique_ptr<NTScalarMetadata> create_metadata_with_display(const NTScalarAlarm& alarm, const NTScalarTime& time_stamp, const NTScalarDisplay& display, bool has_form);
+    std::unique_ptr<NTScalarMetadata> create_metadata_with_control(const NTScalarAlarm& alarm, const NTScalarTime& time_stamp, const NTScalarControl& control, bool has_form);
+    std::unique_ptr<NTScalarMetadata> create_metadata_with_value_alarm(const NTScalarAlarm& alarm, const NTScalarTime& time_stamp, const NTScalarValueAlarm& value_alarm, bool has_form);
+    std::unique_ptr<NTScalarMetadata> create_metadata_with_display_control(const NTScalarAlarm& alarm, const NTScalarTime& time_stamp, const NTScalarDisplay& display, const NTScalarControl& control, bool has_form);
+    std::unique_ptr<NTScalarMetadata> create_metadata_with_display_value_alarm(const NTScalarAlarm& alarm, const NTScalarTime& time_stamp, const NTScalarDisplay& display, const NTScalarValueAlarm& value_alarm, bool has_form);
+    std::unique_ptr<NTScalarMetadata> create_metadata_with_control_value_alarm(const NTScalarAlarm& alarm, const NTScalarTime& time_stamp, const NTScalarControl& control, const NTScalarValueAlarm& value_alarm, bool has_form);
+    std::unique_ptr<NTScalarMetadata> create_metadata_full(const NTScalarAlarm& alarm, const NTScalarTime& time_stamp, const NTScalarDisplay& display, const NTScalarControl& control, const NTScalarValueAlarm& value_alarm, bool has_form);
+    
+    void shared_pv_open_double_with_metadata(SharedPVWrapper& pv, double initial_value, const NTScalarMetadata& metadata);
     void shared_pv_open_int32(SharedPVWrapper &pv, int32_t initial_value);
     void shared_pv_open_string(SharedPVWrapper &pv, rust::String initial_value);
     void shared_pv_open_enum(SharedPVWrapper &pv, rust::Vec<rust::String> enum_choices, int16_t selected_choice);
@@ -500,10 +569,6 @@ namespace pvxs_wrapper
     void static_source_close_all(StaticSourceWrapper &source);
 
     // ============================================================================
-    // Note: RPC Source implementation - to be added later when needed  
-
-
-    // NTScalar metadata structures are defined in bridge.rs as shared structs
-    // and automatically generated by cxx bridge
+    // Note: RPC Source implementation - to be added later when needed
 
 } // namespace pvxs_wrapper

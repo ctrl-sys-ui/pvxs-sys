@@ -121,8 +121,8 @@ fn main() {
         .include(epics_include.join("os").join(os_dir))
         .include(&pvxs_include)
         .include(&libevent_include)  // Add libevent include path
-        .flag_if_supported("-std=c++11")
-        .flag_if_supported("/std:c++11");  // MSVC
+        .flag_if_supported("-std=c++17")
+        .flag_if_supported("/std:c++17");  // MSVC
     
     // Platform-specific flags
     if cfg!(target_os = "windows") {

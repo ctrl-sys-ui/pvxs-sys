@@ -1719,7 +1719,8 @@ impl SharedPV {
     /// # Ok::<(), epics_pvxs_sys::PvxsError>(())
     /// ```
     pub fn open_double_with_metadata(&mut self, initial_value: f64, metadata: NTScalarMetadataBuilder) -> Result<()> {
-        bridge::shared_pv_open_double_with_metadata(self.inner.pin_mut(), initial_value, metadata.build())?;
+        let meta = metadata.build()?;
+        bridge::shared_pv_open_double_with_metadata(self.inner.pin_mut(), initial_value, &meta)?;
         Ok(())
     }
     
@@ -1921,10 +1922,14 @@ impl StaticSource {
     }
 }
 
+// ============================================================================
+// NTScalar Metadata Support with C++ std::optional
+// ============================================================================
+
 /// Builder for creating NTScalar metadata with optional fields
 /// 
-/// This provides a clean, type-safe API for configuring PV metadata
-/// without exposing FFI complexity.
+/// This provides a clean, type-safe API for configuring PV metadata.
+/// The metadata is constructed using C++ builder functions that support std::optional.
 pub struct NTScalarMetadataBuilder {
     alarm_severity: i32,
     alarm_status: i32,
@@ -2031,69 +2036,73 @@ impl NTScalarMetadataBuilder {
         self
     }
     
-    /// Build the metadata struct for FFI
-    fn build(self) -> bridge::NTScalarMetadata {
-        bridge::NTScalarMetadata {
-            alarm: bridge::NTScalarAlarm {
-                severity: self.alarm_severity,
-                status: self.alarm_status,
-                message: self.alarm_message,
-            },
-            time_stamp: bridge::NTScalarTime {
-                seconds_past_epoch: self.timestamp_seconds,
-                nanoseconds: self.timestamp_nanos,
-                user_tag: self.timestamp_user_tag,
-            },
-            display: self.display.as_ref().map(|d| bridge::NTScalarDisplay {
-                limit_low: d.limit_low,
-                limit_high: d.limit_high,
-                description: d.description.clone(),
-                units: d.units.clone(),
-                precision: d.precision,
-            }).unwrap_or(bridge::NTScalarDisplay {
-                limit_low: 0,
-                limit_high: 0,
-                description: String::new(),
-                units: String::new(),
-                precision: 0,
-            }),
-            control: self.control.as_ref().map(|c| bridge::NTScalarControl {
-                limit_low: c.limit_low,
-                limit_high: c.limit_high,
-                min_step: c.min_step,
-            }).unwrap_or(bridge::NTScalarControl {
-                limit_low: 0.0,
-                limit_high: 0.0,
-                min_step: 0.0,
-            }),
-            value_alarm: self.value_alarm.as_ref().map(|v| bridge::NTScalarValueAlarm {
-                active: v.active,
-                low_alarm_limit: v.low_alarm_limit,
-                low_warning_limit: v.low_warning_limit,
-                high_warning_limit: v.high_warning_limit,
-                high_alarm_limit: v.high_alarm_limit,
-                low_alarm_severity: v.low_alarm_severity,
-                low_warning_severity: v.low_warning_severity,
-                high_warning_severity: v.high_warning_severity,
-                high_alarm_severity: v.high_alarm_severity,
-                hysteresis: v.hysteresis,
-            }).unwrap_or(bridge::NTScalarValueAlarm {
-                active: false,
-                low_alarm_limit: 0.0,
-                low_warning_limit: 0.0,
-                high_warning_limit: 0.0,
-                high_alarm_limit: 0.0,
-                low_alarm_severity: 0,
-                low_warning_severity: 0,
-                high_warning_severity: 0,
-                high_alarm_severity: 0,
-                hysteresis: 0,
-            }),
-            has_display: self.display.is_some(),
-            has_control: self.control.is_some(),
-            has_value_alarm: self.value_alarm.is_some(),
-            has_form: self.with_form,
-        }
+    /// Build the metadata using C++ builder functions with std::optional support
+    fn build(self) -> Result<cxx::UniquePtr<bridge::NTScalarMetadata>> {
+        // Create alarm and timestamp (always required)
+        let alarm = bridge::create_alarm(self.alarm_severity, self.alarm_status, self.alarm_message);
+        let time_stamp = bridge::create_time(self.timestamp_seconds, self.timestamp_nanos, self.timestamp_user_tag);
+        
+        // Build metadata based on which optional fields are present
+        let metadata = match (&self.display, &self.control, &self.value_alarm) {
+            (None, None, None) => {
+                bridge::create_metadata_no_optional(&alarm, &time_stamp, self.with_form)
+            }
+            (Some(d), None, None) => {
+                let display = bridge::create_display(d.limit_low, d.limit_high, d.description.clone(), d.units.clone(), d.precision);
+                bridge::create_metadata_with_display(&alarm, &time_stamp, &display, self.with_form)
+            }
+            (None, Some(c), None) => {
+                let control = bridge::create_control(c.limit_low, c.limit_high, c.min_step);
+                bridge::create_metadata_with_control(&alarm, &time_stamp, &control, self.with_form)
+            }
+            (None, None, Some(v)) => {
+                let value_alarm = bridge::create_value_alarm(
+                    v.active, v.low_alarm_limit, v.low_warning_limit,
+                    v.high_warning_limit, v.high_alarm_limit,
+                    v.low_alarm_severity, v.low_warning_severity,
+                    v.high_warning_severity, v.high_alarm_severity, v.hysteresis
+                );
+                bridge::create_metadata_with_value_alarm(&alarm, &time_stamp, &value_alarm, self.with_form)
+            }
+            (Some(d), Some(c), None) => {
+                let display = bridge::create_display(d.limit_low, d.limit_high, d.description.clone(), d.units.clone(), d.precision);
+                let control = bridge::create_control(c.limit_low, c.limit_high, c.min_step);
+                bridge::create_metadata_with_display_control(&alarm, &time_stamp, &display, &control, self.with_form)
+            }
+            (Some(d), None, Some(v)) => {
+                let display = bridge::create_display(d.limit_low, d.limit_high, d.description.clone(), d.units.clone(), d.precision);
+                let value_alarm = bridge::create_value_alarm(
+                    v.active, v.low_alarm_limit, v.low_warning_limit,
+                    v.high_warning_limit, v.high_alarm_limit,
+                    v.low_alarm_severity, v.low_warning_severity,
+                    v.high_warning_severity, v.high_alarm_severity, v.hysteresis
+                );
+                bridge::create_metadata_with_display_value_alarm(&alarm, &time_stamp, &display, &value_alarm, self.with_form)
+            }
+            (None, Some(c), Some(v)) => {
+                let control = bridge::create_control(c.limit_low, c.limit_high, c.min_step);
+                let value_alarm = bridge::create_value_alarm(
+                    v.active, v.low_alarm_limit, v.low_warning_limit,
+                    v.high_warning_limit, v.high_alarm_limit,
+                    v.low_alarm_severity, v.low_warning_severity,
+                    v.high_warning_severity, v.high_alarm_severity, v.hysteresis
+                );
+                bridge::create_metadata_with_control_value_alarm(&alarm, &time_stamp, &control, &value_alarm, self.with_form)
+            }
+            (Some(d), Some(c), Some(v)) => {
+                let display = bridge::create_display(d.limit_low, d.limit_high, d.description.clone(), d.units.clone(), d.precision);
+                let control = bridge::create_control(c.limit_low, c.limit_high, c.min_step);
+                let value_alarm = bridge::create_value_alarm(
+                    v.active, v.low_alarm_limit, v.low_warning_limit,
+                    v.high_warning_limit, v.high_alarm_limit,
+                    v.low_alarm_severity, v.low_warning_severity,
+                    v.high_warning_severity, v.high_alarm_severity, v.hysteresis
+                );
+                bridge::create_metadata_full(&alarm, &time_stamp, &display, &control, &value_alarm, self.with_form)
+            }
+        };
+        
+        Ok(metadata)
     }
 }
 

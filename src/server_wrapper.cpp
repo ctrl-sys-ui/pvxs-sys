@@ -1,7 +1,6 @@
 // server_wrapper.cpp - C++ server wrapper layer for PVXS
 
 #include "wrapper.h"
-#include "epics-pvxs-sys/src/bridge.rs.h"  // cxx-generated shared structs
 #include <sstream>
 #include <chrono>
 #include <thread>
@@ -251,14 +250,14 @@ void shared_pv_open_double(SharedPVWrapper& pv, double initial_value) {
     }
 }
 
-void shared_pv_open_double_with_metadata(SharedPVWrapper& pv, double initial_value, NTScalarMetadata metadata) {
+void shared_pv_open_double_with_metadata(SharedPVWrapper& pv, double initial_value, const NTScalarMetadata& metadata) {
     try {
         // Create NTScalar with flags from metadata
         auto initial = pvxs::nt::NTScalar{
             pvxs::TypeCode::Float64,
-            metadata.has_display,
-            metadata.has_control,
-            metadata.has_value_alarm,
+            metadata.display.has_value(),
+            metadata.control.has_value(),
+            metadata.value_alarm.has_value(),
             metadata.has_form
         }.create();
         
@@ -274,34 +273,37 @@ void shared_pv_open_double_with_metadata(SharedPVWrapper& pv, double initial_val
         initial["timeStamp.userTag"] = metadata.time_stamp.user_tag;
         
         // Optional: display fields
-        if (metadata.has_display) {
-            initial["display.limitLow"] = metadata.display.limit_low;
-            initial["display.limitHigh"] = metadata.display.limit_high;
-            initial["display.description"] = std::string(metadata.display.description);
-            initial["display.units"] = std::string(metadata.display.units);
+        if (metadata.display.has_value()) {
+            const auto& disp = metadata.display.value();
+            initial["display.limitLow"] = disp.limit_low;
+            initial["display.limitHigh"] = disp.limit_high;
+            initial["display.description"] = std::string(disp.description);
+            initial["display.units"] = std::string(disp.units);
             if (metadata.has_form) {
-                initial["display.precision"] = metadata.display.precision;
+                initial["display.precision"] = disp.precision;
             }
         }
         
         // Optional: control fields
-        if (metadata.has_control) {
-            initial["control.limitLow"] = metadata.control.limit_low;
-            initial["control.limitHigh"] = metadata.control.limit_high;
-            initial["control.minStep"] = metadata.control.min_step;
+        if (metadata.control.has_value()) {
+            const auto& ctrl = metadata.control.value();
+            initial["control.limitLow"] = ctrl.limit_low;
+            initial["control.limitHigh"] = ctrl.limit_high;
+            initial["control.minStep"] = ctrl.min_step;
         }
         
         // Optional: valueAlarm fields
-        if (metadata.has_value_alarm) {
-            initial["valueAlarm.active"] = metadata.value_alarm.active;
-            initial["valueAlarm.lowAlarmLimit"] = metadata.value_alarm.low_alarm_limit;
-            initial["valueAlarm.lowWarningLimit"] = metadata.value_alarm.low_warning_limit;
-            initial["valueAlarm.highWarningLimit"] = metadata.value_alarm.high_warning_limit;
-            initial["valueAlarm.highAlarmLimit"] = metadata.value_alarm.high_alarm_limit;
-            initial["valueAlarm.lowAlarmSeverity"] = metadata.value_alarm.low_alarm_severity;
-            initial["valueAlarm.lowWarningSeverity"] = metadata.value_alarm.low_warning_severity;
-            initial["valueAlarm.highWarningSeverity"] = metadata.value_alarm.high_warning_severity;
-            initial["valueAlarm.highAlarmSeverity"] = metadata.value_alarm.high_alarm_severity;
+        if (metadata.value_alarm.has_value()) {
+            const auto& valarm = metadata.value_alarm.value();
+            initial["valueAlarm.active"] = valarm.active;
+            initial["valueAlarm.lowAlarmLimit"] = valarm.low_alarm_limit;
+            initial["valueAlarm.lowWarningLimit"] = valarm.low_warning_limit;
+            initial["valueAlarm.highWarningLimit"] = valarm.high_warning_limit;
+            initial["valueAlarm.highAlarmLimit"] = valarm.high_alarm_limit;
+            initial["valueAlarm.lowAlarmSeverity"] = valarm.low_alarm_severity;
+            initial["valueAlarm.lowWarningSeverity"] = valarm.low_warning_severity;
+            initial["valueAlarm.highWarningSeverity"] = valarm.high_warning_severity;
+            initial["valueAlarm.highAlarmSeverity"] = valarm.high_alarm_severity;
         }
         
         ValueWrapper wrapper(std::move(initial));
@@ -310,6 +312,176 @@ void shared_pv_open_double_with_metadata(SharedPVWrapper& pv, double initial_val
         throw PvxsError(std::string("Error opening SharedPV with NTScalar metadata: ") + e.what());
     }
 }
+
+// ============================================================================
+// Metadata Builder Functions
+// ============================================================================
+
+std::unique_ptr<NTScalarAlarm> create_alarm(int32_t severity, int32_t status, rust::String message) {
+    auto alarm = std::make_unique<NTScalarAlarm>();
+    alarm->severity = severity;
+    alarm->status = status;
+    alarm->message = std::move(message);
+    return alarm;
+}
+
+std::unique_ptr<NTScalarTime> create_time(int64_t seconds_past_epoch, int32_t nanoseconds, int32_t user_tag) {
+    auto time = std::make_unique<NTScalarTime>();
+    time->seconds_past_epoch = seconds_past_epoch;
+    time->nanoseconds = nanoseconds;
+    time->user_tag = user_tag;
+    return time;
+}
+
+std::unique_ptr<NTScalarDisplay> create_display(int64_t limit_low, int64_t limit_high, 
+                                                 rust::String description, rust::String units, int32_t precision) {
+    auto display = std::make_unique<NTScalarDisplay>();
+    display->limit_low = limit_low;
+    display->limit_high = limit_high;
+    display->description = std::move(description);
+    display->units = std::move(units);
+    display->precision = precision;
+    return display;
+}
+
+std::unique_ptr<NTScalarControl> create_control(double limit_low, double limit_high, double min_step) {
+    auto control = std::make_unique<NTScalarControl>();
+    control->limit_low = limit_low;
+    control->limit_high = limit_high;
+    control->min_step = min_step;
+    return control;
+}
+
+std::unique_ptr<NTScalarValueAlarm> create_value_alarm(bool active, double low_alarm_limit, double low_warning_limit, 
+                                                        double high_warning_limit, double high_alarm_limit,
+                                                        int32_t low_alarm_severity, int32_t low_warning_severity,
+                                                        int32_t high_warning_severity, int32_t high_alarm_severity, 
+                                                        uint8_t hysteresis) {
+    auto value_alarm = std::make_unique<NTScalarValueAlarm>();
+    value_alarm->active = active;
+    value_alarm->low_alarm_limit = low_alarm_limit;
+    value_alarm->low_warning_limit = low_warning_limit;
+    value_alarm->high_warning_limit = high_warning_limit;
+    value_alarm->high_alarm_limit = high_alarm_limit;
+    value_alarm->low_alarm_severity = low_alarm_severity;
+    value_alarm->low_warning_severity = low_warning_severity;
+    value_alarm->high_warning_severity = high_warning_severity;
+    value_alarm->high_alarm_severity = high_alarm_severity;
+    value_alarm->hysteresis = hysteresis;
+    return value_alarm;
+}
+
+std::unique_ptr<NTScalarMetadata> create_metadata(const NTScalarAlarm& alarm, const NTScalarTime& time_stamp,
+                                                   const NTScalarDisplay* display, const NTScalarControl* control,
+                                                   const NTScalarValueAlarm* value_alarm, bool has_form) {
+    auto metadata = std::make_unique<NTScalarMetadata>();
+    metadata->alarm = alarm;
+    metadata->time_stamp = time_stamp;
+    
+    if (display) {
+        metadata->display = *display;
+    }
+    
+    if (control) {
+        metadata->control = *control;
+    }
+    
+    if (value_alarm) {
+        metadata->value_alarm = *value_alarm;
+    }
+    
+    metadata->has_form = has_form;
+    return metadata;
+}
+
+// Helper functions for different combinations of optional fields
+std::unique_ptr<NTScalarMetadata> create_metadata_no_optional(const NTScalarAlarm& alarm, const NTScalarTime& time_stamp, bool has_form) {
+    auto metadata = std::make_unique<NTScalarMetadata>();
+    metadata->alarm = alarm;
+    metadata->time_stamp = time_stamp;
+    metadata->has_form = has_form;
+    return metadata;
+}
+
+std::unique_ptr<NTScalarMetadata> create_metadata_with_display(const NTScalarAlarm& alarm, const NTScalarTime& time_stamp, 
+                                                                const NTScalarDisplay& display, bool has_form) {
+    auto metadata = std::make_unique<NTScalarMetadata>();
+    metadata->alarm = alarm;
+    metadata->time_stamp = time_stamp;
+    metadata->display = display;
+    metadata->has_form = has_form;
+    return metadata;
+}
+
+std::unique_ptr<NTScalarMetadata> create_metadata_with_control(const NTScalarAlarm& alarm, const NTScalarTime& time_stamp, 
+                                                                const NTScalarControl& control, bool has_form) {
+    auto metadata = std::make_unique<NTScalarMetadata>();
+    metadata->alarm = alarm;
+    metadata->time_stamp = time_stamp;
+    metadata->control = control;
+    metadata->has_form = has_form;
+    return metadata;
+}
+
+std::unique_ptr<NTScalarMetadata> create_metadata_with_value_alarm(const NTScalarAlarm& alarm, const NTScalarTime& time_stamp, 
+                                                                    const NTScalarValueAlarm& value_alarm, bool has_form) {
+    auto metadata = std::make_unique<NTScalarMetadata>();
+    metadata->alarm = alarm;
+    metadata->time_stamp = time_stamp;
+    metadata->value_alarm = value_alarm;
+    metadata->has_form = has_form;
+    return metadata;
+}
+
+std::unique_ptr<NTScalarMetadata> create_metadata_with_display_control(const NTScalarAlarm& alarm, const NTScalarTime& time_stamp, 
+                                                                        const NTScalarDisplay& display, const NTScalarControl& control, bool has_form) {
+    auto metadata = std::make_unique<NTScalarMetadata>();
+    metadata->alarm = alarm;
+    metadata->time_stamp = time_stamp;
+    metadata->display = display;
+    metadata->control = control;
+    metadata->has_form = has_form;
+    return metadata;
+}
+
+std::unique_ptr<NTScalarMetadata> create_metadata_with_display_value_alarm(const NTScalarAlarm& alarm, const NTScalarTime& time_stamp, 
+                                                                            const NTScalarDisplay& display, const NTScalarValueAlarm& value_alarm, bool has_form) {
+    auto metadata = std::make_unique<NTScalarMetadata>();
+    metadata->alarm = alarm;
+    metadata->time_stamp = time_stamp;
+    metadata->display = display;
+    metadata->value_alarm = value_alarm;
+    metadata->has_form = has_form;
+    return metadata;
+}
+
+std::unique_ptr<NTScalarMetadata> create_metadata_with_control_value_alarm(const NTScalarAlarm& alarm, const NTScalarTime& time_stamp, 
+                                                                            const NTScalarControl& control, const NTScalarValueAlarm& value_alarm, bool has_form) {
+    auto metadata = std::make_unique<NTScalarMetadata>();
+    metadata->alarm = alarm;
+    metadata->time_stamp = time_stamp;
+    metadata->control = control;
+    metadata->value_alarm = value_alarm;
+    metadata->has_form = has_form;
+    return metadata;
+}
+
+std::unique_ptr<NTScalarMetadata> create_metadata_full(const NTScalarAlarm& alarm, const NTScalarTime& time_stamp, 
+                                                        const NTScalarDisplay& display, const NTScalarControl& control, 
+                                                        const NTScalarValueAlarm& value_alarm, bool has_form) {
+    auto metadata = std::make_unique<NTScalarMetadata>();
+    metadata->alarm = alarm;
+    metadata->time_stamp = time_stamp;
+    metadata->display = display;
+    metadata->control = control;
+    metadata->value_alarm = value_alarm;
+    metadata->has_form = has_form;
+    return metadata;
+}
+
+// ============================================================================
+// SharedPV Operations
+// ============================================================================
 
 void shared_pv_open_int32(SharedPVWrapper& pv, int32_t initial_value) {
     try {

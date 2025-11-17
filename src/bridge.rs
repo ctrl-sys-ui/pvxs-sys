@@ -3,58 +3,6 @@
 
 #[cxx::bridge(namespace = "pvxs_wrapper")]
 mod ffi {
-    // Shared structs for NTScalar metadata components
-    struct NTScalarAlarm {
-        severity: i32,
-        status: i32,
-        message: String,
-    }
-    
-    struct NTScalarTime {
-        seconds_past_epoch: i64,
-        nanoseconds: i32,
-        user_tag: i32,
-    }
-    
-    struct NTScalarDisplay {
-        limit_low: i64,
-        limit_high: i64,
-        description: String,
-        units: String,
-        precision: i32,
-    }
-    
-    struct NTScalarControl {
-        limit_low: f64,
-        limit_high: f64,
-        min_step: f64,
-    }
-    
-    struct NTScalarValueAlarm {
-        active: bool,
-        low_alarm_limit: f64,
-        low_warning_limit: f64,
-        high_warning_limit: f64,
-        high_alarm_limit: f64,
-        low_alarm_severity: i32,
-        low_warning_severity: i32,
-        high_warning_severity: i32,
-        high_alarm_severity: i32,
-        hysteresis: u8,
-    }
-    
-    // Combined metadata with optional fields
-    struct NTScalarMetadata {
-        alarm: NTScalarAlarm,
-        time_stamp: NTScalarTime,
-        display: NTScalarDisplay,
-        control: NTScalarControl,
-        value_alarm: NTScalarValueAlarm,
-        has_display: bool,
-        has_control: bool,
-        has_value_alarm: bool,
-        has_form: bool,
-    }
     
     // Opaque C++ types - Rust sees these as opaque pointers
     unsafe extern "C++" {
@@ -65,6 +13,34 @@ mod ffi {
         type ValueWrapper;
         #[cfg(feature = "async")]
         type OperationWrapper; // Re-enabled for async operations
+        
+        // Metadata structs (defined in C++ with std::optional)
+        type NTScalarAlarm;
+        type NTScalarTime;
+        type NTScalarDisplay;
+        type NTScalarControl;
+        type NTScalarValueAlarm;
+        type NTScalarMetadata;
+        
+        // Metadata builder functions - construct metadata from Rust
+        fn create_alarm(severity: i32, status: i32, message: String) -> UniquePtr<NTScalarAlarm>;
+        fn create_time(seconds_past_epoch: i64, nanoseconds: i32, user_tag: i32) -> UniquePtr<NTScalarTime>;
+        fn create_display(limit_low: i64, limit_high: i64, description: String, units: String, precision: i32) -> UniquePtr<NTScalarDisplay>;
+        fn create_control(limit_low: f64, limit_high: f64, min_step: f64) -> UniquePtr<NTScalarControl>;
+        fn create_value_alarm(active: bool, low_alarm_limit: f64, low_warning_limit: f64, 
+                             high_warning_limit: f64, high_alarm_limit: f64,
+                             low_alarm_severity: i32, low_warning_severity: i32,
+                             high_warning_severity: i32, high_alarm_severity: i32, hysteresis: u8) -> UniquePtr<NTScalarValueAlarm>;
+        
+        // Helper functions to build metadata with optional fields
+        fn create_metadata_no_optional(alarm: &NTScalarAlarm, time_stamp: &NTScalarTime, has_form: bool) -> UniquePtr<NTScalarMetadata>;
+        fn create_metadata_with_display(alarm: &NTScalarAlarm, time_stamp: &NTScalarTime, display: &NTScalarDisplay, has_form: bool) -> UniquePtr<NTScalarMetadata>;
+        fn create_metadata_with_control(alarm: &NTScalarAlarm, time_stamp: &NTScalarTime, control: &NTScalarControl, has_form: bool) -> UniquePtr<NTScalarMetadata>;
+        fn create_metadata_with_value_alarm(alarm: &NTScalarAlarm, time_stamp: &NTScalarTime, value_alarm: &NTScalarValueAlarm, has_form: bool) -> UniquePtr<NTScalarMetadata>;
+        fn create_metadata_with_display_control(alarm: &NTScalarAlarm, time_stamp: &NTScalarTime, display: &NTScalarDisplay, control: &NTScalarControl, has_form: bool) -> UniquePtr<NTScalarMetadata>;
+        fn create_metadata_with_display_value_alarm(alarm: &NTScalarAlarm, time_stamp: &NTScalarTime, display: &NTScalarDisplay, value_alarm: &NTScalarValueAlarm, has_form: bool) -> UniquePtr<NTScalarMetadata>;
+        fn create_metadata_with_control_value_alarm(alarm: &NTScalarAlarm, time_stamp: &NTScalarTime, control: &NTScalarControl, value_alarm: &NTScalarValueAlarm, has_form: bool) -> UniquePtr<NTScalarMetadata>;
+        fn create_metadata_full(alarm: &NTScalarAlarm, time_stamp: &NTScalarTime, display: &NTScalarDisplay, control: &NTScalarControl, value_alarm: &NTScalarValueAlarm, has_form: bool) -> UniquePtr<NTScalarMetadata>;
         
         // Note: RpcSourceWrapper - to be implemented later
         
@@ -185,7 +161,7 @@ mod ffi {
         fn shared_pv_create_mailbox() -> Result<UniquePtr<SharedPVWrapper>>;
         fn shared_pv_create_readonly() -> Result<UniquePtr<SharedPVWrapper>>;
         fn shared_pv_open_double(pv: Pin<&mut SharedPVWrapper>, initial_value: f64) -> Result<()>;
-        fn shared_pv_open_double_with_metadata(pv: Pin<&mut SharedPVWrapper>, initial_value: f64, metadata: NTScalarMetadata) -> Result<()>;
+        fn shared_pv_open_double_with_metadata(pv: Pin<&mut SharedPVWrapper>, initial_value: f64, metadata: &NTScalarMetadata) -> Result<()>;
         fn shared_pv_open_int32(pv: Pin<&mut SharedPVWrapper>, initial_value: i32) -> Result<()>;
         fn shared_pv_open_string(pv: Pin<&mut SharedPVWrapper>, initial_value: String) -> Result<()>;
         fn shared_pv_open_enum(pv: Pin<&mut SharedPVWrapper>, choices: Vec<String>, selected_value: i16) -> Result<()>;
