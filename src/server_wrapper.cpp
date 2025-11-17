@@ -1,6 +1,7 @@
 // server_wrapper.cpp - C++ server wrapper layer for PVXS
 
 #include "wrapper.h"
+#include "epics-pvxs-sys/src/bridge.rs.h"  // cxx-generated shared structs
 #include <sstream>
 #include <chrono>
 #include <thread>
@@ -247,6 +248,66 @@ void shared_pv_open_double(SharedPVWrapper& pv, double initial_value) {
         pv.open(wrapper);
     } catch (const std::exception& e) {
         throw PvxsError(std::string("Error opening SharedPV with double value: ") + e.what());
+    }
+}
+
+void shared_pv_open_double_with_metadata(SharedPVWrapper& pv, double initial_value, NTScalarMetadata metadata) {
+    try {
+        // Create NTScalar with flags from metadata
+        auto initial = pvxs::nt::NTScalar{
+            pvxs::TypeCode::Float64,
+            metadata.has_display,
+            metadata.has_control,
+            metadata.has_value_alarm,
+            metadata.has_form
+        }.create();
+        
+        initial["value"] = initial_value;
+        
+        // Always set alarm and timeStamp
+        initial["alarm.severity"] = metadata.alarm.severity;
+        initial["alarm.status"] = metadata.alarm.status;
+        initial["alarm.message"] = std::string(metadata.alarm.message);
+        
+        initial["timeStamp.secondsPastEpoch"] = metadata.time_stamp.seconds_past_epoch;
+        initial["timeStamp.nanoseconds"] = metadata.time_stamp.nanoseconds;
+        initial["timeStamp.userTag"] = metadata.time_stamp.user_tag;
+        
+        // Optional: display fields
+        if (metadata.has_display) {
+            initial["display.limitLow"] = metadata.display.limit_low;
+            initial["display.limitHigh"] = metadata.display.limit_high;
+            initial["display.description"] = std::string(metadata.display.description);
+            initial["display.units"] = std::string(metadata.display.units);
+            if (metadata.has_form) {
+                initial["display.precision"] = metadata.display.precision;
+            }
+        }
+        
+        // Optional: control fields
+        if (metadata.has_control) {
+            initial["control.limitLow"] = metadata.control.limit_low;
+            initial["control.limitHigh"] = metadata.control.limit_high;
+            initial["control.minStep"] = metadata.control.min_step;
+        }
+        
+        // Optional: valueAlarm fields
+        if (metadata.has_value_alarm) {
+            initial["valueAlarm.active"] = metadata.value_alarm.active;
+            initial["valueAlarm.lowAlarmLimit"] = metadata.value_alarm.low_alarm_limit;
+            initial["valueAlarm.lowWarningLimit"] = metadata.value_alarm.low_warning_limit;
+            initial["valueAlarm.highWarningLimit"] = metadata.value_alarm.high_warning_limit;
+            initial["valueAlarm.highAlarmLimit"] = metadata.value_alarm.high_alarm_limit;
+            initial["valueAlarm.lowAlarmSeverity"] = metadata.value_alarm.low_alarm_severity;
+            initial["valueAlarm.lowWarningSeverity"] = metadata.value_alarm.low_warning_severity;
+            initial["valueAlarm.highWarningSeverity"] = metadata.value_alarm.high_warning_severity;
+            initial["valueAlarm.highAlarmSeverity"] = metadata.value_alarm.high_alarm_severity;
+        }
+        
+        ValueWrapper wrapper(std::move(initial));
+        pv.open(wrapper);
+    } catch (const std::exception& e) {
+        throw PvxsError(std::string("Error opening SharedPV with NTScalar metadata: ") + e.what());
     }
 }
 

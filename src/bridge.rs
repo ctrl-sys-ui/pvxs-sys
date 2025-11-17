@@ -3,6 +3,59 @@
 
 #[cxx::bridge(namespace = "pvxs_wrapper")]
 mod ffi {
+    // Shared structs for NTScalar metadata components
+    struct NTScalarAlarm {
+        severity: i32,
+        status: i32,
+        message: String,
+    }
+    
+    struct NTScalarTime {
+        seconds_past_epoch: i64,
+        nanoseconds: i32,
+        user_tag: i32,
+    }
+    
+    struct NTScalarDisplay {
+        limit_low: i64,
+        limit_high: i64,
+        description: String,
+        units: String,
+        precision: i32,
+    }
+    
+    struct NTScalarControl {
+        limit_low: f64,
+        limit_high: f64,
+        min_step: f64,
+    }
+    
+    struct NTScalarValueAlarm {
+        active: bool,
+        low_alarm_limit: f64,
+        low_warning_limit: f64,
+        high_warning_limit: f64,
+        high_alarm_limit: f64,
+        low_alarm_severity: i32,
+        low_warning_severity: i32,
+        high_warning_severity: i32,
+        high_alarm_severity: i32,
+        hysteresis: u8,
+    }
+    
+    // Combined metadata with optional fields
+    struct NTScalarMetadata {
+        alarm: NTScalarAlarm,
+        time_stamp: NTScalarTime,
+        display: NTScalarDisplay,
+        control: NTScalarControl,
+        value_alarm: NTScalarValueAlarm,
+        has_display: bool,
+        has_control: bool,
+        has_value_alarm: bool,
+        has_form: bool,
+    }
+    
     // Opaque C++ types - Rust sees these as opaque pointers
     unsafe extern "C++" {
         include!("wrapper.h");
@@ -132,6 +185,7 @@ mod ffi {
         fn shared_pv_create_mailbox() -> Result<UniquePtr<SharedPVWrapper>>;
         fn shared_pv_create_readonly() -> Result<UniquePtr<SharedPVWrapper>>;
         fn shared_pv_open_double(pv: Pin<&mut SharedPVWrapper>, initial_value: f64) -> Result<()>;
+        fn shared_pv_open_double_with_metadata(pv: Pin<&mut SharedPVWrapper>, initial_value: f64, metadata: NTScalarMetadata) -> Result<()>;
         fn shared_pv_open_int32(pv: Pin<&mut SharedPVWrapper>, initial_value: i32) -> Result<()>;
         fn shared_pv_open_string(pv: Pin<&mut SharedPVWrapper>, initial_value: String) -> Result<()>;
         fn shared_pv_open_enum(pv: Pin<&mut SharedPVWrapper>, choices: Vec<String>, selected_value: i16) -> Result<()>;

@@ -259,3 +259,54 @@ All network protocols that support schema evolution use this pattern because:
 3. Introspection is required
 
 EPICS being a **30+ year old** industrial control protocol that evolved from Channel Access to pvAccess **must** use this pattern to support backward compatibility and runtime type discovery.
+
+```
+epics:nt/NTScalar:1.0
+    double value
+    alarm_t alarm
+        int severity
+        int status
+        string message
+    structure timeStamp
+        long secondsPastEpoch
+        int nanoseconds
+        int userTag
+    structure display
+        double limitLow
+        double limitHigh
+        string description
+        string units
+        int precision
+        enum_t form
+            int index
+            string[] choices
+    control_t control
+        double limitLow
+        double limitHigh
+        double minStep
+    valueAlarm_t valueAlarm
+        boolean active
+        double lowAlarmLimit
+        double lowWarningLimit
+        double highWarningLimit
+        double highAlarmLimit
+        int lowAlarmSeverity
+        int lowWarningSeverity
+        int highWarningSeverity
+        int highAlarmSeverity
+        byte hysteresis
+
+epics:nt/NTEnum:1.0
+    enum_t value
+        int index
+        string[] choices
+    alarm_t alarm
+        int severity
+        int status
+        string message
+    structure timeStamp
+        long secondsPastEpoch
+        int nanoseconds
+        int userTag
+```
+

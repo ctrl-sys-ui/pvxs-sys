@@ -1570,6 +1570,21 @@ impl Server {
         pv.open_double(initial_value)?;
         Ok(pv)
     }
+
+    /// Create a new mailbox SharedPV with a double value and metadata
+    /// 
+    /// Mailbox PVs allow both reading and writing by clients.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `_name` - Name for debugging/logging (not the PV name)
+    /// * `initial_value` - Initial value for the PV
+    /// * `metadata` - Metadata for the scalar PV
+    pub fn create_pv_double_with_metadata(&self, _name: &str, initial_value: f64, metadata: NTScalarMetadataBuilder) -> Result<SharedPV> {
+        let mut pv = SharedPV::create_mailbox()?;
+        pv.open_double_with_metadata(initial_value, metadata)?;
+        Ok(pv)
+    }
     
     /// Create a new mailbox SharedPV with an int32 value
     /// 
@@ -1673,6 +1688,38 @@ impl SharedPV {
     /// * `initial_value` - The initial value for the PV
     pub fn open_double(&mut self, initial_value: f64) -> Result<()> {
         bridge::shared_pv_open_double(self.inner.pin_mut(), initial_value)?;
+        Ok(())
+    }
+
+    /// Open the PV with a double value and metadata
+    /// 
+    /// # Arguments
+    /// 
+    /// * `initial_value` - The initial value for the PV
+    /// * `metadata` - Metadata builder for the scalar PV
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// # use epics_pvxs_sys::{SharedPV, NTScalarMetadataBuilder, DisplayMetadata};
+    /// let mut pv = SharedPV::create_mailbox()?;
+    /// 
+    /// let metadata = NTScalarMetadataBuilder::new()
+    ///     .alarm(0, 0, "OK")
+    ///     .display(DisplayMetadata {
+    ///         limit_low: 0,
+    ///         limit_high: 100,
+    ///         description: "Temperature".to_string(),
+    ///         units: "°C".to_string(),
+    ///         precision: 2,
+    ///     })
+    ///     .with_form(true);
+    /// 
+    /// pv.open_double_with_metadata(25.5, metadata)?;
+    /// # Ok::<(), epics_pvxs_sys::PvxsError>(())
+    /// ```
+    pub fn open_double_with_metadata(&mut self, initial_value: f64, metadata: NTScalarMetadataBuilder) -> Result<()> {
+        bridge::shared_pv_open_double_with_metadata(self.inner.pin_mut(), initial_value, metadata.build())?;
         Ok(())
     }
     
@@ -1873,3 +1920,190 @@ impl StaticSource {
         Ok(())
     }
 }
+
+/// Builder for creating NTScalar metadata with optional fields
+/// 
+/// This provides a clean, type-safe API for configuring PV metadata
+/// without exposing FFI complexity.
+pub struct NTScalarMetadataBuilder {
+    alarm_severity: i32,
+    alarm_status: i32,
+    alarm_message: String,
+    timestamp_seconds: i64,
+    timestamp_nanos: i32,
+    timestamp_user_tag: i32,
+    display: Option<DisplayMetadata>,
+    control: Option<ControlMetadata>,
+    value_alarm: Option<ValueAlarmMetadata>,
+    with_form: bool,
+}
+
+/// Display metadata for NTScalar
+#[derive(Clone, Debug, Default)]
+pub struct DisplayMetadata {
+    pub limit_low: i64,
+    pub limit_high: i64,
+    pub description: String,
+    pub units: String,
+    pub precision: i32,
+}
+
+/// Control metadata for NTScalar
+#[derive(Clone, Debug, Default)]
+pub struct ControlMetadata {
+    pub limit_low: f64,
+    pub limit_high: f64,
+    pub min_step: f64,
+}
+
+/// Value alarm metadata for NTScalar
+#[derive(Clone, Debug, Default)]
+pub struct ValueAlarmMetadata {
+    pub active: bool,
+    pub low_alarm_limit: f64,
+    pub low_warning_limit: f64,
+    pub high_warning_limit: f64,
+    pub high_alarm_limit: f64,
+    pub low_alarm_severity: i32,
+    pub low_warning_severity: i32,
+    pub high_warning_severity: i32,
+    pub high_alarm_severity: i32,
+    pub hysteresis: u8,
+}
+
+impl NTScalarMetadataBuilder {
+    /// Create a new metadata builder with default values
+    pub fn new() -> Self {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+        
+        Self {
+            alarm_severity: 0,
+            alarm_status: 0,
+            alarm_message: String::new(),
+            timestamp_seconds: now.as_secs() as i64,
+            timestamp_nanos: now.subsec_nanos() as i32,
+            timestamp_user_tag: 0,
+            display: None,
+            control: None,
+            value_alarm: None,
+            with_form: false,
+        }
+    }
+    
+    /// Set alarm information
+    pub fn alarm(mut self, severity: i32, status: i32, message: impl Into<String>) -> Self {
+        self.alarm_severity = severity;
+        self.alarm_status = status;
+        self.alarm_message = message.into();
+        self
+    }
+    
+    /// Set timestamp (defaults to current time)
+    pub fn timestamp(mut self, seconds: i64, nanos: i32, user_tag: i32) -> Self {
+        self.timestamp_seconds = seconds;
+        self.timestamp_nanos = nanos;
+        self.timestamp_user_tag = user_tag;
+        self
+    }
+    
+    /// Add display metadata
+    pub fn display(mut self, meta: DisplayMetadata) -> Self {
+        self.display = Some(meta);
+        self
+    }
+    
+    /// Add control metadata
+    pub fn control(mut self, meta: ControlMetadata) -> Self {
+        self.control = Some(meta);
+        self
+    }
+    
+    /// Add value alarm metadata
+    pub fn value_alarm(mut self, meta: ValueAlarmMetadata) -> Self {
+        self.value_alarm = Some(meta);
+        self
+    }
+    
+    /// Enable form field (precision for numeric displays)
+    pub fn with_form(mut self, enable: bool) -> Self {
+        self.with_form = enable;
+        self
+    }
+    
+    /// Build the metadata struct for FFI
+    fn build(self) -> bridge::NTScalarMetadata {
+        bridge::NTScalarMetadata {
+            alarm: bridge::NTScalarAlarm {
+                severity: self.alarm_severity,
+                status: self.alarm_status,
+                message: self.alarm_message,
+            },
+            time_stamp: bridge::NTScalarTime {
+                seconds_past_epoch: self.timestamp_seconds,
+                nanoseconds: self.timestamp_nanos,
+                user_tag: self.timestamp_user_tag,
+            },
+            display: self.display.as_ref().map(|d| bridge::NTScalarDisplay {
+                limit_low: d.limit_low,
+                limit_high: d.limit_high,
+                description: d.description.clone(),
+                units: d.units.clone(),
+                precision: d.precision,
+            }).unwrap_or(bridge::NTScalarDisplay {
+                limit_low: 0,
+                limit_high: 0,
+                description: String::new(),
+                units: String::new(),
+                precision: 0,
+            }),
+            control: self.control.as_ref().map(|c| bridge::NTScalarControl {
+                limit_low: c.limit_low,
+                limit_high: c.limit_high,
+                min_step: c.min_step,
+            }).unwrap_or(bridge::NTScalarControl {
+                limit_low: 0.0,
+                limit_high: 0.0,
+                min_step: 0.0,
+            }),
+            value_alarm: self.value_alarm.as_ref().map(|v| bridge::NTScalarValueAlarm {
+                active: v.active,
+                low_alarm_limit: v.low_alarm_limit,
+                low_warning_limit: v.low_warning_limit,
+                high_warning_limit: v.high_warning_limit,
+                high_alarm_limit: v.high_alarm_limit,
+                low_alarm_severity: v.low_alarm_severity,
+                low_warning_severity: v.low_warning_severity,
+                high_warning_severity: v.high_warning_severity,
+                high_alarm_severity: v.high_alarm_severity,
+                hysteresis: v.hysteresis,
+            }).unwrap_or(bridge::NTScalarValueAlarm {
+                active: false,
+                low_alarm_limit: 0.0,
+                low_warning_limit: 0.0,
+                high_warning_limit: 0.0,
+                high_alarm_limit: 0.0,
+                low_alarm_severity: 0,
+                low_warning_severity: 0,
+                high_warning_severity: 0,
+                high_alarm_severity: 0,
+                hysteresis: 0,
+            }),
+            has_display: self.display.is_some(),
+            has_control: self.control.is_some(),
+            has_value_alarm: self.value_alarm.is_some(),
+            has_form: self.with_form,
+        }
+    }
+}
+
+impl Default for NTScalarMetadataBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
+
+
+
