@@ -237,20 +237,7 @@ std::unique_ptr<SharedPVWrapper> shared_pv_create_readonly() {
     return SharedPVWrapper::create_readonly();
 }
 
-void shared_pv_open_double(SharedPVWrapper& pv, double initial_value) {
-    try {
-        // Create an NTScalar with double value
-        auto initial = pvxs::nt::NTScalar{pvxs::TypeCode::Float64}.create();
-        initial["value"] = initial_value;
-        
-        ValueWrapper wrapper(std::move(initial));
-        pv.open(wrapper);
-    } catch (const std::exception& e) {
-        throw PvxsError(std::string("Error opening SharedPV with double value: ") + e.what());
-    }
-}
-
-void shared_pv_open_double_with_metadata(SharedPVWrapper& pv, double initial_value, const NTScalarMetadata& metadata) {
+void shared_pv_open_double(SharedPVWrapper& pv, double initial_value, const NTScalarMetadata& metadata) {
     try {
         // Create NTScalar with flags from metadata
         auto initial = pvxs::nt::NTScalar{
@@ -634,84 +621,6 @@ void shared_pv_post_enum(SharedPVWrapper& pv, int16_t value) {
         pv.post_value(wrapper);
     } catch (const std::exception& e) {
         throw PvxsError(std::string("Error posting enum value to SharedPV: ") + e.what());
-    }
-}
-
-void shared_pv_post_double_with_alarm(SharedPVWrapper& pv, double value, int32_t severity, int32_t status, rust::String message) {
-    try {
-        // Use cloneEmpty() to get correct structure, then set the value and alarm fields
-        auto update = pv.get_template().cloneEmpty();
-        update["value"] = value;
-        update["alarm.severity"] = severity;
-        update["alarm.status"] = status;
-        update["alarm.message"] = std::string(message);
-        
-        ValueWrapper wrapper(std::move(update));
-        pv.post_value(wrapper);
-    } catch (const std::exception& e) {
-        throw PvxsError(std::string("Error posting double value with alarm to SharedPV: ") + e.what());
-    }
-}
-
-void shared_pv_post_int32_with_alarm(SharedPVWrapper& pv, int32_t value, int32_t severity, int32_t status, rust::String message) {
-    try {
-        // Use cloneEmpty() to get correct structure, then set the value and alarm fields
-        auto update = pv.get_template().cloneEmpty();
-        update["value"] = value;
-        update["alarm.severity"] = severity;
-        update["alarm.status"] = status;
-        update["alarm.message"] = std::string(message);
-        
-        ValueWrapper wrapper(std::move(update));
-        pv.post_value(wrapper);
-    } catch (const std::exception& e) {
-        throw PvxsError(std::string("Error posting int32 value with alarm to SharedPV: ") + e.what());
-    }
-}
-
-void shared_pv_post_string_with_alarm(SharedPVWrapper& pv, rust::String value, int32_t severity, int32_t status, rust::String message) {
-    try {
-        // Use cloneEmpty() to get correct structure, then set the value and alarm fields
-        auto update = pv.get_template().cloneEmpty();
-        update["value"] = std::string(value);
-        update["alarm.severity"] = severity;
-        update["alarm.status"] = status;
-        update["alarm.message"] = std::string(message);
-        
-        ValueWrapper wrapper(std::move(update));
-        pv.post_value(wrapper);
-    } catch (const std::exception& e) {
-        throw PvxsError(std::string("Error posting string value with alarm to SharedPV: ") + e.what());
-    }
-}
-
-void shared_pv_post_enum_with_alarm(SharedPVWrapper& pv, int16_t value, int32_t severity, int32_t status, rust::String message) {
-    try {
-        // Get the current template to validate against choices
-        auto current = pv.get_template();
-        
-        // Validate the enum index is within valid range
-        if (value < 0) {
-            throw PvxsError("Enum index cannot be negative");
-        }
-        
-        // Get the choices array to validate the index
-        auto choices = current["value.choices"].as<pvxs::shared_array<const std::string>>();
-        if (static_cast<size_t>(value) >= choices.size()) {
-            throw PvxsError("Enum index " + std::to_string(value) + " is out of range (max: " + std::to_string(choices.size() - 1) + ")");
-        }
-        
-        // Use cloneEmpty() to get correct structure, then set the enum index and alarm fields
-        auto update = current.cloneEmpty();
-        update["value.index"] = value;
-        update["alarm.severity"] = severity;
-        update["alarm.status"] = status;
-        update["alarm.message"] = std::string(message);
-        
-        ValueWrapper wrapper(std::move(update));
-        pv.post_value(wrapper);
-    } catch (const std::exception& e) {
-        throw PvxsError(std::string("Error posting enum value with alarm to SharedPV: ") + e.what());
     }
 }
 

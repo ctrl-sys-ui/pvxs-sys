@@ -1,4 +1,4 @@
-use epics_pvxs_sys::{Server, SharedPV, Context, PvxsError};
+use epics_pvxs_sys::{Server, SharedPV, Context, PvxsError, NTScalarMetadataBuilder};
 
 #[test]
 fn test_pv_remote_double_array_get_put() {

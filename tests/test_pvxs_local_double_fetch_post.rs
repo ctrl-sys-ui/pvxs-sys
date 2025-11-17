@@ -1,4 +1,4 @@
-use epics_pvxs_sys::{Server, SharedPV};
+use epics_pvxs_sys::{Server, SharedPV, NTScalarMetadataBuilder};
 
 #[test]
 fn test_pv_local_double_fetch_post() {
@@ -8,7 +8,7 @@ fn test_pv_local_double_fetch_post() {
     let loc_srv = Server::create_isolated()
         .expect("Failed to create isolated server");
 
-    let mut srv_pv_loc_double: SharedPV = loc_srv.create_pv_double("loc:double", initial_value)
+    let mut srv_pv_loc_double: SharedPV = loc_srv.create_pv_double("loc:double", initial_value, NTScalarMetadataBuilder::new())
         .expect("Failed to create pv:double");
 
     // Do a server side fetch to verify initial value
@@ -55,7 +55,7 @@ fn test_pv_local_double_fetch_post_with_error_propagation() -> Result<(), Box<dy
     // This test verifies that errors in get/set operations are properly propagated.
     let loc_srv = Server::create_isolated()?;
 
-    let mut srv_pv_loc_double: SharedPV = loc_srv.create_pv_double("loc:double", initial_value)?;
+    let mut srv_pv_loc_double: SharedPV = loc_srv.create_pv_double("loc:double", initial_value, NTScalarMetadataBuilder::new())?;
 
     // Intentionally cause an error by trying to post an invalid value
     match srv_pv_loc_double.post_string("invalid_double") {
@@ -82,7 +82,7 @@ fn test_pv_local_double_special_values() {
     let loc_srv = Server::create_isolated()
         .expect("Failed to create isolated server");
 
-    let mut srv_pv_loc_double: SharedPV = loc_srv.create_pv_double("loc:double", 0.0)
+    let mut srv_pv_loc_double: SharedPV = loc_srv.create_pv_double("loc:double", 0.0, NTScalarMetadataBuilder::new())
         .expect("Failed to create pv:double");
 
     // Test positive infinity

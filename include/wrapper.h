@@ -546,7 +546,7 @@ namespace pvxs_wrapper
     std::unique_ptr<NTScalarMetadata> create_metadata_with_control_value_alarm(const NTScalarAlarm& alarm, const NTScalarTime& time_stamp, const NTScalarControl& control, const NTScalarValueAlarm& value_alarm, bool has_form);
     std::unique_ptr<NTScalarMetadata> create_metadata_full(const NTScalarAlarm& alarm, const NTScalarTime& time_stamp, const NTScalarDisplay& display, const NTScalarControl& control, const NTScalarValueAlarm& value_alarm, bool has_form);
     
-    void shared_pv_open_double_with_metadata(SharedPVWrapper& pv, double initial_value, const NTScalarMetadata& metadata);
+    void shared_pv_open_double(SharedPVWrapper& pv, double initial_value, const NTScalarMetadata& metadata);
     void shared_pv_open_int32(SharedPVWrapper &pv, int32_t initial_value);
     void shared_pv_open_string(SharedPVWrapper &pv, rust::String initial_value);
     void shared_pv_open_enum(SharedPVWrapper &pv, rust::Vec<rust::String> enum_choices, int16_t selected_choice);
@@ -556,10 +556,6 @@ namespace pvxs_wrapper
     void shared_pv_post_int32(SharedPVWrapper &pv, int32_t value);
     void shared_pv_post_string(SharedPVWrapper &pv, rust::String value);
     void shared_pv_post_enum(SharedPVWrapper &pv, int16_t value);
-    void shared_pv_post_double_with_alarm(SharedPVWrapper &pv, double value, int32_t severity, int32_t status, rust::String message);
-    void shared_pv_post_int32_with_alarm(SharedPVWrapper &pv, int32_t value, int32_t severity, int32_t status, rust::String message);
-    void shared_pv_post_string_with_alarm(SharedPVWrapper &pv, rust::String value, int32_t severity, int32_t status, rust::String message);
-    void shared_pv_post_enum_with_alarm(SharedPVWrapper &pv, int16_t value, int32_t severity, int32_t status, rust::String message);
     std::unique_ptr<ValueWrapper> shared_pv_fetch(const SharedPVWrapper &pv);
 
     // StaticSource creation and operations

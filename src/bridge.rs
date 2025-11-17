@@ -160,8 +160,7 @@ mod ffi {
         // SharedPV creation and operations
         fn shared_pv_create_mailbox() -> Result<UniquePtr<SharedPVWrapper>>;
         fn shared_pv_create_readonly() -> Result<UniquePtr<SharedPVWrapper>>;
-        fn shared_pv_open_double(pv: Pin<&mut SharedPVWrapper>, initial_value: f64) -> Result<()>;
-        fn shared_pv_open_double_with_metadata(pv: Pin<&mut SharedPVWrapper>, initial_value: f64, metadata: &NTScalarMetadata) -> Result<()>;
+        fn shared_pv_open_double(pv: Pin<&mut SharedPVWrapper>, initial_value: f64, metadata: &NTScalarMetadata) -> Result<()>;
         fn shared_pv_open_int32(pv: Pin<&mut SharedPVWrapper>, initial_value: i32) -> Result<()>;
         fn shared_pv_open_string(pv: Pin<&mut SharedPVWrapper>, initial_value: String) -> Result<()>;
         fn shared_pv_open_enum(pv: Pin<&mut SharedPVWrapper>, choices: Vec<String>, selected_value: i16) -> Result<()>;
@@ -171,10 +170,6 @@ mod ffi {
         fn shared_pv_post_int32(pv: Pin<&mut SharedPVWrapper>, value: i32) -> Result<()>;
         fn shared_pv_post_string(pv: Pin<&mut SharedPVWrapper>, value: String) -> Result<()>;
         fn shared_pv_post_enum(pv: Pin<&mut SharedPVWrapper>, value: i16) -> Result<()>;
-        fn shared_pv_post_double_with_alarm(pv: Pin<&mut SharedPVWrapper>, value: f64, severity: i32, status: i32, message: String) -> Result<()>;
-        fn shared_pv_post_int32_with_alarm(pv: Pin<&mut SharedPVWrapper>, value: i32, severity: i32, status: i32, message: String) -> Result<()>;
-        fn shared_pv_post_string_with_alarm(pv: Pin<&mut SharedPVWrapper>, value: String, severity: i32, status: i32, message: String) -> Result<()>;
-        fn shared_pv_post_enum_with_alarm(pv: Pin<&mut SharedPVWrapper>, value: i16, severity: i32, status: i32, message: String) -> Result<()>;
         fn shared_pv_fetch(pv: &SharedPVWrapper) -> Result<UniquePtr<ValueWrapper>>;
         
         // StaticSource creation and operations

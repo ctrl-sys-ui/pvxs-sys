@@ -1557,20 +1557,6 @@ impl Server {
         bridge::server_get_udp_port(&self.inner)
     }
     
-    /// Create a new mailbox SharedPV with a double value
-    /// 
-    /// Mailbox PVs allow both reading and writing by clients.
-    /// 
-    /// # Arguments
-    /// 
-    /// * `_name` - Name for debugging/logging (not the PV name)
-    /// * `initial_value` - Initial value for the PV
-    pub fn create_pv_double(&self, _name: &str, initial_value: f64) -> Result<SharedPV> {
-        let mut pv = SharedPV::create_mailbox()?;
-        pv.open_double(initial_value)?;
-        Ok(pv)
-    }
-
     /// Create a new mailbox SharedPV with a double value and metadata
     /// 
     /// Mailbox PVs allow both reading and writing by clients.
@@ -1580,9 +1566,9 @@ impl Server {
     /// * `_name` - Name for debugging/logging (not the PV name)
     /// * `initial_value` - Initial value for the PV
     /// * `metadata` - Metadata for the scalar PV
-    pub fn create_pv_double_with_metadata(&self, _name: &str, initial_value: f64, metadata: NTScalarMetadataBuilder) -> Result<SharedPV> {
+    pub fn create_pv_double(&self, _name: &str, initial_value: f64, metadata: NTScalarMetadataBuilder) -> Result<SharedPV> {
         let mut pv = SharedPV::create_mailbox()?;
-        pv.open_double_with_metadata(initial_value, metadata)?;
+        pv.open_double(initial_value, metadata)?;
         Ok(pv)
     }
     
@@ -1624,7 +1610,7 @@ impl Server {
         Ok(pv)
     }
     
-    /// Create a new readonly SharedPV with a double value
+    /// Create a new readonly SharedPV with a double value and metadata
     /// 
     /// Readonly PVs only allow reading by clients.
     /// 
@@ -1632,9 +1618,10 @@ impl Server {
     /// 
     /// * `_name` - Name for debugging/logging (not the PV name)
     /// * `initial_value` - Initial value for the PV
-    pub fn create_readonly_pv_double(&self, _name: &str, initial_value: f64) -> Result<SharedPV> {
+    /// * `metadata` - Metadata for the scalar PV
+    pub fn create_readonly_pv_double(&self, _name: &str, initial_value: f64, metadata: NTScalarMetadataBuilder) -> Result<SharedPV> {
         let mut pv = SharedPV::create_readonly()?;
-        pv.open_double(initial_value)?;
+        pv.open_double(initial_value, metadata)?;
         Ok(pv)
     }
 }
@@ -1681,16 +1668,6 @@ impl SharedPV {
         Ok(Self { inner })
     }
     
-    /// Open the PV with a double value
-    /// 
-    /// # Arguments
-    /// 
-    /// * `initial_value` - The initial value for the PV
-    pub fn open_double(&mut self, initial_value: f64) -> Result<()> {
-        bridge::shared_pv_open_double(self.inner.pin_mut(), initial_value)?;
-        Ok(())
-    }
-
     /// Open the PV with a double value and metadata
     /// 
     /// # Arguments
@@ -1715,12 +1692,12 @@ impl SharedPV {
     ///     })
     ///     .with_form(true);
     /// 
-    /// pv.open_double_with_metadata(25.5, metadata)?;
+    /// pv.open_double(25.5, metadata)?;
     /// # Ok::<(), epics_pvxs_sys::PvxsError>(())
     /// ```
-    pub fn open_double_with_metadata(&mut self, initial_value: f64, metadata: NTScalarMetadataBuilder) -> Result<()> {
+    pub fn open_double(&mut self, initial_value: f64, metadata: NTScalarMetadataBuilder) -> Result<()> {
         let meta = metadata.build()?;
-        bridge::shared_pv_open_double_with_metadata(self.inner.pin_mut(), initial_value, &meta)?;
+        bridge::shared_pv_open_double(self.inner.pin_mut(), initial_value, &meta)?;
         Ok(())
     }
     
@@ -1796,60 +1773,6 @@ impl SharedPV {
     /// * `value` - The enum index to post (should be valid for the choices array)
     pub fn post_enum(&mut self, value: i16) -> Result<()> {
         bridge::shared_pv_post_enum(self.inner.pin_mut(), value)?;
-        Ok(())
-    }
-    
-    /// Post a new double value to the PV with alarm information
-    /// 
-    /// This updates the PV value and alarm fields, then notifies connected clients.
-    /// 
-    /// # Arguments
-    /// 
-    /// * `value` - The new value to post
-    /// * `severity` - Alarm severity (0=NO_ALARM, 1=MINOR, 2=MAJOR, 3=INVALID)
-    /// * `status` - Alarm status code (0=NO_ALARM, 1=DEVICE, 2=DRIVER, 3=RECORD, 4=DATABASE, 5=CONFIGURATION, 6=UNDEFINED, 7=CLIENT)
-    /// * `message` - Alarm message string
-    pub fn post_double_with_alarm(&mut self, value: f64, severity: i32, status: i32, message: &str) -> Result<()> {
-        bridge::shared_pv_post_double_with_alarm(self.inner.pin_mut(), value, severity, status, message.to_string())?;
-        Ok(())
-    }
-    
-    /// Post a new int32 value to the PV with alarm information
-    /// 
-    /// # Arguments
-    /// 
-    /// * `value` - The new value to post
-    /// * `severity` - Alarm severity (0=NO_ALARM, 1=MINOR, 2=MAJOR, 3=INVALID)
-    /// * `status` - Alarm status code (0=NO_ALARM, 1=DEVICE, 2=DRIVER, 3=RECORD, 4=DATABASE, 5=CONFIGURATION, 6=UNDEFINED, 7=CLIENT)
-    /// * `message` - Alarm message string
-    pub fn post_int32_with_alarm(&mut self, value: i32, severity: i32, status: i32, message: &str) -> Result<()> {
-        bridge::shared_pv_post_int32_with_alarm(self.inner.pin_mut(), value, severity, status, message.to_string())?;
-        Ok(())
-    }
-    
-    /// Post a new string value to the PV with alarm information
-    /// 
-    /// # Arguments
-    /// 
-    /// * `value` - The new value to post
-    /// * `severity` - Alarm severity (0=NO_ALARM, 1=MINOR, 2=MAJOR, 3=INVALID)
-    /// * `status` - Alarm status code (0=NO_ALARM, 1=DEVICE, 2=DRIVER, 3=RECORD, 4=DATABASE, 5=CONFIGURATION, 6=UNDEFINED, 7=CLIENT)
-    /// * `message` - Alarm message string
-    pub fn post_string_with_alarm(&mut self, value: &str, severity: i32, status: i32, message: &str) -> Result<()> {
-        bridge::shared_pv_post_string_with_alarm(self.inner.pin_mut(), value.to_string(), severity, status, message.to_string())?;
-        Ok(())
-    }
-
-    /// Post a new enum value to the PV with alarm information
-    /// 
-    /// # Arguments
-    /// 
-    /// * `value` - The enum index to post (should be valid for the choices array)
-    /// * `severity` - Alarm severity (0=NO_ALARM, 1=MINOR, 2=MAJOR, 3=INVALID)
-    /// * `status` - Alarm status code (0=NO_ALARM, 1=DEVICE, 2=DRIVER, 3=RECORD, 4=DATABASE, 5=CONFIGURATION, 6=UNDEFINED, 7=CLIENT)
-    /// * `message` - Alarm message string
-    pub fn post_enum_with_alarm(&mut self, value: i16, severity: i32, status: i32, message: &str) -> Result<()> {
-        bridge::shared_pv_post_enum_with_alarm(self.inner.pin_mut(), value, severity, status, message.to_string())?;
         Ok(())
     }
     

@@ -44,7 +44,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_form(true);
     
     // Create PV with metadata
-    let mut pv = server.create_pv_double_with_metadata("temp_sensor", 25.5, metadata)?;
+    let mut pv = server.create_pv_double("temp_sensor", 25.5, metadata)?;
     println!("Created PV with metadata: initial value = 25.5°C");
     
     // Add to source

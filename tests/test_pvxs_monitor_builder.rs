@@ -1,6 +1,6 @@
 // test_pvxs_monitor_builder.rs - Test MonitorBuilder and callback functionality
 
-use epics_pvxs_sys::{Context, Monitor, PvxsError, Server, SharedPV};
+use epics_pvxs_sys::{Context, Monitor, PvxsError, Server, SharedPV, NTScalarMetadataBuilder};
 use std::thread;
 use std::time::Duration;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -30,7 +30,7 @@ fn test_monitor_builder_creation() -> Result<(), PvxsError> {
     let pv_name = "test:pv:double";
     
     // Open with initial double value
-    shared_pv.open_double(1.0)?;
+    shared_pv.open_double(1.0, NTScalarMetadataBuilder::new())?;
     server.add_pv(pv_name, &mut shared_pv)?;
     // INTENTIONALLY NOT starting server to test monitor creation on non-existent PV
     
@@ -75,7 +75,7 @@ fn test_monitor_builder_creation() -> Result<(), PvxsError> {
     // Now start a new server from_env to test actual connection
     server = Server::from_env()?;
     shared_pv = SharedPV::create_mailbox()?;
-    shared_pv.open_double(1.0)?;
+    shared_pv.open_double(1.0, NTScalarMetadataBuilder::new())?;
     server.add_pv(pv_name, &mut shared_pv)?;
     server.start()?;
     
@@ -125,7 +125,7 @@ fn test_monitor_builder_mask_options() -> Result<(), PvxsError> {
     let mut shared_pv = SharedPV::create_mailbox()?;
     
     // Open with initial value
-    shared_pv.open_double(2.5)?;
+    shared_pv.open_double(2.5, NTScalarMetadataBuilder::new())?;
     server.add_pv("TEST:MonitorBuilder:Masks", &mut shared_pv)?;
     server.start()?;
     
@@ -167,7 +167,7 @@ fn test_monitor_pop_functionality() -> Result<(), PvxsError> {
     let mut shared_pv = SharedPV::create_mailbox()?;
     
     // Open with initial value
-    shared_pv.open_double(10.0)?;
+    shared_pv.open_double(10.0, NTScalarMetadataBuilder::new())?;
     server.add_pv("TEST:MonitorBuilder:Pop", &mut shared_pv)?;
     server.start()?;
     
@@ -264,7 +264,7 @@ fn test_monitor_builder_with_callback() -> Result<(), PvxsError> {
     let mut server = Server::create_isolated()?;
     let mut shared_pv = SharedPV::create_mailbox()?;
     
-    shared_pv.open_double(42.0)?;
+    shared_pv.open_double(42.0, NTScalarMetadataBuilder::new())?;
     server.add_pv("TEST:MonitorBuilder:Callback", &mut shared_pv)?;
     server.start()?;
     
@@ -458,7 +458,7 @@ fn test_monitor_builder_rapid_updates() -> Result<(), PvxsError> {
     let mut server = Server::create_isolated()?;
     let mut shared_pv = SharedPV::create_mailbox()?;
     
-    shared_pv.open_double(0.0)?;
+    shared_pv.open_double(0.0, NTScalarMetadataBuilder::new())?;
     server.add_pv("TEST:MonitorBuilder:Rapid", &mut shared_pv)?;
     server.start()?;
     
@@ -511,7 +511,7 @@ fn test_monitor_builder_vs_regular_monitor() -> Result<(), PvxsError> {
     let mut server = Server::create_isolated()?;
     let mut shared_pv = SharedPV::create_mailbox()?;
     
-    shared_pv.open_double(100.0)?;
+    shared_pv.open_double(100.0, NTScalarMetadataBuilder::new())?;
     server.add_pv("TEST:MonitorBuilder:Compare", &mut shared_pv)?;
     server.start()?;
     
@@ -565,7 +565,7 @@ fn test_monitor_builder_with_server_side_counter() -> Result<(), PvxsError> {
     let mut server = Server::from_env()?;
     let mut shared_pv = SharedPV::create_mailbox()?;
     
-    shared_pv.open_double(0.0)?;
+    shared_pv.open_double(0.0, NTScalarMetadataBuilder::new())?;
     server.add_pv("TEST:MonitorBuilder:Counter", &mut shared_pv)?;
     server.start()?;
     
@@ -690,7 +690,7 @@ fn test_monitor_builder_proper_event_pattern() -> Result<(), PvxsError> {
     let mut server = Server::from_env()?;
     let mut shared_pv = SharedPV::create_mailbox()?;
     
-    shared_pv.open_double(0.0)?;
+    shared_pv.open_double(0.0, NTScalarMetadataBuilder::new())?;
     server.add_pv("TEST:MonitorBuilder:EventPattern", &mut shared_pv)?;
     server.start()?;
     
