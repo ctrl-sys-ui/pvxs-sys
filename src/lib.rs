@@ -15,100 +15,10 @@
 //! - **INFO operations**: Query PV type information
 //! - **MONITOR operations**: Subscribe to value changes with callbacks
 //! - **MonitorBuilder**: Advanced monitor configuration with PVXS-style API
-//! - **Array support**: Read/write arrays of double, int32, enum, and string values
+//! - **Array support**: Read/write arrays of double, int32, and string values
 //! - **Server support**: Create and manage PVAccess servers
 //! - Thread-safe client context
 //! 
-//! ## Basic Example
-//! 
-//! ```no_run
-//! use epics_pvxs_sys::{Context, PvxsError};
-//! 
-//! fn main() -> Result<(), PvxsError> {
-//!     // Create a client context from environment variables
-//!     let mut ctx = Context::from_env()?;
-//!     
-//!     // Read a PV value (timeout after 5 seconds)
-//!     let value = ctx.get("my:pv:name", 5.0)?;
-//!     
-//!     // Access the value field as a double
-//!     let val = value.get_field_double("value")?;
-//!     println!("Value: {}", val);
-//!     
-//!     // Write a new value
-//!     ctx.put_double("my:pv:name", 42.0, 5.0)?;
-//!     
-//!     Ok(())
-//! }
-//! ```
-//! 
-//! ## Monitor Example with MonitorBuilder
-//! 
-//! ```no_run
-//! use epics_pvxs_sys::{Context, PvxsError};
-//! 
-//! fn main() -> Result<(), PvxsError> {
-//!     let mut ctx = Context::from_env()?;
-//!     
-//!     // Create a monitor with advanced configuration
-//!     let mut monitor = ctx.monitor_builder("my:pv:name")?
-//!         .mask_connected(false)      // Don't include connection events
-//!         .mask_disconnected(true)    // Include disconnection events
-//!         .exec()?;
-//!     
-//!     monitor.start();
-//!     
-//!     // PVXS-style event processing
-//!     loop {
-//!         match monitor.pop() {
-//!             Ok(Some(value)) => {
-//!                 println!("Update: {}", value);
-//!                 // Process the value...
-//!             },
-//!             Ok(None) => break, // Queue empty
-//!             Err(e) => {
-//!                 println!("Event: {}", e); // Connection events, errors
-//!                 break;
-//!             }
-//!         }
-//!     }
-//!     
-//!     monitor.stop();
-//!     Ok(())
-//! }
-//! ```
-//! 
-//! ## Array Example
-//! 
-//! ```no_run
-//! use epics_pvxs_sys::{Context, PvxsError};
-//! 
-//! fn main() -> Result<(), PvxsError> {
-//!     let mut ctx = Context::from_env()?;
-//!     
-//!     // Read a waveform array
-//!     let value = ctx.get("waveform:pv", 5.0)?;
-//!     let array = value.get_field_double_array("value")?;
-//!     println!("Waveform has {} points", array.len());
-//!     
-//!     // Read enum choices
-//!     let enum_pv = ctx.get("enum:pv", 5.0)?;
-//!     let choices = enum_pv.get_field_string_array("value.choices")?;
-//!     let index = enum_pv.get_field_enum("value.index")?;
-//!     println!("Current choice: '{}'", choices[index as usize]);
-//!     
-//!     // Write an array
-//!     ctx.put_double_array("array:pv", vec![1.0, 2.0, 3.0], 5.0)?;
-//!     
-//!     Ok(())
-//! }
-//! ```
-//! 
-//! ## Requirements
-//! 
-//! - EPICS Base (set `EPICS_BASE` environment variable)
-//! - PVXS library (set `PVXS_DIR` or built within EPICS)
-//! - `EPICS_HOST_ARCH` environment variable (auto-detected if not set)
 
 pub mod bridge;
 
@@ -1609,17 +1519,18 @@ impl Server {
         Ok(pv)
     }
 
-    /// Create a new mailbox SharedPV with an enum value
+    /// Create a new mailbox SharedPV with an enum value and metadata
     /// 
     /// # Arguments
     /// 
     /// * `_name` - Name for debugging/logging (not the PV name)
     /// * `choices` - List of string choices for the enum
     /// * `selected_index` - Initial selected index (0-based)
-    pub fn create_pv_enum(&self, _name: &str, choices: Vec<&str>, selected_index: i16) -> Result<SharedPV> {
+    /// * `metadata` - Metadata for the enum PV
+    pub fn create_pv_enum(&self, _name: &str, choices: Vec<&str>, selected_index: i16, metadata: NTScalarMetadataBuilder) -> Result<SharedPV> {
         let mut pv = SharedPV::create_mailbox()?;
         let choices_vec: Vec<String> = choices.iter().map(|s| s.to_string()).collect();
-        bridge::shared_pv_open_enum(pv.inner.pin_mut(), choices_vec, selected_index)?;
+        bridge::shared_pv_open_enum(pv.inner.pin_mut(), choices_vec, selected_index, metadata)?;
         Ok(pv)
     }
     
@@ -1878,6 +1789,43 @@ impl StaticSource {
 /// 
 /// This provides a clean, type-safe API for configuring PV metadata.
 /// The metadata is constructed using C++ builder functions that support std::optional.
+/// 
+/// ```text
+/// epics:nt/NTScalar:1.0
+/// double value
+/// alarm_t alarm
+///     int severity
+///     int status
+///     string message
+/// structure timeStamp
+///     long secondsPastEpoch
+///     int nanoseconds
+///     int userTag
+/// structure display
+///     double limitLow
+///     double limitHigh
+///     string description
+///     string units
+///     int precision
+///     enum_t form
+///         int index
+///         string[] choices
+/// control_t control
+///     double limitLow
+///     double limitHigh
+///     double minStep
+/// valueAlarm_t valueAlarm
+///     boolean active
+///     double lowAlarmLimit
+///     double lowWarningLimit
+///     double highWarningLimit
+///     double highAlarmLimit
+///     int lowAlarmSeverity
+///     int lowWarningSeverity
+///     int highWarningSeverity
+///     int highAlarmSeverity
+///     byte hysteresis
+/// ```
 pub struct NTScalarMetadataBuilder {
     alarm_severity: i32,
     alarm_status: i32,
@@ -2060,7 +2008,79 @@ impl Default for NTScalarMetadataBuilder {
     }
 }
 
+// ============================================================================
+// NTEnum Metadata support
+// ============================================================================
+/// Builder for creating NTEnum metadata
+/// 
+/// This provides a clean, type-safe API for configuring enum PV metadata.
+/// The metadata is constructed using C++ builder functions.
+/// 
+/// ```text
+/// epics:nt/NTEnum:1.0
+/// enum_t value
+///     int index
+///     string[] choices
+/// alarm_t alarm
+///     int severity
+///     int status
+///     string message
+/// structure timeStamp
+///     long secondsPastEpoch
+///     int nanoseconds
+///     int userTag
+/// ```
+pub struct NTEnumMetadataBuilder {
+    alarm_severity: i32,
+    alarm_status: i32,
+    alarm_message: String,
+    timestamp_seconds: i64,
+    timestamp_nanos: i32,
+    timestamp_user_tag: i32,
+}
 
+impl NTEnumMetadataBuilder {
+    /// Create a new metadata builder with default values
+    pub fn new() -> Self {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+        
+        Self {
+            alarm_severity: 0,
+            alarm_status: 0,
+            alarm_message: String::new(),
+            timestamp_seconds: now.as_secs() as i64,
+            timestamp_nanos: now.subsec_nanos() as i32,
+            timestamp_user_tag: 0,
+        }
+    }
+    
+    /// Set alarm information
+    pub fn alarm(mut self, severity: i32, status: i32, message: impl Into<String>) -> Self {
+        self.alarm_severity = severity;
+        self.alarm_status = status;
+        self.alarm_message = message.into();
+        self
+    }
+    
+    /// Set timestamp (defaults to current time)
+    pub fn timestamp(mut self, seconds: i64, nanos: i32, user_tag: i32) -> Self {
+        self.timestamp_seconds = seconds;
+        self.timestamp_nanos = nanos;
+        self.timestamp_user_tag = user_tag;
+        self
+    }
 
+    fn build(self) -> Result<cxx::UniquePtr<bridge::NTEnumMetadata>> {
+        let alarm = bridge::create_alarm(self.alarm_severity, self.alarm_status, self.alarm_message);
+        let time_stamp = bridge::create_time(self.timestamp_seconds, self.timestamp_nanos, self.timestamp_user_tag);
+        let metadata = bridge::create_enum_metadata(&alarm, &time_stamp);
+        Ok(metadata)
+    }
+}
 
-
+impl Default for NTEnumMetadataBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}

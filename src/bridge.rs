@@ -5,6 +5,7 @@
 mod ffi {
     
     // Opaque C++ types - Rust sees these as opaque pointers
+
     unsafe extern "C++" {
         include!("wrapper.h");
         
@@ -21,6 +22,7 @@ mod ffi {
         type NTScalarControl;
         type NTScalarValueAlarm;
         type NTScalarMetadata;
+        type NTEnumMetadata;
         
         // Metadata builder functions - construct metadata from Rust
         fn create_alarm(severity: i32, status: i32, message: String) -> UniquePtr<NTScalarAlarm>;
@@ -41,6 +43,8 @@ mod ffi {
         fn create_metadata_with_display_value_alarm(alarm: &NTScalarAlarm, time_stamp: &NTScalarTime, display: &NTScalarDisplay, value_alarm: &NTScalarValueAlarm, has_form: bool) -> UniquePtr<NTScalarMetadata>;
         fn create_metadata_with_control_value_alarm(alarm: &NTScalarAlarm, time_stamp: &NTScalarTime, control: &NTScalarControl, value_alarm: &NTScalarValueAlarm, has_form: bool) -> UniquePtr<NTScalarMetadata>;
         fn create_metadata_full(alarm: &NTScalarAlarm, time_stamp: &NTScalarTime, display: &NTScalarDisplay, control: &NTScalarControl, value_alarm: &NTScalarValueAlarm, has_form: bool) -> UniquePtr<NTScalarMetadata>;
+
+        fn create_enum_metadata(alarm: &NTScalarAlarm, time_stamp: &NTScalarTime, enum_choices: Vec<String>) -> UniquePtr<NTEnumMetadata>;
         
         // Note: RpcSourceWrapper - to be implemented later
         
@@ -164,7 +168,7 @@ mod ffi {
         fn shared_pv_open_double_array(pv: Pin<&mut SharedPVWrapper>, initial_value: Vec<f64>, metadata: &NTScalarMetadata) -> Result<()>;
         fn shared_pv_open_int32(pv: Pin<&mut SharedPVWrapper>, initial_value: i32) -> Result<()>;
         fn shared_pv_open_string(pv: Pin<&mut SharedPVWrapper>, initial_value: String) -> Result<()>;
-        fn shared_pv_open_enum(pv: Pin<&mut SharedPVWrapper>, choices: Vec<String>, selected_value: i16) -> Result<()>;
+        fn shared_pv_open_enum(pv: Pin<&mut SharedPVWrapper>, choices: Vec<String>, selected_value: i16, metadata: &NTEnumMetadata) -> Result<()>;
         fn shared_pv_is_open(pv: &SharedPVWrapper) -> bool;
         fn shared_pv_close(pv: Pin<&mut SharedPVWrapper>) -> Result<()>;
         fn shared_pv_post_double(pv: Pin<&mut SharedPVWrapper>, value: f64) -> Result<()>;
