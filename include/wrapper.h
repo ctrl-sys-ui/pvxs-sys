@@ -475,7 +475,6 @@ namespace pvxs_wrapper
     // SharedPV creation and operations
     std::unique_ptr<SharedPVWrapper> shared_pv_create_mailbox();
     std::unique_ptr<SharedPVWrapper> shared_pv_create_readonly();
-    void shared_pv_open_double(SharedPVWrapper &pv, double initial_value);
     
     // NTScalar metadata structures with C++ optional for optional fields
     struct NTScalarAlarm {
