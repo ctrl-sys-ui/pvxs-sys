@@ -547,6 +547,7 @@ namespace pvxs_wrapper
     std::unique_ptr<NTScalarMetadata> create_metadata_full(const NTScalarAlarm& alarm, const NTScalarTime& time_stamp, const NTScalarDisplay& display, const NTScalarControl& control, const NTScalarValueAlarm& value_alarm, bool has_form);
     
     void shared_pv_open_double(SharedPVWrapper& pv, double initial_value, const NTScalarMetadata& metadata);
+    void shared_pv_open_double_array(SharedPVWrapper& pv, rust::Vec<double> initial_value, const NTScalarMetadata& metadata);
     void shared_pv_open_int32(SharedPVWrapper &pv, int32_t initial_value);
     void shared_pv_open_string(SharedPVWrapper &pv, rust::String initial_value);
     void shared_pv_open_enum(SharedPVWrapper &pv, rust::Vec<rust::String> enum_choices, int16_t selected_choice);

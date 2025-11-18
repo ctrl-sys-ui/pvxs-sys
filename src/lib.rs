@@ -1571,6 +1571,19 @@ impl Server {
         pv.open_double(initial_value, metadata)?;
         Ok(pv)
     }
+
+    /// Create a new mailbox SharedPV with a double array value and metadata
+    /// 
+    /// # Arguments
+    /// 
+    /// * `_name` - Name for debugging/logging (not the PV name)
+    /// * `initial_value` - Initial array value for the PV
+    /// * `metadata` - Metadata for the scalar array PV
+    pub fn create_pv_double_array(&self, _name: &str, initial_value: Vec<f64>, metadata: NTScalarMetadataBuilder) -> Result<SharedPV> {
+        let mut pv = SharedPV::create_mailbox()?;
+        pv.open_double_array(initial_value, metadata)?;
+        Ok(pv)
+    }
     
     /// Create a new mailbox SharedPV with an int32 value
     /// 
@@ -1698,6 +1711,18 @@ impl SharedPV {
     pub fn open_double(&mut self, initial_value: f64, metadata: NTScalarMetadataBuilder) -> Result<()> {
         let meta = metadata.build()?;
         bridge::shared_pv_open_double(self.inner.pin_mut(), initial_value, &meta)?;
+        Ok(())
+    }
+
+    /// Open the PV with a double array value and metadata
+    /// 
+    /// # Arguments
+    /// 
+    /// * `initial_value` - The initial array value for the PV
+    /// * `metadata` - Metadata builder for the scalar array PV
+    pub fn open_double_array(&mut self, initial_value: Vec<f64>, metadata: NTScalarMetadataBuilder) -> Result<()> {
+        let meta = metadata.build()?;
+        bridge::shared_pv_open_double_array(self.inner.pin_mut(), initial_value, &meta)?;
         Ok(())
     }
     

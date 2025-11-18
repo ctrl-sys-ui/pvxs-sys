@@ -161,6 +161,7 @@ mod ffi {
         fn shared_pv_create_mailbox() -> Result<UniquePtr<SharedPVWrapper>>;
         fn shared_pv_create_readonly() -> Result<UniquePtr<SharedPVWrapper>>;
         fn shared_pv_open_double(pv: Pin<&mut SharedPVWrapper>, initial_value: f64, metadata: &NTScalarMetadata) -> Result<()>;
+        fn shared_pv_open_double_array(pv: Pin<&mut SharedPVWrapper>, initial_value: Vec<f64>, metadata: &NTScalarMetadata) -> Result<()>;
         fn shared_pv_open_int32(pv: Pin<&mut SharedPVWrapper>, initial_value: i32) -> Result<()>;
         fn shared_pv_open_string(pv: Pin<&mut SharedPVWrapper>, initial_value: String) -> Result<()>;
         fn shared_pv_open_enum(pv: Pin<&mut SharedPVWrapper>, choices: Vec<String>, selected_value: i16) -> Result<()>;
