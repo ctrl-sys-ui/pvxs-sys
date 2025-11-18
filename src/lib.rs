@@ -1527,10 +1527,9 @@ impl Server {
     /// * `choices` - List of string choices for the enum
     /// * `selected_index` - Initial selected index (0-based)
     /// * `metadata` - Metadata for the enum PV
-    pub fn create_pv_enum(&self, _name: &str, choices: Vec<&str>, selected_index: i16, metadata: NTScalarMetadataBuilder) -> Result<SharedPV> {
+    pub fn create_pv_enum(&self, _name: &str, choices: Vec<&str>, selected_index: i16, metadata: NTEnumMetadataBuilder) -> Result<SharedPV> {
         let mut pv = SharedPV::create_mailbox()?;
-        let choices_vec: Vec<String> = choices.iter().map(|s| s.to_string()).collect();
-        bridge::shared_pv_open_enum(pv.inner.pin_mut(), choices_vec, selected_index, metadata)?;
+        pv.open_enum(choices, selected_index, metadata)?;
         Ok(pv)
     }
     
@@ -1634,6 +1633,20 @@ impl SharedPV {
     pub fn open_double_array(&mut self, initial_value: Vec<f64>, metadata: NTScalarMetadataBuilder) -> Result<()> {
         let meta = metadata.build()?;
         bridge::shared_pv_open_double_array(self.inner.pin_mut(), initial_value, &meta)?;
+        Ok(())
+    }
+
+    /// Open the PV with an enum value and metadata
+    /// 
+    /// # Arguments
+    /// 
+    /// * `choices` - List of string choices for the enum
+    /// * `selected_index` - Initial selected index (0-based)
+    /// * `metadata` - Metadata builder for the enum PV
+    pub fn open_enum(&mut self, choices: Vec<&str>, selected_index: i16, metadata: NTEnumMetadataBuilder) -> Result<()> {
+        let meta = metadata.build()?;
+        let choices_vec: Vec<String> = choices.iter().map(|s| s.to_string()).collect();
+        bridge::shared_pv_open_enum(self.inner.pin_mut(), choices_vec, selected_index, &meta)?;
         Ok(())
     }
     

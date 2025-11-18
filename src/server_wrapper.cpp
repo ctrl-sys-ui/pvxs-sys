@@ -403,6 +403,13 @@ std::unique_ptr<NTScalarMetadata> create_metadata_full(const NTScalarAlarm& alar
     return metadata;
 }
 
+std::unique_ptr<NTEnumMetadata> create_enum_metadata(const NTScalarAlarm& alarm, const NTScalarTime& time_stamp) {
+    auto metadata = std::make_unique<NTEnumMetadata>();
+    metadata->alarm = alarm;
+    metadata->time_stamp = time_stamp;
+    return metadata;
+}
+
 // ============================================================================
 // SharedPV Operations
 // ============================================================================

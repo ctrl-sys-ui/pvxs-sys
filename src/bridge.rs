@@ -44,7 +44,7 @@ mod ffi {
         fn create_metadata_with_control_value_alarm(alarm: &NTScalarAlarm, time_stamp: &NTScalarTime, control: &NTScalarControl, value_alarm: &NTScalarValueAlarm, has_form: bool) -> UniquePtr<NTScalarMetadata>;
         fn create_metadata_full(alarm: &NTScalarAlarm, time_stamp: &NTScalarTime, display: &NTScalarDisplay, control: &NTScalarControl, value_alarm: &NTScalarValueAlarm, has_form: bool) -> UniquePtr<NTScalarMetadata>;
 
-        fn create_enum_metadata(alarm: &NTScalarAlarm, time_stamp: &NTScalarTime, enum_choices: Vec<String>) -> UniquePtr<NTEnumMetadata>;
+        fn create_enum_metadata(alarm: &NTScalarAlarm, time_stamp: &NTScalarTime) -> UniquePtr<NTEnumMetadata>;
         
         // Note: RpcSourceWrapper - to be implemented later
         

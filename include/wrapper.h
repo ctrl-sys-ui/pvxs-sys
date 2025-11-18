@@ -528,7 +528,6 @@ namespace pvxs_wrapper
     struct NTEnumMetadata {
         NTScalarAlarm alarm;
         NTScalarTime time_stamp;
-        rust::Vec<rust::String> enum_choices;
     };
     
     // Builder functions for metadata construction from Rust
@@ -551,6 +550,8 @@ namespace pvxs_wrapper
     std::unique_ptr<NTScalarMetadata> create_metadata_with_control_value_alarm(const NTScalarAlarm& alarm, const NTScalarTime& time_stamp, const NTScalarControl& control, const NTScalarValueAlarm& value_alarm, bool has_form);
     std::unique_ptr<NTScalarMetadata> create_metadata_full(const NTScalarAlarm& alarm, const NTScalarTime& time_stamp, const NTScalarDisplay& display, const NTScalarControl& control, const NTScalarValueAlarm& value_alarm, bool has_form);
     
+    std::unique_ptr<NTEnumMetadata> create_enum_metadata(const NTScalarAlarm& alarm, const NTScalarTime& time_stamp);
+
     void shared_pv_open_double(SharedPVWrapper& pv, double initial_value, const NTScalarMetadata& metadata);
     void shared_pv_open_double_array(SharedPVWrapper& pv, rust::Vec<double> initial_value, const NTScalarMetadata& metadata);
     void shared_pv_open_int32(SharedPVWrapper &pv, int32_t initial_value);
