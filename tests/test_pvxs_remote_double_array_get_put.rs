@@ -83,17 +83,13 @@ mod test_pvxs_remote_double_array_get_put {
         let timeout = 5.0;
         let name = "remote:double:array:special";
         
-        let mut srv = Server::from_env()
-            .expect("Failed to create server from env");
-        let mut srv_pv_array: SharedPV = srv.create_pv_double_array(name, vec![0.0], NTScalarMetadataBuilder::new())
-            .expect("Failed to create pv:double:array on server");
+        let mut srv = Server::from_env().expect("Failed to create server from env");
+        let mut srv_pv_array: SharedPV = srv.create_pv_double_array(name, vec![0.0], NTScalarMetadataBuilder::new()).expect("Failed to create pv:double:array on server");
 
-        srv.add_pv(name, &mut srv_pv_array)
-            .expect("Failed to add pv to server");
+        srv.add_pv(name, &mut srv_pv_array).expect("Failed to add pv to server");
         srv.start().expect("Failed to start server");
 
-        let mut ctx = Context::from_env()
-            .expect("Failed to create client context from env");
+        let mut ctx = Context::from_env().expect("Failed to create client context from env");
 
         // Test array with special values
         let special_array = vec![
@@ -115,13 +111,11 @@ mod test_pvxs_remote_double_array_get_put {
                 
                 for (i, (&expected, &actual)) in special_array.iter().zip(retrieved.iter()).enumerate() {
                     if expected.is_finite() && actual.is_finite() {
-                        assert!((expected - actual).abs() < 1e-14, 
-                            "Special value {} mismatch: expected {}, got {}", i, expected, actual);
+                        assert_eq!(expected, actual, "Special value {} mismatch: expected {}, got {}", i, expected, actual);
                     }
                 }
-                println!("Special values array handled successfully");
             },
-            Err(e) => println!("Special values array not supported: {:?}", e),
+            Err(e) => assert!(false, "Special values array not supported: {:?}", e),
         }
 
         srv.stop().expect("Failed to stop server");
