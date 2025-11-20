@@ -1484,38 +1484,82 @@ impl Server {
 
     /// Create a new mailbox SharedPV with a double array value and metadata
     /// 
+    /// Create should fail if array is empty.
+    /// 
     /// # Arguments
     /// 
     /// * `_name` - Name for debugging/logging (not the PV name)
     /// * `initial_value` - Initial array value for the PV
     /// * `metadata` - Metadata for the scalar array PV
     pub fn create_pv_double_array(&self, _name: &str, initial_value: Vec<f64>, metadata: NTScalarMetadataBuilder) -> Result<SharedPV> {
+        if initial_value.is_empty() {
+            return Err(PvxsError::new("Initial double array cannot be empty"));
+        }
         let mut pv = SharedPV::create_mailbox()?;
         pv.open_double_array(initial_value, metadata)?;
         Ok(pv)
     }
     
-    /// Create a new mailbox SharedPV with an int32 value
+    /// Create a new mailbox SharedPV with an int32 value and metadata
     /// 
     /// # Arguments
     /// 
     /// * `_name` - Name for debugging/logging (not the PV name)  
     /// * `initial_value` - Initial value for the PV
-    pub fn create_pv_int32(&self, _name: &str, initial_value: i32) -> Result<SharedPV> {
+    /// * `metadata` - Metadata for the scalar PV
+    pub fn create_pv_int32(&self, _name: &str, initial_value: i32, metadata: NTScalarMetadataBuilder) -> Result<SharedPV> {
         let mut pv = SharedPV::create_mailbox()?;
-        pv.open_int32(initial_value)?;
+        pv.open_int32(initial_value, metadata)?;
         Ok(pv)
     }
     
-    /// Create a new mailbox SharedPV with a string value
+    /// Create a new mailbox SharedPV with an int32 array value and metadata
+    /// 
+    /// Create should fail if array is empty.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `_name` - Name for debugging/logging (not the PV name)
+    /// * `initial_value` - Initial array value for the PV
+    /// * `metadata` - Metadata for the array PV
+    pub fn create_pv_int32_array(&self, _name: &str, initial_value: Vec<i32>, metadata: NTScalarMetadataBuilder) -> Result<SharedPV> {
+        // Check for empty array
+        if initial_value.is_empty() {
+            return Err(PvxsError::new("Initial int32 array cannot be empty"));
+        }
+        let mut pv = SharedPV::create_mailbox()?;
+        pv.open_int32_array(initial_value, metadata)?;
+        Ok(pv)
+    }
+    
+    /// Create a new mailbox SharedPV with a string value and metadata
     /// 
     /// # Arguments
     /// 
     /// * `_name` - Name for debugging/logging (not the PV name)
     /// * `initial_value` - Initial value for the PV
-    pub fn create_pv_string(&self, _name: &str, initial_value: &str) -> Result<SharedPV> {
+    /// * `metadata` - Metadata for the string PV
+    pub fn create_pv_string(&self, _name: &str, initial_value: &str, metadata: NTScalarMetadataBuilder) -> Result<SharedPV> {
         let mut pv = SharedPV::create_mailbox()?;
-        pv.open_string(initial_value)?;
+        pv.open_string_with_metadata(initial_value, metadata)?;
+        Ok(pv)
+    }
+    
+    /// Create a new mailbox SharedPV with a string array value and metadata
+    /// 
+    /// Create should fail if array is empty.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `_name` - Name for debugging/logging (not the PV name)
+    /// * `initial_value` - Initial array value for the PV
+    /// * `metadata` - Metadata for the string array PV
+    pub fn create_pv_string_array(&self, _name: &str, initial_value: Vec<String>, metadata: NTScalarMetadataBuilder) -> Result<SharedPV> {
+        if initial_value.is_empty() {
+            return Err(PvxsError::new("Initial string array cannot be empty"));
+        }
+        let mut pv = SharedPV::create_mailbox()?;
+        pv.open_string_array(initial_value, metadata)?;
         Ok(pv)
     }
 
@@ -1650,13 +1694,27 @@ impl SharedPV {
         Ok(())
     }
     
-    /// Open the PV with an int32 value
+    /// Open the PV with an int32 value and metadata
     /// 
     /// # Arguments
     /// 
     /// * `initial_value` - The initial value for the PV
-    pub fn open_int32(&mut self, initial_value: i32) -> Result<()> {
-        bridge::shared_pv_open_int32(self.inner.pin_mut(), initial_value)?;
+    /// * `metadata` - Metadata builder for the int32 PV
+    pub fn open_int32(&mut self, initial_value: i32, metadata: NTScalarMetadataBuilder) -> Result<()> {
+        let meta = metadata.build()?;
+        bridge::shared_pv_open_int32(self.inner.pin_mut(), initial_value, &meta)?;
+        Ok(())
+    }
+    
+    /// Open the PV with an int32 array value and metadata
+    /// 
+    /// # Arguments
+    /// 
+    /// * `initial_value` - The initial array value for the PV
+    /// * `metadata` - Metadata builder for the int32 array PV
+    pub fn open_int32_array(&mut self, initial_value: Vec<i32>, metadata: NTScalarMetadataBuilder) -> Result<()> {
+        let meta = metadata.build()?;
+        bridge::shared_pv_open_int32_array(self.inner.pin_mut(), initial_value, &meta)?;
         Ok(())
     }
     
@@ -1667,6 +1725,30 @@ impl SharedPV {
     /// * `initial_value` - The initial value for the PV
     pub fn open_string(&mut self, initial_value: &str) -> Result<()> {
         bridge::shared_pv_open_string(self.inner.pin_mut(), initial_value.to_string())?;
+        Ok(())
+    }
+    
+    /// Open the PV with a string value and metadata
+    /// 
+    /// # Arguments
+    /// 
+    /// * `initial_value` - The initial value for the PV
+    /// * `metadata` - Metadata builder for the string PV
+    pub fn open_string_with_metadata(&mut self, initial_value: &str, metadata: NTScalarMetadataBuilder) -> Result<()> {
+        let meta = metadata.build()?;
+        bridge::shared_pv_open_string_with_metadata(self.inner.pin_mut(), initial_value.to_string(), &meta)?;
+        Ok(())
+    }
+    
+    /// Open the PV with a string array value and metadata
+    /// 
+    /// # Arguments
+    /// 
+    /// * `initial_value` - The initial array value for the PV
+    /// * `metadata` - Metadata builder for the string array PV
+    pub fn open_string_array(&mut self, initial_value: Vec<String>, metadata: NTScalarMetadataBuilder) -> Result<()> {
+        let meta = metadata.build()?;
+        bridge::shared_pv_open_string_array(self.inner.pin_mut(), initial_value, &meta)?;
         Ok(())
     }
     
@@ -1684,6 +1766,7 @@ impl SharedPV {
     /// Post a new double value to the PV
     /// 
     /// This updates the PV value and notifies connected clients.
+    /// If the PV is a double array, this will just replace the value at position 0.
     /// 
     /// # Arguments
     /// 
@@ -1694,6 +1777,9 @@ impl SharedPV {
     }
     
     /// Post a new int32 value to the PV
+    /// 
+    /// This updates the PV value and notifies connected clients.
+    /// If the PV is an int32 array, this will just replace the value at position 0.
     /// 
     /// # Arguments
     /// 

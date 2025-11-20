@@ -1,4 +1,4 @@
-use epics_pvxs_sys::{Server, SharedPV, Context, PvxsError};
+use epics_pvxs_sys::{Server, SharedPV, Context, PvxsError, NTScalarMetadataBuilder};
 
 #[test]
 fn test_pv_remote_int32_array_get_put() {
@@ -11,7 +11,7 @@ fn test_pv_remote_int32_array_get_put() {
         .expect("Failed to create server from env");
     
     // Create server with int32 array PV
-    let mut srv_pv_array: SharedPV = srv.create_pv_int32(name, 0)
+    let mut srv_pv_array: SharedPV = srv.create_pv_int32_array(name, initial_array.clone(), NTScalarMetadataBuilder::new())
         .expect("Failed to create pv:int32:array on server");
 
     // Add pv to server, making it accessible to clients
@@ -97,14 +97,14 @@ fn test_pv_remote_int32_array_get_put() {
 }
 
 #[test]
-fn test_pv_remote_int32_array_boundary_values() {
-    // Test array with boundary values for int32
+fn test_pv_remote_int32_array_boundary() {
+    // Test int32 array with boundary values
     let timeout = 5.0;
     let name = "remote:int32:array:boundary";
     
     let mut srv = Server::from_env()
         .expect("Failed to create server from env");
-    let mut srv_pv_array: SharedPV = srv.create_pv_int32(name, 0)
+    let mut srv_pv_array: SharedPV = srv.create_pv_int32_array(name, vec![0], NTScalarMetadataBuilder::new())
         .expect("Failed to create pv:int32:array on server");
 
     srv.add_pv(name, &mut srv_pv_array)

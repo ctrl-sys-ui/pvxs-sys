@@ -166,8 +166,11 @@ mod ffi {
         fn shared_pv_create_readonly() -> Result<UniquePtr<SharedPVWrapper>>;
         fn shared_pv_open_double(pv: Pin<&mut SharedPVWrapper>, initial_value: f64, metadata: &NTScalarMetadata) -> Result<()>;
         fn shared_pv_open_double_array(pv: Pin<&mut SharedPVWrapper>, initial_value: Vec<f64>, metadata: &NTScalarMetadata) -> Result<()>;
-        fn shared_pv_open_int32(pv: Pin<&mut SharedPVWrapper>, initial_value: i32) -> Result<()>;
+        fn shared_pv_open_int32(pv: Pin<&mut SharedPVWrapper>, initial_value: i32, metadata: &NTScalarMetadata) -> Result<()>;
+        fn shared_pv_open_int32_array(pv: Pin<&mut SharedPVWrapper>, initial_value: Vec<i32>, metadata: &NTScalarMetadata) -> Result<()>;
         fn shared_pv_open_string(pv: Pin<&mut SharedPVWrapper>, initial_value: String) -> Result<()>;
+        fn shared_pv_open_string_with_metadata(pv: Pin<&mut SharedPVWrapper>, initial_value: String, metadata: &NTScalarMetadata) -> Result<()>;
+        fn shared_pv_open_string_array(pv: Pin<&mut SharedPVWrapper>, initial_value: Vec<String>, metadata: &NTScalarMetadata) -> Result<()>;
         fn shared_pv_open_enum(pv: Pin<&mut SharedPVWrapper>, choices: Vec<String>, selected_value: i16, metadata: &NTEnumMetadata) -> Result<()>;
         fn shared_pv_is_open(pv: &SharedPVWrapper) -> bool;
         fn shared_pv_close(pv: Pin<&mut SharedPVWrapper>) -> Result<()>;
