@@ -604,19 +604,6 @@ void shared_pv_open_int32(SharedPVWrapper& pv, int32_t initial_value, const NTSc
     }
 }
 
-void shared_pv_open_string(SharedPVWrapper& pv, rust::String initial_value) {
-    try {
-        // Create an NTScalar with string value
-        auto initial = pvxs::nt::NTScalar{pvxs::TypeCode::String}.create();
-        initial["value"] = std::string(initial_value);
-        
-        ValueWrapper wrapper(std::move(initial));
-        pv.open(wrapper);
-    } catch (const std::exception& e) {
-        throw PvxsError(std::string("Error opening SharedPV with string value: ") + e.what());
-    }
-}
-
 void shared_pv_open_int32_array(SharedPVWrapper& pv, rust::Vec<int32_t> initial_value, const NTScalarMetadata& metadata) {
     try {
         // Create NTScalar with array value using flags from metadata
@@ -685,7 +672,7 @@ void shared_pv_open_int32_array(SharedPVWrapper& pv, rust::Vec<int32_t> initial_
     }
 }
 
-void shared_pv_open_string_with_metadata(SharedPVWrapper& pv, rust::String initial_value, const NTScalarMetadata& metadata) {
+void shared_pv_open_string(SharedPVWrapper& pv, rust::String initial_value, const NTScalarMetadata& metadata) {
     try {
         // Create NTScalar with string value using flags from metadata
         auto initial = pvxs::nt::NTScalar{
@@ -887,6 +874,50 @@ void shared_pv_post_enum(SharedPVWrapper& pv, int16_t value) {
         pv.post_value(wrapper);
     } catch (const std::exception& e) {
         throw PvxsError(std::string("Error posting enum value to SharedPV: ") + e.what());
+    }
+}
+
+void shared_pv_post_double_array(SharedPVWrapper& pv, rust::Vec<double> value) {
+    try {
+        auto update = pv.get_template().cloneEmpty();
+        pvxs::shared_array<const double> arr(value.begin(), value.end());
+        update["value"] = arr;
+        
+        ValueWrapper wrapper(std::move(update));
+        pv.post_value(wrapper);
+    } catch (const std::exception& e) {
+        throw PvxsError(std::string("Error posting double array to SharedPV: ") + e.what());
+    }
+}
+
+void shared_pv_post_int32_array(SharedPVWrapper& pv, rust::Vec<int32_t> value) {
+    try {
+        auto update = pv.get_template().cloneEmpty();
+        pvxs::shared_array<const int32_t> arr(value.begin(), value.end());
+        update["value"] = arr;
+        
+        ValueWrapper wrapper(std::move(update));
+        pv.post_value(wrapper);
+    } catch (const std::exception& e) {
+        throw PvxsError(std::string("Error posting int32 array to SharedPV: ") + e.what());
+    }
+}
+
+void shared_pv_post_string_array(SharedPVWrapper& pv, rust::Vec<rust::String> value) {
+    try {
+        auto update = pv.get_template().cloneEmpty();
+        std::vector<std::string> cpp_vec;
+        cpp_vec.reserve(value.size());
+        for (const auto& s : value) {
+            cpp_vec.emplace_back(std::string(s));
+        }
+        pvxs::shared_array<const std::string> arr(cpp_vec.begin(), cpp_vec.end());
+        update["value"] = arr;
+        
+        ValueWrapper wrapper(std::move(update));
+        pv.post_value(wrapper);
+    } catch (const std::exception& e) {
+        throw PvxsError(std::string("Error posting string array to SharedPV: ") + e.what());
     }
 }
 

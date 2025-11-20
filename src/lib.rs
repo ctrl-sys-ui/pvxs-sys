@@ -1328,16 +1328,16 @@ impl Rpc {
 /// # Example
 /// 
 /// ```no_run
-/// use epics_pvxs_sys::Server;
+/// use epics_pvxs_sys::{Server, NTScalarMetadataBuilder};
 /// 
 /// let mut server = Server::from_env()?; // Create server from environment
 /// //let mut server = Server::create_isolated()?; // Create an isolated server
 /// 
-/// let mut pv = server.create_pv_double("test:pv", 42.0)?;
-/// server.add_pv("test:pv", &mut pv)?;
+/// // Create and add PV in one step
+/// server.create_pv_double("test:pv", 42.0, NTScalarMetadataBuilder::new())?;
 /// 
 /// server.start()?;
-/// println!("Server running on port {}", server.tcp_port());
+/// println!(\"Server running on port {}\", server.tcp_port());
 /// 
 /// server.stop()?;
 /// # Ok::<(), epics_pvxs_sys::PvxsError>(())
@@ -1404,25 +1404,16 @@ impl Server {
         Ok(())
     }
     
-    /// Add a PV to the server
+    /// Add a PV to the server (internal use only)
     /// 
     /// Makes a process variable available to clients under the given name.
+    /// This is now internal - use create_pv_* methods instead.
     /// 
     /// # Arguments
     /// 
     /// * `name` - The PV name that clients will use
     /// * `pv` - The SharedPV to add
-    /// 
-    /// # Example
-    /// 
-    /// ```no_run
-    /// # use epics_pvxs_sys::Server;
-    /// # let mut server = Server::create_isolated().unwrap();
-    /// let mut pv = server.create_pv_double("counter", 0.0)?;
-    /// server.add_pv("test:counter", &mut pv)?;
-    /// # Ok::<(), epics_pvxs_sys::PvxsError>(())
-    /// ```
-    pub fn add_pv(&mut self, name: &str, pv: &mut SharedPV) -> Result<()> {
+    pub(crate) fn add_pv(&mut self, name: &str, pv: &mut SharedPV) -> Result<()> {
         bridge::server_add_pv(self.inner.pin_mut(), name.to_string(), pv.inner.pin_mut())?;
         Ok(())
     }
@@ -1467,129 +1458,156 @@ impl Server {
         bridge::server_get_udp_port(&self.inner)
     }
     
-    /// Create a new mailbox SharedPV with a double value and metadata
+    /// Create and add a new mailbox SharedPV with a double value and metadata
     /// 
     /// Mailbox PVs allow both reading and writing by clients.
+    /// The PV is automatically added to the server with the given name.
     /// 
     /// # Arguments
     /// 
-    /// * `_name` - Name for debugging/logging (not the PV name)
+    /// * `name` - The PV name that clients will use
     /// * `initial_value` - Initial value for the PV
     /// * `metadata` - Metadata for the scalar PV
-    pub fn create_pv_double(&self, _name: &str, initial_value: f64, metadata: NTScalarMetadataBuilder) -> Result<SharedPV> {
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// # use epics_pvxs_sys::{Server, NTScalarMetadataBuilder};
+    /// # let mut server = Server::create_isolated().unwrap();
+    /// server.create_pv_double("test:double", 42.5, NTScalarMetadataBuilder::new())?;
+    /// # Ok::<(), epics_pvxs_sys::PvxsError>(())
+    /// ```
+    pub fn create_pv_double(&mut self, name: &str, initial_value: f64, metadata: NTScalarMetadataBuilder) -> Result<()> {
         let mut pv = SharedPV::create_mailbox()?;
         pv.open_double(initial_value, metadata)?;
-        Ok(pv)
+        self.add_pv(name, &mut pv)?;
+        Ok(())
     }
 
-    /// Create a new mailbox SharedPV with a double array value and metadata
+    /// Create and add a new mailbox SharedPV with a double array value and metadata
     /// 
     /// Create should fail if array is empty.
+    /// The PV is automatically added to the server with the given name.
     /// 
     /// # Arguments
     /// 
-    /// * `_name` - Name for debugging/logging (not the PV name)
+    /// * `name` - The PV name that clients will use
     /// * `initial_value` - Initial array value for the PV
     /// * `metadata` - Metadata for the scalar array PV
-    pub fn create_pv_double_array(&self, _name: &str, initial_value: Vec<f64>, metadata: NTScalarMetadataBuilder) -> Result<SharedPV> {
+    pub fn create_pv_double_array(&mut self, name: &str, initial_value: Vec<f64>, metadata: NTScalarMetadataBuilder) -> Result<()> {
         if initial_value.is_empty() {
             return Err(PvxsError::new("Initial double array cannot be empty"));
         }
         let mut pv = SharedPV::create_mailbox()?;
         pv.open_double_array(initial_value, metadata)?;
-        Ok(pv)
+        self.add_pv(name, &mut pv)?;
+        Ok(())
     }
     
-    /// Create a new mailbox SharedPV with an int32 value and metadata
+    /// Create and add a new mailbox SharedPV with an int32 value and metadata
+    /// 
+    /// The PV is automatically added to the server with the given name.
     /// 
     /// # Arguments
     /// 
-    /// * `_name` - Name for debugging/logging (not the PV name)  
+    /// * `name` - The PV name that clients will use
     /// * `initial_value` - Initial value for the PV
     /// * `metadata` - Metadata for the scalar PV
-    pub fn create_pv_int32(&self, _name: &str, initial_value: i32, metadata: NTScalarMetadataBuilder) -> Result<SharedPV> {
+    pub fn create_pv_int32(&mut self, name: &str, initial_value: i32, metadata: NTScalarMetadataBuilder) -> Result<()> {
         let mut pv = SharedPV::create_mailbox()?;
         pv.open_int32(initial_value, metadata)?;
-        Ok(pv)
+        self.add_pv(name, &mut pv)?;
+        Ok(())
     }
     
-    /// Create a new mailbox SharedPV with an int32 array value and metadata
+    /// Create and add a new mailbox SharedPV with an int32 array value and metadata
     /// 
     /// Create should fail if array is empty.
+    /// The PV is automatically added to the server with the given name.
     /// 
     /// # Arguments
     /// 
-    /// * `_name` - Name for debugging/logging (not the PV name)
+    /// * `name` - The PV name that clients will use
     /// * `initial_value` - Initial array value for the PV
     /// * `metadata` - Metadata for the array PV
-    pub fn create_pv_int32_array(&self, _name: &str, initial_value: Vec<i32>, metadata: NTScalarMetadataBuilder) -> Result<SharedPV> {
-        // Check for empty array
+    pub fn create_pv_int32_array(&mut self, name: &str, initial_value: Vec<i32>, metadata: NTScalarMetadataBuilder) -> Result<()> {
         if initial_value.is_empty() {
             return Err(PvxsError::new("Initial int32 array cannot be empty"));
         }
         let mut pv = SharedPV::create_mailbox()?;
         pv.open_int32_array(initial_value, metadata)?;
-        Ok(pv)
+        self.add_pv(name, &mut pv)?;
+        Ok(())
     }
     
-    /// Create a new mailbox SharedPV with a string value and metadata
+    /// Create and add a new mailbox SharedPV with a string value and metadata
+    /// 
+    /// The PV is automatically added to the server with the given name.
     /// 
     /// # Arguments
     /// 
-    /// * `_name` - Name for debugging/logging (not the PV name)
+    /// * `name` - The PV name that clients will use
     /// * `initial_value` - Initial value for the PV
     /// * `metadata` - Metadata for the string PV
-    pub fn create_pv_string(&self, _name: &str, initial_value: &str, metadata: NTScalarMetadataBuilder) -> Result<SharedPV> {
+    pub fn create_pv_string(&mut self, name: &str, initial_value: &str, metadata: NTScalarMetadataBuilder) -> Result<()> {
         let mut pv = SharedPV::create_mailbox()?;
-        pv.open_string_with_metadata(initial_value, metadata)?;
-        Ok(pv)
+        pv.open_string(initial_value, metadata)?;
+        self.add_pv(name, &mut pv)?;
+        Ok(())
     }
     
-    /// Create a new mailbox SharedPV with a string array value and metadata
+    /// Create and add a new mailbox SharedPV with a string array value and metadata
     /// 
     /// Create should fail if array is empty.
+    /// The PV is automatically added to the server with the given name.
     /// 
     /// # Arguments
     /// 
-    /// * `_name` - Name for debugging/logging (not the PV name)
+    /// * `name` - The PV name that clients will use
     /// * `initial_value` - Initial array value for the PV
     /// * `metadata` - Metadata for the string array PV
-    pub fn create_pv_string_array(&self, _name: &str, initial_value: Vec<String>, metadata: NTScalarMetadataBuilder) -> Result<SharedPV> {
+    pub fn create_pv_string_array(&mut self, name: &str, initial_value: Vec<String>, metadata: NTScalarMetadataBuilder) -> Result<()> {
         if initial_value.is_empty() {
             return Err(PvxsError::new("Initial string array cannot be empty"));
         }
         let mut pv = SharedPV::create_mailbox()?;
         pv.open_string_array(initial_value, metadata)?;
-        Ok(pv)
+        self.add_pv(name, &mut pv)?;
+        Ok(())
     }
 
-    /// Create a new mailbox SharedPV with an enum value and metadata
+    /// Create and add a new mailbox SharedPV with an enum value and metadata
+    /// 
+    /// The PV is automatically added to the server with the given name.
     /// 
     /// # Arguments
     /// 
-    /// * `_name` - Name for debugging/logging (not the PV name)
+    /// * `name` - The PV name that clients will use
     /// * `choices` - List of string choices for the enum
     /// * `selected_index` - Initial selected index (0-based)
     /// * `metadata` - Metadata for the enum PV
-    pub fn create_pv_enum(&self, _name: &str, choices: Vec<&str>, selected_index: i16, metadata: NTEnumMetadataBuilder) -> Result<SharedPV> {
+    pub fn create_pv_enum(&mut self, name: &str, choices: Vec<&str>, selected_index: i16, metadata: NTEnumMetadataBuilder) -> Result<()> {
         let mut pv = SharedPV::create_mailbox()?;
         pv.open_enum(choices, selected_index, metadata)?;
-        Ok(pv)
+        self.add_pv(name, &mut pv)?;
+        Ok(())
     }
     
-    /// Create a new readonly SharedPV with a double value and metadata
+    /// Create and add a new readonly SharedPV with a double value and metadata
     /// 
     /// Readonly PVs only allow reading by clients.
+    /// The PV is automatically added to the server with the given name.
     /// 
     /// # Arguments
     /// 
-    /// * `_name` - Name for debugging/logging (not the PV name)
+    /// * `name` - The PV name that clients will use
     /// * `initial_value` - Initial value for the PV
     /// * `metadata` - Metadata for the scalar PV
-    pub fn create_readonly_pv_double(&self, _name: &str, initial_value: f64, metadata: NTScalarMetadataBuilder) -> Result<SharedPV> {
+    pub fn create_readonly_pv_double(&mut self, name: &str, initial_value: f64, metadata: NTScalarMetadataBuilder) -> Result<()> {
         let mut pv = SharedPV::create_readonly()?;
         pv.open_double(initial_value, metadata)?;
-        Ok(pv)
+        self.add_pv(name, &mut pv)?;
+        Ok(())
     }
 }
 
@@ -1662,7 +1680,7 @@ impl SharedPV {
     /// pv.open_double(25.5, metadata)?;
     /// # Ok::<(), epics_pvxs_sys::PvxsError>(())
     /// ```
-    pub fn open_double(&mut self, initial_value: f64, metadata: NTScalarMetadataBuilder) -> Result<()> {
+    pub(crate) fn open_double(&mut self, initial_value: f64, metadata: NTScalarMetadataBuilder) -> Result<()> {
         let meta = metadata.build()?;
         bridge::shared_pv_open_double(self.inner.pin_mut(), initial_value, &meta)?;
         Ok(())
@@ -1674,7 +1692,7 @@ impl SharedPV {
     /// 
     /// * `initial_value` - The initial array value for the PV
     /// * `metadata` - Metadata builder for the scalar array PV
-    pub fn open_double_array(&mut self, initial_value: Vec<f64>, metadata: NTScalarMetadataBuilder) -> Result<()> {
+    pub(crate) fn open_double_array(&mut self, initial_value: Vec<f64>, metadata: NTScalarMetadataBuilder) -> Result<()> {
         let meta = metadata.build()?;
         bridge::shared_pv_open_double_array(self.inner.pin_mut(), initial_value, &meta)?;
         Ok(())
@@ -1687,7 +1705,7 @@ impl SharedPV {
     /// * `choices` - List of string choices for the enum
     /// * `selected_index` - Initial selected index (0-based)
     /// * `metadata` - Metadata builder for the enum PV
-    pub fn open_enum(&mut self, choices: Vec<&str>, selected_index: i16, metadata: NTEnumMetadataBuilder) -> Result<()> {
+    pub(crate) fn open_enum(&mut self, choices: Vec<&str>, selected_index: i16, metadata: NTEnumMetadataBuilder) -> Result<()> {
         let meta = metadata.build()?;
         let choices_vec: Vec<String> = choices.iter().map(|s| s.to_string()).collect();
         bridge::shared_pv_open_enum(self.inner.pin_mut(), choices_vec, selected_index, &meta)?;
@@ -1700,7 +1718,7 @@ impl SharedPV {
     /// 
     /// * `initial_value` - The initial value for the PV
     /// * `metadata` - Metadata builder for the int32 PV
-    pub fn open_int32(&mut self, initial_value: i32, metadata: NTScalarMetadataBuilder) -> Result<()> {
+    pub(crate) fn open_int32(&mut self, initial_value: i32, metadata: NTScalarMetadataBuilder) -> Result<()> {
         let meta = metadata.build()?;
         bridge::shared_pv_open_int32(self.inner.pin_mut(), initial_value, &meta)?;
         Ok(())
@@ -1712,19 +1730,9 @@ impl SharedPV {
     /// 
     /// * `initial_value` - The initial array value for the PV
     /// * `metadata` - Metadata builder for the int32 array PV
-    pub fn open_int32_array(&mut self, initial_value: Vec<i32>, metadata: NTScalarMetadataBuilder) -> Result<()> {
+    pub(crate) fn open_int32_array(&mut self, initial_value: Vec<i32>, metadata: NTScalarMetadataBuilder) -> Result<()> {
         let meta = metadata.build()?;
         bridge::shared_pv_open_int32_array(self.inner.pin_mut(), initial_value, &meta)?;
-        Ok(())
-    }
-    
-    /// Open the PV with a string value
-    /// 
-    /// # Arguments
-    /// 
-    /// * `initial_value` - The initial value for the PV
-    pub fn open_string(&mut self, initial_value: &str) -> Result<()> {
-        bridge::shared_pv_open_string(self.inner.pin_mut(), initial_value.to_string())?;
         Ok(())
     }
     
@@ -1734,9 +1742,9 @@ impl SharedPV {
     /// 
     /// * `initial_value` - The initial value for the PV
     /// * `metadata` - Metadata builder for the string PV
-    pub fn open_string_with_metadata(&mut self, initial_value: &str, metadata: NTScalarMetadataBuilder) -> Result<()> {
+    pub(crate) fn open_string(&mut self, initial_value: &str, metadata: NTScalarMetadataBuilder) -> Result<()> {
         let meta = metadata.build()?;
-        bridge::shared_pv_open_string_with_metadata(self.inner.pin_mut(), initial_value.to_string(), &meta)?;
+        bridge::shared_pv_open_string(self.inner.pin_mut(), initial_value.to_string(), &meta)?;
         Ok(())
     }
     
@@ -1746,7 +1754,7 @@ impl SharedPV {
     /// 
     /// * `initial_value` - The initial array value for the PV
     /// * `metadata` - Metadata builder for the string array PV
-    pub fn open_string_array(&mut self, initial_value: Vec<String>, metadata: NTScalarMetadataBuilder) -> Result<()> {
+    pub(crate) fn open_string_array(&mut self, initial_value: Vec<String>, metadata: NTScalarMetadataBuilder) -> Result<()> {
         let meta = metadata.build()?;
         bridge::shared_pv_open_string_array(self.inner.pin_mut(), initial_value, &meta)?;
         Ok(())
@@ -1808,6 +1816,51 @@ impl SharedPV {
     /// * `value` - The enum index to post (should be valid for the choices array)
     pub fn post_enum(&mut self, value: i16) -> Result<()> {
         bridge::shared_pv_post_enum(self.inner.pin_mut(), value)?;
+        Ok(())
+    }
+    
+    /// Post a new double array to the PV
+    /// 
+    /// Updates the array value and notifies connected clients.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `value` - The new array to post
+    pub fn post_double_array(&mut self, value: &[f64]) -> Result<()> {
+        if value.is_empty() {
+            return Err(PvxsError::new("Cannot post empty double array"));
+        }
+        bridge::shared_pv_post_double_array(self.inner.pin_mut(), value.to_vec())?;
+        Ok(())
+    }
+    
+    /// Post a new int32 array to the PV
+    /// 
+    /// Updates the array value and notifies connected clients.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `value` - The new array to post
+    pub fn post_int32_array(&mut self, value: &[i32]) -> Result<()> {
+        if value.is_empty() {
+            return Err(PvxsError::new("Cannot post empty int32 array"));
+        }
+        bridge::shared_pv_post_int32_array(self.inner.pin_mut(), value.to_vec())?;
+        Ok(())
+    }
+    
+    /// Post a new string array to the PV
+    /// 
+    /// Updates the array value and notifies connected clients.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `value` - The new array to post
+    pub fn post_string_array(&mut self, value: &[String]) -> Result<()> {
+        if value.is_empty() {
+            return Err(PvxsError::new("Cannot post empty string array"));
+        }
+        bridge::shared_pv_post_string_array(self.inner.pin_mut(), value.to_vec())?;
         Ok(())
     }
     

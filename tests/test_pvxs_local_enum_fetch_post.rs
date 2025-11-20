@@ -28,14 +28,14 @@ mod test_pv_local_double_array_fetch_post {
                         assert_eq!(&retrieved_choices[i], choice);
                     }
                 },
-                Err(e) => panic!("Failed to fetch value: {:?}", e),
+                Err(e) => assert!(false, "Failed to fetch value: {:?}", e),
             }
 
             // Post a different enum index
             let new_index = 2; // "STANDBY"
             match srv_pv_loc_enum.post_enum(new_index) {
                 Ok(_) => (),
-                Err(e) => panic!("Failed to post new enum index: {:?}", e),
+                Err(e) => assert!(false, "Failed to post new enum index: {:?}", e),
             }
 
             // Fetch again to verify the new index
@@ -44,14 +44,14 @@ mod test_pv_local_double_array_fetch_post {
                     let index = value.get_field_enum("value.index").unwrap();
                     assert_eq!(index, new_index);
                 },
-                Err(e) => panic!("Failed to fetch value: {:?}", e),
+                Err(e) => assert!(false, "Failed to fetch value: {:?}", e),
             }
 
             // Test posting an invalid index (negative test)
             match srv_pv_loc_enum.post_enum(99) {
                 Ok(_) => {
                     // Some implementations may allow out-of-range values
-                    panic!("Server accepted out-of-range enum index");
+                    assert!(false, "Server accepted out-of-range enum index");
                 },
                 Err(_) => assert!(true), // Expected error
             }
@@ -109,7 +109,7 @@ mod test_pv_local_double_array_fetch_post {
                         let retrieved_choices = value.get_field_string_array("value.choices").unwrap();
                         assert_eq!(&retrieved_choices[index as usize], expected_choice);
                     },
-                    Err(e) => panic!("Failed to set state {}: {:?}", expected_choice, e),
+                    Err(e) => assert!(false, "Failed to set state {}: {:?}", expected_choice, e),
                 }
             }
         }
@@ -137,7 +137,7 @@ mod test_pv_local_double_array_fetch_post {
 
             // Test negative index (should fail or be clamped)
             match srv_pv_loc_enum.post_enum(-1) {
-                Ok(_) => panic!("Server accepted negative enum index"),
+                Ok(_) => assert!(false, "Server accepted negative enum index"),
                 Err(_) => assert!(true), // Expected behavior
             }
         }

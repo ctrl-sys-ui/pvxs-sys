@@ -1,4 +1,4 @@
-use epics_pvxs_sys::{Server, SharedPV, Context, PvxsError, NTScalarMetadataBuilder};
+use epics_pvxs_sys::{Server, Context, PvxsError, NTScalarMetadataBuilder};
 
 #[test]
 fn test_pv_remote_int32_array_get_put() {
@@ -10,13 +10,9 @@ fn test_pv_remote_int32_array_get_put() {
     let mut srv = Server::from_env()
         .expect("Failed to create server from env");
     
-    // Create server with int32 array PV
-    let mut srv_pv_array: SharedPV = srv.create_pv_int32_array(name, initial_array.clone(), NTScalarMetadataBuilder::new())
+    // Create server with int32 array PV (automatically added)
+    srv.create_pv_int32_array(name, initial_array.clone(), NTScalarMetadataBuilder::new())
         .expect("Failed to create pv:int32:array on server");
-
-    // Add pv to server, making it accessible to clients
-    srv.add_pv(name, &mut srv_pv_array)
-        .expect("Failed to add pv to server");
 
     // start the server
     srv.start().expect("Failed to start server");
@@ -27,9 +23,7 @@ fn test_pv_remote_int32_array_get_put() {
 
     // Do a put to set array values
     match ctx.put_int32_array(name, initial_array.clone(), timeout) {
-        Ok(_) => {
-            println!("Successfully put int32 array");
-            
+        Ok(_) => {            
             // Do a get to verify the array values
             let get_result: Result<epics_pvxs_sys::Value, PvxsError> = ctx.get(name, timeout);
             match get_result {
@@ -41,16 +35,14 @@ fn test_pv_remote_int32_array_get_put() {
                                 assert_eq!(expected, actual, 
                                           "Array element {} mismatch: expected {}, got {}", i, expected, actual);
                             }
-                            println!("Array values verified successfully");
                         },
-                        Err(e) => panic!("Failed to get array field: {:?}", e),
+                        Err(e) => assert!(false, "Failed to get array field: {:?}", e),
                     }
                 },
-                Err(e) => panic!("Failed to get value from remote pv: {:?}", e),
+                Err(e) => assert!(false, "Failed to get value from remote pv: {:?}", e),
             }
         },
         Err(e) => {
-            println!("Server may not support int32 arrays: {:?}", e);
             // Skip the test if arrays aren't supported
             srv.stop().expect("Failed to stop server");
             return;
@@ -64,9 +56,8 @@ fn test_pv_remote_int32_array_get_put() {
             let value = ctx.get(name, timeout).expect("Failed to get negative array");
             let retrieved = value.get_field_int32_array("value").unwrap();
             assert_eq!(retrieved, negative_array);
-            println!("Negative values array handled successfully");
         },
-        Err(e) => println!("Negative array not supported: {:?}", e),
+        Err(e) => assert!(false, "Negative array not supported: {:?}", e),
     }
 
     // Test with large array
@@ -75,10 +66,9 @@ fn test_pv_remote_int32_array_get_put() {
         Ok(_) => {
             let value = ctx.get(name, timeout).expect("Failed to get large array");
             let retrieved = value.get_field_int32_array("value").unwrap();
-            assert_eq!(retrieved.len(), large_array.len());
-            println!("Large array ({} elements) handled successfully", large_array.len());
+            assert_eq!(retrieved.len(), large_array.len(), "Large array length mismatch");
         },
-        Err(e) => println!("Large array not supported: {:?}", e),
+        Err(e) => assert!(false, "Large array not supported: {:?}", e),
     }
 
     // Test with empty array
@@ -87,9 +77,8 @@ fn test_pv_remote_int32_array_get_put() {
             let value = ctx.get(name, timeout).expect("Failed to get empty array");
             let retrieved = value.get_field_int32_array("value").unwrap();
             assert_eq!(retrieved.len(), 0);
-            println!("Empty array handled successfully");
         },
-        Err(e) => println!("Empty array not supported: {:?}", e),
+        Err(e) => assert!(false, "Empty array not supported: {:?}", e),
     }
 
     // Close the server after test
@@ -104,11 +93,9 @@ fn test_pv_remote_int32_array_boundary() {
     
     let mut srv = Server::from_env()
         .expect("Failed to create server from env");
-    let mut srv_pv_array: SharedPV = srv.create_pv_int32_array(name, vec![0], NTScalarMetadataBuilder::new())
+    srv.create_pv_int32_array(name, vec![0], NTScalarMetadataBuilder::new())
         .expect("Failed to create pv:int32:array on server");
 
-    srv.add_pv(name, &mut srv_pv_array)
-        .expect("Failed to add pv to server");
     srv.start().expect("Failed to start server");
 
     let mut ctx = Context::from_env()
@@ -135,9 +122,8 @@ fn test_pv_remote_int32_array_boundary() {
                 assert_eq!(expected, actual, 
                           "Boundary value {} mismatch: expected {}, got {}", i, expected, actual);
             }
-            println!("Boundary values array handled successfully");
         },
-        Err(e) => println!("Boundary values array not supported: {:?}", e),
+        Err(e) => assert!(false, "Boundary values array not supported: {:?}", e),
     }
 
     // Test monotonic sequence
@@ -146,10 +132,9 @@ fn test_pv_remote_int32_array_boundary() {
         Ok(_) => {
             let value = ctx.get(name, timeout).expect("Failed to get sequence array");
             let retrieved = value.get_field_int32_array("value").unwrap();
-            assert_eq!(retrieved, sequence_array);
-            println!("Monotonic sequence array handled successfully");
+            assert_eq!(retrieved, sequence_array, "Monotonic sequence array does not match");
         },
-        Err(e) => println!("Sequence array not supported: {:?}", e),
+        Err(e) => assert!(false, "Sequence array not supported: {:?}", e),
     }
 
     srv.stop().expect("Failed to stop server");

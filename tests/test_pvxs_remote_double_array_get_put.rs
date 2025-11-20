@@ -1,5 +1,5 @@
 mod test_pvxs_remote_double_array_get_put {
-    use epics_pvxs_sys::{Server, SharedPV, Context, PvxsError, NTScalarMetadataBuilder};
+    use epics_pvxs_sys::{Server, Context, PvxsError, NTScalarMetadataBuilder};
 
     #[test]
     fn test_pv_remote_double_array_get_put() {
@@ -13,12 +13,8 @@ mod test_pvxs_remote_double_array_get_put {
         
         // Create server with double array PV (this may require special setup)
         // Note: Array PV creation might need different approach depending on server implementation
-        let mut srv_pv_array: SharedPV = srv.create_pv_double_array(name, initial_array.clone(), NTScalarMetadataBuilder::new())
+        srv.create_pv_double_array(name, initial_array.clone(), NTScalarMetadataBuilder::new())
             .expect("Failed to create pv:double:array on server");
-
-        // Add pv to server, making it accessible to clients
-        srv.add_pv(name, &mut srv_pv_array)
-            .expect("Failed to add pv to server");
 
         // start the server
         srv.start().expect("Failed to start server");
@@ -41,10 +37,10 @@ mod test_pvxs_remote_double_array_get_put {
                                     assert_eq!(expected, actual, "Array element {} mismatch: expected {}, got {}", i, expected, actual);
                                 }
                             },
-                            Err(e) => panic!("Failed to get array `value` field: {:?}", e),
+                            Err(e) => assert!(false, "Failed to get array `value` field: {:?}", e),
                         }
                     },
-                    Err(e) => panic!("Failed to get value from remote pv: {:?}", e),
+                    Err(e) => assert!(false, "Failed to get value from remote pv: {:?}", e),
                 }
             },
             Err(e) => {
@@ -60,7 +56,7 @@ mod test_pvxs_remote_double_array_get_put {
                 let retrieved = value.get_field_double_array("value").unwrap();
                 assert_eq!(retrieved.len(), large_array.len(), "Large array length mismatch");
             },
-            Err(e) => panic!("Large array not supported: {:?}", e),
+            Err(e) => assert!(false, "Large array not supported: {:?}", e),
         }
 
         // Test with empty array
@@ -70,7 +66,7 @@ mod test_pvxs_remote_double_array_get_put {
                 let retrieved = value.get_field_double_array("value").unwrap();
                 assert_eq!(retrieved.len(), 0);
             },
-            Err(e) => panic!("Empty array not supported: {:?}", e),
+            Err(e) => assert!(false, "Empty array not supported: {:?}", e),
         }
 
         // Close the server after test
@@ -84,9 +80,7 @@ mod test_pvxs_remote_double_array_get_put {
         let name = "remote:double:array:special";
         
         let mut srv = Server::from_env().expect("Failed to create server from env");
-        let mut srv_pv_array: SharedPV = srv.create_pv_double_array(name, vec![0.0], NTScalarMetadataBuilder::new()).expect("Failed to create pv:double:array on server");
-
-        srv.add_pv(name, &mut srv_pv_array).expect("Failed to add pv to server");
+        srv.create_pv_double_array(name, vec![0.0], NTScalarMetadataBuilder::new()).expect("Failed to create pv:double:array on server");
         srv.start().expect("Failed to start server");
 
         let mut ctx = Context::from_env().expect("Failed to create client context from env");

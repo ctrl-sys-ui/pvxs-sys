@@ -168,8 +168,7 @@ mod ffi {
         fn shared_pv_open_double_array(pv: Pin<&mut SharedPVWrapper>, initial_value: Vec<f64>, metadata: &NTScalarMetadata) -> Result<()>;
         fn shared_pv_open_int32(pv: Pin<&mut SharedPVWrapper>, initial_value: i32, metadata: &NTScalarMetadata) -> Result<()>;
         fn shared_pv_open_int32_array(pv: Pin<&mut SharedPVWrapper>, initial_value: Vec<i32>, metadata: &NTScalarMetadata) -> Result<()>;
-        fn shared_pv_open_string(pv: Pin<&mut SharedPVWrapper>, initial_value: String) -> Result<()>;
-        fn shared_pv_open_string_with_metadata(pv: Pin<&mut SharedPVWrapper>, initial_value: String, metadata: &NTScalarMetadata) -> Result<()>;
+        fn shared_pv_open_string(pv: Pin<&mut SharedPVWrapper>, initial_value: String, metadata: &NTScalarMetadata) -> Result<()>;
         fn shared_pv_open_string_array(pv: Pin<&mut SharedPVWrapper>, initial_value: Vec<String>, metadata: &NTScalarMetadata) -> Result<()>;
         fn shared_pv_open_enum(pv: Pin<&mut SharedPVWrapper>, choices: Vec<String>, selected_value: i16, metadata: &NTEnumMetadata) -> Result<()>;
         fn shared_pv_is_open(pv: &SharedPVWrapper) -> bool;
@@ -178,6 +177,9 @@ mod ffi {
         fn shared_pv_post_int32(pv: Pin<&mut SharedPVWrapper>, value: i32) -> Result<()>;
         fn shared_pv_post_string(pv: Pin<&mut SharedPVWrapper>, value: String) -> Result<()>;
         fn shared_pv_post_enum(pv: Pin<&mut SharedPVWrapper>, value: i16) -> Result<()>;
+        fn shared_pv_post_double_array(pv: Pin<&mut SharedPVWrapper>, value: Vec<f64>) -> Result<()>;
+        fn shared_pv_post_int32_array(pv: Pin<&mut SharedPVWrapper>, value: Vec<i32>) -> Result<()>;
+        fn shared_pv_post_string_array(pv: Pin<&mut SharedPVWrapper>, value: Vec<String>) -> Result<()>;
         fn shared_pv_fetch(pv: &SharedPVWrapper) -> Result<UniquePtr<ValueWrapper>>;
         
         // StaticSource creation and operations

@@ -15,24 +15,24 @@ mod test_pvxs_local_double_fetch_post {
         // Do a server side fetch to verify initial value
         match srv_pv_loc_double.fetch() {
             Ok(value) => assert_eq!(value.get_field_double("value").unwrap(), initial_value, "Initial value mismatch"),
-            Err(e) => panic!("Failed to fetch value: {:?}", e),
+            Err(e) => assert!(false, "Failed to fetch value: {:?}", e),
         }
 
         // Post an int32 to simulate value conversion
         match srv_pv_loc_double.post_int32(42) {
             Ok(_) => (),
-            Err(e) => panic!("Failed to post int32 value: {:?}", e),
+            Err(e) => assert!(false, "Failed to post int32 value: {:?}", e),
         }
 
         // Fetch again to verify the converted value
         match srv_pv_loc_double.fetch() {
             Ok(value) => assert_eq!(value.get_field_double("value").unwrap(), 42.0, "Value mismatch after posting int32"),
-            Err(e) => panic!("Failed to fetch value: {:?}", e),
+            Err(e) => assert!(false, "Failed to fetch value: {:?}", e),
         }
 
         // Post a string to simulate value being invalid... negative test
         match srv_pv_loc_double.post_string("not_a_number") {
-            Ok(_) => panic!("Expected error when posting invalid string to double pv, but got Ok"),
+            Ok(_) => assert!(false, "Expected error when posting invalid string to double pv, but got Ok"),
             Err(_) => assert!(true), // Expected error
         }
         
@@ -40,13 +40,13 @@ mod test_pvxs_local_double_fetch_post {
         let new_value = 2.71828;
         match srv_pv_loc_double.post_double(new_value) {
             Ok(_) => (),
-            Err(e) => panic!("Failed to post new value: {:?}", e),
+            Err(e) => assert!(false, "Failed to post new value: {:?}", e),
         } 
         
         // Fetch again to verify the new value
         match srv_pv_loc_double.fetch() {
             Ok(value) => assert_eq!(value.get_field_double("value").unwrap(), new_value, "Value mismatch after posting new double"),
-            Err(e) => panic!("Failed to fetch value: {:?}", e),
+            Err(e) => assert!(false, "Failed to fetch value: {:?}", e),
         }
     }
 
@@ -60,7 +60,7 @@ mod test_pvxs_local_double_fetch_post {
 
         // Intentionally cause an error by trying to post an invalid value
         match srv_pv_loc_double.post_string("invalid_double") {
-            Ok(_) => panic!("Expected error when posting invalid value, but got Ok"),
+            Ok(_) => assert!(false, "Expected error when posting invalid value, but got Ok"),
             Err(_) => assert!(true), // Expected error
         }
 

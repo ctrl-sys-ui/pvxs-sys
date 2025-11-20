@@ -14,24 +14,24 @@ fn test_pv_local_fetch_post(){
     // Do a server side fetch to verify initial value
     match srv_pv_loc_int.fetch() {
         Ok(value) => assert!(value.get_field_int32("value").unwrap() == initial_value),
-        Err(e) => panic!("Failed to fetch value: {:?}", e),
+        Err(e) => assert!(false, "Failed to fetch value: {:?}", e),
     }
 
     // Post a double to similate value being clipped
     match srv_pv_loc_int.post_double(3.14) {
         Ok(_) => (),
-        Err(e) => panic!("Failed to post double value: {:?}", e),
+        Err(e) => assert!(false, "Failed to post double value: {:?}", e),
     }
 
     // Fetch again to verify the clipped value
     match srv_pv_loc_int.fetch() {
         Ok(value) => assert!(value.get_field_int32("value").unwrap() == 3),
-        Err(e) => panic!("Failed to fetch value: {:?}", e),
+        Err(e) => assert!(false, "Failed to fetch value: {:?}", e),
     }
 
     // Post a string to similate value being invalid... negative test
     match srv_pv_loc_int.post_string("invalid") {
-        Ok(_) => panic!("Expected error when posting string to int pv, but got Ok"),
+        Ok(_) => assert!(false, "Expected error when posting string to int pv, but got Ok"),
         Err(_) => assert!(true), // Expected error
     }
     
@@ -39,13 +39,13 @@ fn test_pv_local_fetch_post(){
     let new_value = 200;
     match srv_pv_loc_int.post_int32(new_value) {
         Ok(_) => (),
-        Err(e) => panic!("Failed to post new value: {:?}", e),
+        Err(e) => assert!(false, "Failed to post new value: {:?}", e),
     } 
     
     // Fetch again to verify the new value
     match srv_pv_loc_int.fetch() {
         Ok(value) => assert!(value.get_field_int32("value").unwrap() == new_value),
-        Err(e) => panic!("Failed to fetch value: {:?}", e),
+        Err(e) => assert!(false, "Failed to fetch value: {:?}", e),
     }
 }
 
@@ -59,7 +59,7 @@ fn test_pv_local_fetch_post_with_error_propagation() -> Result<(), Box<dyn std::
 
     // Intentionally cause an error by trying to post an invalid value
     match srv_pv_loc_int.post_string("invalid_value") {
-        Ok(_) => panic!("Expected error when posting invalid value, but got Ok"),
+        Ok(_) => assert!(false, "Expected error when posting invalid value, but got Ok"),
         Err(_) => assert!(true), // Expected error
     }
 

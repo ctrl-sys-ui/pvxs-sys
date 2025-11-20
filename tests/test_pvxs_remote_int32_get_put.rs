@@ -1,5 +1,5 @@
 mod test_pvxs_remote_int32_get_put {
-    use epics_pvxs_sys::{Server, SharedPV, Context, PvxsError, NTScalarMetadataBuilder};
+    use epics_pvxs_sys::{Server, Context, PvxsError, NTScalarMetadataBuilder};
 
     #[test]
     fn test_pv_remote_int_get_put() {
@@ -10,12 +10,8 @@ mod test_pvxs_remote_int32_get_put {
         let name = "remote:int";
         let mut srv = Server::from_env()
             .expect("Failed to create server from env");
-        let mut srv_pv_int: SharedPV = srv.create_pv_int32(name, initial_value, NTScalarMetadataBuilder::new())
+        srv.create_pv_int32(name, initial_value, NTScalarMetadataBuilder::new())
             .expect("Failed to create pv:int on server");
-
-        // Add pv to server, making it accessible to clients
-        srv.add_pv(name, &mut srv_pv_int)
-            .expect("Failed to add pv to server");
 
         // start the server
         srv.start().expect("Failed to start server");
@@ -30,7 +26,7 @@ mod test_pvxs_remote_int32_get_put {
             Ok(value) => {
                 assert!(value.get_field_int32("value").unwrap() == initial_value);
             },
-            Err(e) => panic!("Failed to get value from remote pv: {:?}", e),
+            Err(e) => assert!(false, "Failed to get value from remote pv: {:?}", e),
         }
 
         // Stop the server to simulate a network error
@@ -39,10 +35,9 @@ mod test_pvxs_remote_int32_get_put {
         // Try to do a get which should fail due to server being down
         let failed_get: Result<epics_pvxs_sys::Value, PvxsError> = ctx.get(name, timeout);
         match failed_get {
-            Ok(_) => panic!("Expected error when getting from stopped server, but got Ok"),
+            Ok(_) => assert!(false, "Expected error when getting from stopped server, but got Ok"),
             Err(e) => {
                 // Just verify we got an error - could be timeout or connection error
-                println!("Got expected error: {:?}", e);
                 assert!(e.to_string().contains("Timeout") || e.to_string().contains("Error"));
             },
         }
@@ -54,7 +49,7 @@ mod test_pvxs_remote_int32_get_put {
         let new_value = 150;
         match ctx.put_int32(name, new_value, 5.0) {
             Ok(_) => (),
-            Err(e) => panic!("Failed to put new value to remote pv: {:?}", e),
+            Err(e) => assert!(false, "Failed to put new value to remote pv: {:?}", e),
         }
 
         // Do a get again to verify the new value
@@ -63,7 +58,7 @@ mod test_pvxs_remote_int32_get_put {
             Ok(value) => {
                 assert!(value.get_field_int32("value").unwrap() == new_value);
             },
-            Err(e) => panic!("Failed to get value from remote pv: {:?}", e),
+            Err(e) => assert!(false, "Failed to get value from remote pv: {:?}", e),
         }
 
         // Close the server after test

@@ -1,5 +1,5 @@
 mod test_pvxs_remote_enum_get_put {
-    use epics_pvxs_sys::{Server, SharedPV, Context, PvxsError, NTEnumMetadataBuilder};
+    use epics_pvxs_sys::{Server, Context, PvxsError, NTEnumMetadataBuilder};
 
     #[test]
     fn test_pv_remote_enum_get_put() {
@@ -12,12 +12,8 @@ mod test_pvxs_remote_enum_get_put {
         
         let mut srv = Server::from_env()
             .expect("Failed to create server from env");
-        let mut srv_pv_enum: SharedPV = srv.create_pv_enum(name, choices.clone(), initial_index, NTEnumMetadataBuilder::new())
+        srv.create_pv_enum(name, choices.clone(), initial_index, NTEnumMetadataBuilder::new())
             .expect("Failed to create pv:enum on server");
-
-        // Add pv to server, making it accessible to clients
-        srv.add_pv(name, &mut srv_pv_enum)
-            .expect("Failed to add pv to server");
 
         // start the server
         srv.start().expect("Failed to start server");
@@ -40,7 +36,7 @@ mod test_pvxs_remote_enum_get_put {
                 assert_eq!(retrieved_choices[1], "ENABLED");
                 assert_eq!(retrieved_choices[2], "TESTING");
             },
-            Err(e) => panic!("Failed to get value from remote pv: {:?}", e),
+            Err(e) => assert!(false, "Failed to get value from remote pv: {:?}", e),
         }
 
         // Stop the server to simulate a network error
@@ -49,7 +45,7 @@ mod test_pvxs_remote_enum_get_put {
         // Try to do a get which should fail due to server being down
         let failed_get: Result<epics_pvxs_sys::Value, PvxsError> = ctx.get(name, timeout);
         match failed_get {
-            Ok(_) => panic!("Expected error when getting from stopped server, but got Ok"),
+            Ok(_) => assert!(false, "Expected error when getting from stopped server, but got Ok"),
             Err(e) => {
                 // Just verify we got an error - could be timeout or connection error
                 assert!(e.to_string().contains("Timeout") || e.to_string().contains("Error"));
@@ -63,7 +59,7 @@ mod test_pvxs_remote_enum_get_put {
         let new_index = 1; // "ENABLED"
         match ctx.put_enum(name, new_index, timeout) {
             Ok(_) => (),
-            Err(e) => panic!("Failed to put new enum value to remote pv: {:?}", e),
+            Err(e) => assert!(false, "Failed to put new enum value to remote pv: {:?}", e),
         }
 
         // Do a get again to verify the new value
@@ -73,7 +69,7 @@ mod test_pvxs_remote_enum_get_put {
                 let index = value.get_field_enum("value.index").unwrap();
                 assert_eq!(index, new_index);
             },
-            Err(e) => panic!("Failed to get value from remote pv: {:?}", e),
+            Err(e) => assert!(false, "Failed to get value from remote pv: {:?}", e),
         }
 
         // Close the server after test
@@ -89,11 +85,9 @@ mod test_pvxs_remote_enum_get_put {
         
         let mut srv = Server::from_env()
             .expect("Failed to create server from env");
-        let mut srv_pv_enum: SharedPV = srv.create_pv_enum(name, choices.clone(), 0, NTEnumMetadataBuilder::new())
+        srv.create_pv_enum(name, choices.clone(), 0, NTEnumMetadataBuilder::new())
             .expect("Failed to create pv:enum on server");
 
-        srv.add_pv(name, &mut srv_pv_enum)
-            .expect("Failed to add pv to server");
         srv.start().expect("Failed to start server");
 
         let mut ctx = Context::from_env()
@@ -128,11 +122,8 @@ mod test_pvxs_remote_enum_get_put {
         
         let mut srv = Server::from_env()
             .expect("Failed to create server from env");
-        let mut srv_pv_enum: SharedPV = srv.create_pv_enum(name, choices.clone(), 0, NTEnumMetadataBuilder::new())
+        srv.create_pv_enum(name, choices.clone(), 0, NTEnumMetadataBuilder::new())
             .expect("Failed to create pv:enum on server");
-
-        srv.add_pv(name, &mut srv_pv_enum)
-            .expect("Failed to add pv to server");
         srv.start().expect("Failed to start server");
 
         let mut ctx = Context::from_env()
@@ -141,7 +132,7 @@ mod test_pvxs_remote_enum_get_put {
         // Try to put an invalid (out of range) index
         match ctx.put_enum(name, 99, timeout) {
             Ok(_) => {
-                panic!("Server accepted out-of-range enum index");
+                assert!(false, "Server accepted out-of-range enum index");
             },
             Err(_) => {
                 assert!(true, "Server did not reject invalid index"); // Expected behavior
@@ -150,7 +141,7 @@ mod test_pvxs_remote_enum_get_put {
 
         // Try negative index
         match ctx.put_enum(name, -1, timeout) {
-            Ok(_) => panic!("Server accepted negative enum index"),
+            Ok(_) => assert!(false, "Server accepted negative enum index"),
             Err(_) => {
                 assert!(true, "Server did not reject a negative index"); // Expected behavior
             },
@@ -168,11 +159,8 @@ mod test_pvxs_remote_enum_get_put {
         
         let mut srv = Server::from_env()
             .expect("Failed to create server from env");
-        let mut srv_pv_enum: SharedPV = srv.create_pv_enum(name, choices.clone(), 0, NTEnumMetadataBuilder::new())
+        srv.create_pv_enum(name, choices.clone(), 0, NTEnumMetadataBuilder::new())
             .expect("Failed to create pv:enum on server");
-
-        srv.add_pv(name, &mut srv_pv_enum)
-            .expect("Failed to add pv to server");
         srv.start().expect("Failed to start server");
 
         let mut ctx = Context::from_env()
