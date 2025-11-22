@@ -136,11 +136,19 @@ namespace pvxs_wrapper {
     }
 
     void monitor_start(MonitorWrapper& monitor) {
-        monitor.start();
+        try {
+            monitor.start();
+        } catch (const std::exception& e) {
+            throw PvxsError(std::string("Error starting monitor: ") + e.what());
+        }
     }
 
     void monitor_stop(MonitorWrapper& monitor) {
-        monitor.stop();
+        try {
+            monitor.stop();
+        } catch (const std::exception& e) {
+            throw PvxsError(std::string("Error stopping monitor: ") + e.what());
+        }
     }
 
     bool monitor_is_running(const MonitorWrapper& monitor) {

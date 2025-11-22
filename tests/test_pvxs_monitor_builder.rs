@@ -9,90 +9,84 @@ mod test_pvxs_monitor_builder {
         // This is just a placeholder for testing callback registration
     }
 
-    /// Test basic MonitorBuilder creation and configuration
     #[test]
-    fn test_monitor_builder_creation() -> Result<(), PvxsError> {
+    fn test_local_server_failes_to_connect_to_remote_client_monitor() -> Result<(), PvxsError> {
         // Create isolated server for testing
         let mut server = Server::create_isolated()?;
-        let pv_name = "test:pv:double";
         
-        // Create PV with initial double value (automatically added to server)
-        server.create_pv_double(pv_name, 1.0, NTScalarMetadataBuilder::new())?;
-        // INTENTIONALLY NOT starting server to test monitor creation on non-existent PV
-        
-        // Create client context
-        let mut ctx = Context::from_env()?;
-        
-        // Test MonitorBuilder creation and configuration
-        // This should succeed - creating a monitor for a PV that doesn't exist yet
-        let _monitor: Result<Monitor, PvxsError> = ctx.monitor_builder(pv_name)?
-            .mask_connected(true)        
-            .mask_disconnected(true)     
-            .exec();
-        
-        match _monitor {
-            Ok(mut monitor) => {
-                assert_eq!(monitor.name(), pv_name, "Monitor should have correct PV name");
-                // Start the monitor
-                monitor.start();
-                // Give the monitor some time to attempt connection
-                thread::sleep(Duration::from_millis(500));
-                // is_connected() now properly checks connection status using Connect object
-                assert_eq!(monitor.is_connected(), false, 
-                    "Monitor should not be connected - server not started yet");
-                // start server (isolated server - won't accept external connections)
-                server.start()?;
-                thread::sleep(Duration::from_millis(500));
-                assert_eq!(monitor.is_connected(), false, 
-                    "Monitor should not connect to isolated server");
-                
-                monitor.stop();
-            },
-            Err(e) => {
-                return Err(e);
-            }
-        }
-        // Clean up and stop this server
-        let _ = server.stop();
-
-        // Now start a new server from_env to test actual connection
-        server = Server::from_env()?;
-        server.create_pv_double(pv_name, 1.0, NTScalarMetadataBuilder::new())?;
+        // Create PV with initial value (automatically added to server)
+        server.create_pv_double("TEST:MonitorBuilder:LocalFail", 3.14, NTScalarMetadataBuilder::new())?;
         server.start()?;
         
+        thread::sleep(Duration::from_millis(100));
+        
+        let mut ctx = Context::from_env()?;
+        
+        // Attempt to create monitor using builder from remote client context
+        let monitor_result: Result<Monitor, PvxsError> = ctx.monitor_builder("TEST:MonitorBuilder:LocalFail")?
+            .mask_connected(true)
+            .mask_disconnected(true)
+            .exec();
+        
+        match monitor_result {
+            Ok(mut monitor) => {
+                // Start monitoring
+                assert!(monitor.start().is_ok());
+                thread::sleep(Duration::from_millis(1000)); // Wait a bit for connection attempt
+                
+                // Since server is isolated, monitor should not connect
+                assert!(!monitor.is_connected(), "Monitor should not connect to isolated local server");
+                
+                assert!(monitor.stop().is_ok());
+            },
+            Err(e) => {
+                assert!(false, "Monitor creation failed unexpectedly: {:?}", e);
+            }
+        }
+        assert!(server.stop().is_ok());
+        Ok(())
+    }
+
+    /// Test basic MonitorBuilder creation and configuration
+    #[test]
+    fn test_monitor_builder_creation()  -> Result<(), PvxsError> {
+        let pv_name = "TEST:MonitorBuilder:Creation";
+        // Now start a new server from_env to test actual connection
+        let mut server = Server::from_env()?;
+        server.create_pv_double(pv_name, 1.0, NTScalarMetadataBuilder::new())?;
+        assert!(server.start().is_ok());
+        
+        let mut ctx = Context::from_env()?;
         // Test MonitorBuilder creation again - this time server is running
-        let _monitor: Result<Monitor, PvxsError> = ctx.monitor_builder(pv_name)?
+        let mut _monitor: Result<Monitor, PvxsError> = ctx.monitor_builder(pv_name)?
             .mask_connected(true)        
             .mask_disconnected(true)     
             .exec();
         match _monitor {
-            Ok(mut monitor) => {
+            Ok(mut mon) => {
                 // Start the monitor
-                monitor.start();
+                mon.start();
                 // Give more time for connection to establish
                 thread::sleep(Duration::from_millis(2000));
                 
                 // is_connected() now properly uses Connect object to check actual connection
-                assert_eq!(monitor.is_connected(), true, 
-                    "Monitor should be connected to from_env server");
+                assert!(mon.is_connected(), "Monitor should be connected to from_env server");
                 
                 // stop the server
-                let _ = server.stop();
+                assert!(server.stop().is_ok());
                 thread::sleep(Duration::from_millis(1000));
                 
                 // After stopping server, should detect disconnection
-                assert_eq!(monitor.is_connected(), false, 
-                    "Monitor should be disconnected after server stop");
+                assert_eq!(mon.is_connected(), false, "Monitor should be disconnected after server stop");
                 
                 // start the server again
-                server.start()?;
+                assert!(server.start().is_ok());
                 // Give more time for reconnection (might take longer than initial connection)
                 thread::sleep(Duration::from_millis(5000));
-                assert_eq!(monitor.is_connected(), true, 
-                    "Monitor should reconnect after server restart");
+                assert_eq!(mon.is_connected(), true, "Monitor should reconnect after server restart");
             },
             Err(e) => {
-                return Err(e);
+                assert!(false, "Monitor creation failed: {:?}", e);
             }
         }
         Ok(())
@@ -116,7 +110,21 @@ mod test_pvxs_monitor_builder {
         let _monitor1 = ctx.monitor_builder("TEST:MonitorBuilder:Masks")?
             .mask_connected(true)
             .mask_disconnected(true)
+            .event(callback)
             .exec()?;
+        // When both connected and disconnected masks are enabled, we should see connection events
+        match _monitor1 {
+            Ok(mut mon) => {
+                mon.start();
+                thread::sleep(Duration::from_millis(500));
+                
+                mon.stop();
+            },
+            Err(e) => {
+                assert!(false, "Monitor creation failed: {:?}", e);
+            }
+        }
+
         // Test with both masks disabled
         let _monitor2 = ctx.monitor_builder("TEST:MonitorBuilder:Masks")?
             .mask_connected(false)

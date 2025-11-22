@@ -1,41 +1,23 @@
 mod test_pvxs_local_string_array_fetch_post {
-    use epics_pvxs_sys::{Server, Context, NTScalarMetadataBuilder};
+    use epics_pvxs_sys::{Server, NTScalarMetadataBuilder};
 
     #[test]
     fn test_pv_local_string_array_fetch_post() {
-        // This test creates a local pv (loc:string:array) on a server and gets 
-        // and sets the array value using client operations.
+        // This test creates a local pv (loc:string:array) and tests
+        // server-side fetch() and post_string() operations.
         let initial_value = "Initial string array element";
         let name = "loc:string:array";
-        let timeout = 5.0;
         let mut loc_srv = Server::create_isolated()
             .expect("Failed to create isolated server");
 
-        // Create a string PV
-        loc_srv.create_pv_string(name, initial_value, NTScalarMetadataBuilder::new())
+        // Create a string PV and capture for server-side operations
+        let mut srv_pv = loc_srv.create_pv_string(name, initial_value, NTScalarMetadataBuilder::new())
             .expect("Failed to create pv:string:array");
 
-        let mut ctx = Context::from_env().expect("Failed to create client context");
-
         // Verify we can fetch the initial scalar value
-        match ctx.get(name, timeout) {
-            Ok(value) => {
-                // Try to get as array first, fall back to scalar
-                match value.get_field_string_array("value") {
-                    Ok(array) => {
-                        if !array.is_empty() {
-                            assert_eq!(array[0], initial_value);
-                        }
-                    },
-                    Err(_) => {
-                        // Fall back to scalar access
-                        let scalar_val = value.get_field_string("value").unwrap();
-                        assert_eq!(scalar_val, initial_value);
-                    }
-                }
-            },
-            Err(e) => assert!(false, "Failed to fetch initial value: {:?}", e),
-        }
+        let value = srv_pv.fetch().expect("Failed to fetch initial value");
+        let scalar_val = value.get_field_string("value").unwrap();
+        assert_eq!(scalar_val, initial_value);
 
         // Test posting different string values and reading back
         let test_values = vec![
@@ -48,9 +30,9 @@ mod test_pvxs_local_string_array_fetch_post {
         ];
         
         for test_val in test_values {
-            ctx.put_string(name, &test_val, timeout).expect("Failed to post test value");
+            srv_pv.post_string(&test_val).expect("Failed to post test value");
             
-            let fetched = ctx.get(name, timeout).expect("Failed to fetch test value");
+            let fetched = srv_pv.fetch().expect("Failed to fetch test value");
             let retrieved_val = fetched.get_field_string("value").unwrap();
             assert_eq!(retrieved_val, test_val, 
                     "Value mismatch: posted '{}', got '{}'", test_val, retrieved_val);
@@ -60,16 +42,13 @@ mod test_pvxs_local_string_array_fetch_post {
 
     #[test]
     fn test_pv_local_string_array_special_characters() {
-        // Test local handling of special characters and encodings
+        // Test local handling of special characters using server-side operations
         let name = "loc:string:special";
-        let timeout = 5.0;
         let mut loc_srv = Server::create_isolated()
             .expect("Failed to create isolated server");
 
-        loc_srv.create_pv_string(name, "", NTScalarMetadataBuilder::new())
+        let mut srv_pv = loc_srv.create_pv_string(name, "", NTScalarMetadataBuilder::new())
             .expect("Failed to create pv:string:special");
-
-        let mut ctx = Context::from_env().expect("Failed to create client context");
 
         // Test various character encodings and special cases
         let long_string = "A".repeat(1000);
@@ -93,93 +72,63 @@ mod test_pvxs_local_string_array_fetch_post {
         ];
 
         for (test_name, test_string) in special_strings {
-            match ctx.put_string(name, test_string, timeout) {
-                Ok(_) => {
-                    let fetched = ctx.get(name, timeout).expect("Failed to fetch special string");
-                    let retrieved = fetched.get_field_string("value").unwrap();
-                    assert_eq!(retrieved, test_string, "{}: string not preserved correctly", test_name);
-                    if test_string.len() > 50 {
-                        assert!(test_string.len() > 50, "{}: string length {}", test_name, test_string.len());
-                    }
-                },
-                Err(e) => println!("{} string not supported: '{}' - {}", test_name, test_string, e),
+            srv_pv.post_string(test_string).expect(&format!("Failed to post {} string", test_name));
+            let fetched = srv_pv.fetch().expect("Failed to fetch special string");
+            let retrieved = fetched.get_field_string("value").unwrap();
+            assert_eq!(retrieved, test_string, "{}: string not preserved correctly", test_name);
+            if test_string.len() > 50 {
+                assert!(test_string.len() > 50, "{}: string length {}", test_name, test_string.len());
             }
         }
     }
 
     #[test]
     fn test_pv_local_string_array_type_conversions() {
-        // Test various type conversions to string
+        // Test various type conversions to string using server-side operations
         let name = "loc:string:convert";
-        let timeout = 5.0;
         let mut loc_srv = Server::create_isolated()
             .expect("Failed to create isolated server");
 
-        loc_srv.create_pv_string(name, "initial", NTScalarMetadataBuilder::new())
+        let mut srv_pv = loc_srv.create_pv_string(name, "initial", NTScalarMetadataBuilder::new())
             .expect("Failed to create pv:string:convert");
-
-        let mut ctx = Context::from_env().expect("Failed to create client context");
 
         // Test numeric to string conversions
 
         // Test double to string conversion
-        match ctx.put_double(name, 3.14159, timeout) {
-            Ok(_) => {
-                let fetched = ctx.get(name, timeout).unwrap();
-                let _retrieved = fetched.get_field_string("value").unwrap();
-            },
-            Err(e) => assert!(false, "Double to string conversion not supported: {}", e),
-        }
+        srv_pv.post_double(3.14159).expect("Failed to post double");
+        let fetched = srv_pv.fetch().unwrap();
+        let _retrieved = fetched.get_field_string("value").unwrap();
 
         // Test int32 to string conversion  
-        match ctx.put_int32(name, 42, timeout) {
-            Ok(_) => {
-                let fetched = ctx.get(name, timeout).unwrap();
-                let _retrieved = fetched.get_field_string("value").unwrap();
-            },
-            Err(e) => assert!(false, "Int32 to string conversion not supported: {}", e),
-        }
+        srv_pv.post_int32(42).expect("Failed to post int32");
+        let fetched = srv_pv.fetch().unwrap();
+        let _retrieved = fetched.get_field_string("value").unwrap();
 
         // Test negative numbers
-        match ctx.put_int32(name, -123, timeout) {
-            Ok(_) => {
-                let fetched = ctx.get(name, timeout).unwrap();
-                let _retrieved = fetched.get_field_string("value").unwrap();
-            },
-            Err(e) => assert!(false, "Negative int32 to string conversion not supported: {}", e),
-        }
+        srv_pv.post_int32(-123).expect("Failed to post negative int32");
+        let fetched = srv_pv.fetch().unwrap();
+        let _retrieved = fetched.get_field_string("value").unwrap();
 
         // Test zero
-        match ctx.put_double(name, 0.0, timeout) {
-            Ok(_) => {
-                let fetched = ctx.get(name, timeout).unwrap();
-                let _retrieved = fetched.get_field_string("value").unwrap();
-            },
-            Err(e) => assert!(false, "Zero to string conversion not supported: {}", e),
-        }
+        srv_pv.post_double(0.0).expect("Failed to post zero");
+        let fetched = srv_pv.fetch().unwrap();
+        let _retrieved = fetched.get_field_string("value").unwrap();
 
         // Test very large numbers
-        match ctx.put_double(name, 1e15, timeout) {
-            Ok(_) => {
-                let fetched = ctx.get(name, timeout).unwrap();
-                let _retrieved = fetched.get_field_string("value").unwrap();
-            },
-            Err(e) => assert!(false, "Large number to string conversion not supported: {}", e),
-        }
+        srv_pv.post_double(1e15).expect("Failed to post large number");
+        let fetched = srv_pv.fetch().unwrap();
+        let _retrieved = fetched.get_field_string("value").unwrap();
     }
 
     #[test]
     fn test_pv_local_string_array_length_limits() {
-        // Test string length limits and performance
+        // Test string length limits using server-side operations
         let name = "loc:string:limits";
-        let timeout = 5.0;
         let mut loc_srv = Server::create_isolated()
             .expect("Failed to create isolated server");
 
-        loc_srv.create_pv_string(name, "", NTScalarMetadataBuilder::new())
+        let mut srv_pv = loc_srv.create_pv_string(name, "", NTScalarMetadataBuilder::new())
             .expect("Failed to create pv:string:limits");
-
-        let mut ctx = Context::from_env().expect("Failed to create client context");
 
         // Test various string lengths to find limits
         let length_tests = vec![
@@ -193,36 +142,29 @@ mod test_pvxs_local_string_array_fetch_post {
         for (length, description) in length_tests {
             let test_string = "X".repeat(length);
             
-            match ctx.put_string(name, &test_string, timeout) {
-                Ok(_) => {
-                    let fetched = ctx.get(name, timeout).unwrap();
-                    let retrieved = fetched.get_field_string("value").unwrap();
-                    
-                    assert!(retrieved == test_string, "{}: string length {} not preserved correctly", description, length);
-                },
-                Err(e) => assert!(false, "{} string ({} chars) not supported: {}", description, length, e),
-            }
+            srv_pv.post_string(&test_string).expect(&format!("Failed to post {} string", description));
+            let fetched = srv_pv.fetch().unwrap();
+            let retrieved = fetched.get_field_string("value").unwrap();
+            
+            assert!(retrieved == test_string, "{}: string length {} not preserved correctly", description, length);
         }
     }
 
     #[test]
     fn test_pv_local_string_array_error_handling() -> Result<(), Box<dyn std::error::Error>> {
-        // Test error handling for string arrays with proper error propagation
+        // Test error handling for string arrays using server-side operations
         let name = "loc:string:errors";
-        let timeout = 5.0;
         let mut loc_srv = Server::create_isolated()?;
-        loc_srv.create_pv_string(name, "initial", NTScalarMetadataBuilder::new())?;
-
-        let mut ctx = Context::from_env()?;
+        let mut srv_pv = loc_srv.create_pv_string(name, "initial", NTScalarMetadataBuilder::new())?;
 
         // Verify initial state
-        let initial_fetch = ctx.get(name, timeout)?;
+        let initial_fetch = srv_pv.fetch()?;
         let initial_val = initial_fetch.get_field_string("value")?;
         assert_eq!(initial_val, "initial");
 
         // Test that valid operations work
-        ctx.put_string(name, "updated", timeout)?;
-        let updated_fetch = ctx.get(name, timeout)?;
+        srv_pv.post_string("updated")?;
+        let updated_fetch = srv_pv.fetch()?;
         let updated_val = updated_fetch.get_field_string("value")?;
         assert_eq!(updated_val, "updated");
 
@@ -235,18 +177,14 @@ mod test_pvxs_local_string_array_fetch_post {
         ];
 
         for test_case in edge_cases {
-            match ctx.put_string(name, test_case, timeout) {
-                Ok(_) => {
-                    let fetched = ctx.get(name, timeout)?;
-                    assert!(fetched.get_field_string("value").is_ok(), "Failed to retrieve posted edge case string");
-                },
-                Err(e) => assert!(false, "Edge case not supported: {:?} - {}", test_case, e),
-            }
+            srv_pv.post_string(test_case)?;
+            let fetched = srv_pv.fetch()?;
+            assert!(fetched.get_field_string("value").is_ok(), "Failed to retrieve posted edge case string");
         }
 
         // Verify PV still works after edge case tests
-        ctx.put_string(name, "final", timeout)?;
-        let final_fetch = ctx.get(name, timeout)?;
+        srv_pv.post_string("final")?;
+        let final_fetch = srv_pv.fetch()?;
         let final_val = final_fetch.get_field_string("value")?;
         assert_eq!(final_val, "final");
 

@@ -5,7 +5,7 @@ fn test_pv_local_fetch_post(){
     // This test creates a local pv (loc:int) on a server and gets 
     // and sets the value on server side.
     let initial_value = 100;
-    let loc_srv = Server::create_isolated()
+    let mut loc_srv = Server::create_isolated()
         .expect("Failed to create isolated server");
 
     let mut srv_pv_loc_int: SharedPV = loc_srv.create_pv_int32("loc:int", initial_value, NTScalarMetadataBuilder::new())
@@ -53,7 +53,7 @@ fn test_pv_local_fetch_post(){
 fn test_pv_local_fetch_post_with_error_propagation() -> Result<(), Box<dyn std::error::Error>> {
     let initial_value = 1234;
     // This test verifies that errors in get/set operations are properly propagated.
-    let loc_srv = Server::create_isolated()?;
+    let mut loc_srv = Server::create_isolated()?;
 
     let mut srv_pv_loc_int: SharedPV = loc_srv.create_pv_int32("loc:int", initial_value, NTScalarMetadataBuilder::new())?;
 

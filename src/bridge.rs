@@ -73,8 +73,8 @@ mod ffi {
         
         // Monitor operations
         fn context_monitor_create(ctx: Pin<&mut ContextWrapper>, pv_name: String,) -> Result<UniquePtr<MonitorWrapper>>;
-        fn monitor_start(monitor: Pin<&mut MonitorWrapper>);
-        fn monitor_stop(monitor: Pin<&mut MonitorWrapper>);
+        fn monitor_start(monitor: Pin<&mut MonitorWrapper>) -> Result<()>;
+        fn monitor_stop(monitor: Pin<&mut MonitorWrapper>) -> Result<()>;
         fn monitor_is_running(monitor: &MonitorWrapper) -> bool;
         fn monitor_has_update(monitor: &MonitorWrapper) -> bool;
         fn monitor_get_update(monitor: Pin<&mut MonitorWrapper>, timeout: f64) -> Result<UniquePtr<ValueWrapper>>;

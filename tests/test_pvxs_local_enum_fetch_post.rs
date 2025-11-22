@@ -9,7 +9,7 @@ mod test_pv_local_double_array_fetch_post {
             let choices = vec!["OFF", "ON", "STANDBY"];
             let initial_index = 1; // "ON"
             
-            let loc_srv = Server::create_isolated()
+            let mut loc_srv = Server::create_isolated()
                 .expect("Failed to create isolated server");
 
             let mut srv_pv_loc_enum: SharedPV = loc_srv.create_pv_enum("loc:enum", choices.clone(), initial_index, NTEnumMetadataBuilder::new())
@@ -62,7 +62,7 @@ mod test_pv_local_double_array_fetch_post {
             let choices = vec!["IDLE", "RUNNING", "ERROR", "STOPPED"];
             let initial_index = 0; // "IDLE"
             
-            let loc_srv = Server::create_isolated()?;
+            let mut loc_srv = Server::create_isolated()?;
 
             let mut srv_pv_loc_enum: SharedPV = loc_srv.create_pv_enum("loc:enum", choices.clone(), initial_index, NTEnumMetadataBuilder::new())?;
 
@@ -92,7 +92,7 @@ mod test_pv_local_double_array_fetch_post {
             // Test cycling through all enum states
             let choices = vec!["STATE_0", "STATE_1", "STATE_2", "STATE_3", "STATE_4"];
             
-            let loc_srv = Server::create_isolated()
+            let mut loc_srv = Server::create_isolated()
                 .expect("Failed to create isolated server");
 
             let mut srv_pv_loc_enum: SharedPV = loc_srv.create_pv_enum("loc:enum", choices.clone(), 0, NTEnumMetadataBuilder::new())
@@ -119,7 +119,7 @@ mod test_pv_local_double_array_fetch_post {
             // Test first and last choices
             let choices = vec!["FIRST", "MIDDLE", "LAST"];
             
-            let loc_srv = Server::create_isolated()
+            let mut loc_srv = Server::create_isolated()
                 .expect("Failed to create isolated server");
 
             let mut srv_pv_loc_enum: SharedPV = loc_srv.create_pv_enum("loc:enum", choices.clone(), 0, NTEnumMetadataBuilder::new())

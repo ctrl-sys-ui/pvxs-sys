@@ -1,64 +1,52 @@
 mod test_pvxs_local_string_fetch_post {
-    use epics_pvxs_sys::{Server, Context, NTScalarMetadataBuilder};
+    use epics_pvxs_sys::{Server, NTScalarMetadataBuilder};
 
     #[test]
     fn test_pv_local_string_fetch_post() {
-        // This test creates a local pv (loc:string) on a server and gets 
-        // and sets the value using client operations.
+        // This test creates a local pv (loc:string) on a server and tests
+        // server-side fetch() and post_string() operations.
         let initial_value = "Hello, EPICS!";
         let name = "loc:string";
-        let timeout = 5.0;
         let mut loc_srv = Server::create_isolated()
             .expect("Failed to create isolated server");
 
-        loc_srv.create_pv_string(name, initial_value, NTScalarMetadataBuilder::new())
+        let mut srv_pv = loc_srv.create_pv_string(name, initial_value, NTScalarMetadataBuilder::new())
             .expect("Failed to create pv:string");
 
-        loc_srv.start().expect("Failed to start server");
-
-        // Create client context
-        let mut ctx = Context::from_env().expect("Failed to create client context");
-
-        // Do a client GET to verify initial value
-        match ctx.get(name, timeout) {
+        // Do a server-side fetch to verify initial value
+        match srv_pv.fetch() {
             Ok(value) => assert_eq!(value.get_field_string("value").unwrap(), initial_value),
             Err(e) => assert!(false, "Failed to fetch value: {:?}", e),
         }
         
-        // Now set a new string value using client PUT
+        // Now set a new string value using server-side post
         let new_value = "Updated string value";
-        match ctx.put_string(name, new_value, timeout) {
+        match srv_pv.post_string(new_value) {
             Ok(_) => (),
-            Err(e) => assert!(false, "Failed to put new value: {:?}", e),
+            Err(e) => assert!(false, "Failed to post new value: {:?}", e),
         } 
         
-        // GET again to verify the new value
-        match ctx.get(name, timeout) {
+        // Fetch again to verify the new value
+        match srv_pv.fetch() {
             Ok(value) => assert_eq!(value.get_field_string("value").unwrap(), new_value),
             Err(e) => assert!(false, "Failed to fetch value: {:?}", e),
         }
-
-        loc_srv.stop().expect("Failed to stop server");
     }
 
     #[test]
     fn test_pv_local_string_fetch_post_with_error_propagation() -> Result<(), Box<dyn std::error::Error>> {
         let initial_value = "Initial string";
         let name = "loc:string:error";
-        let timeout = 5.0;
-        // This test verifies that errors in get/set operations are properly propagated.
+        // This test verifies that server-side operations properly propagate errors.
         let mut loc_srv = Server::create_isolated()?;
 
-        loc_srv.create_pv_string(name, initial_value, NTScalarMetadataBuilder::new())?;
-        loc_srv.start()?;
+        let mut srv_pv_loc_string = loc_srv.create_pv_string(name, initial_value, NTScalarMetadataBuilder::new())?;
 
-        let mut ctx = Context::from_env()?;
-
-        // Verify initial value using client GET
-        let fetched_value = ctx.get(name, timeout)?;
+        // Verify initial value using server-side fetch
+        let fetched_value = srv_pv_loc_string.fetch()?;
         assert_eq!(fetched_value.get_field_string("value")?, initial_value);
 
-        // Put a valid string value and verify using client operations
+        // Put a valid string value and verify using server-side operations
         let new_value = "New string value";
         srv_pv_loc_string.post_string(new_value)?;
         let fetched_value = srv_pv_loc_string.fetch()?;
@@ -70,10 +58,10 @@ mod test_pvxs_local_string_fetch_post {
     #[test]
     fn test_pv_local_string_special_characters() {
         // Test handling of special characters in strings
-        let loc_srv = Server::create_isolated()
+        let mut loc_srv = Server::create_isolated()
             .expect("Failed to create isolated server");
 
-        let mut srv_pv_loc_string: SharedPV = loc_srv.create_pv_string("loc:string", "", NTScalarMetadataBuilder::new())
+        let mut srv_pv_loc_string = loc_srv.create_pv_string("loc:string", "", NTScalarMetadataBuilder::new())
             .expect("Failed to create pv:string");
 
         // Test empty string

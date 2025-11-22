@@ -6,7 +6,7 @@ mod test_pvxs_local_double_fetch_post {
         // This test creates a local pv (loc:double) on a server and gets 
         // and sets the value on server side.
         let initial_value = 3.14159;
-        let loc_srv = Server::create_isolated()
+        let mut loc_srv = Server::create_isolated()
             .expect("Failed to create isolated server");
 
         let mut srv_pv_loc_double: SharedPV = loc_srv.create_pv_double("loc:double", initial_value, NTScalarMetadataBuilder::new())
@@ -54,7 +54,7 @@ mod test_pvxs_local_double_fetch_post {
     fn test_pv_local_double_fetch_post_with_error_propagation() -> Result<(), Box<dyn std::error::Error>> {
         let initial_value = 123.456;
         // This test verifies that errors in get/set operations are properly propagated.
-        let loc_srv = Server::create_isolated()?;
+        let mut loc_srv = Server::create_isolated()?;
 
         let mut srv_pv_loc_double: SharedPV = loc_srv.create_pv_double("loc:double", initial_value, NTScalarMetadataBuilder::new())?;
 
@@ -80,7 +80,7 @@ mod test_pvxs_local_double_fetch_post {
     #[test]
     fn test_pv_local_double_special_values() {
         // Test handling of special floating point values
-        let loc_srv = Server::create_isolated()
+        let mut loc_srv = Server::create_isolated()
             .expect("Failed to create isolated server");
 
         let mut srv_pv_loc_double: SharedPV = loc_srv.create_pv_double("loc:double", 0.0, NTScalarMetadataBuilder::new())
