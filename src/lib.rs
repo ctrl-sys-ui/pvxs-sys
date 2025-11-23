@@ -61,6 +61,29 @@ impl From<cxx::Exception> for PvxsError {
     }
 }
 
+/// Monitor event types that can be returned by pop()
+#[derive(Debug, Clone, PartialEq)]
+pub enum MonitorEvent {
+    /// Connection event (when maskConnected(true) is set)
+    Connected(String),
+    /// Disconnection event (when maskDisconnected(true) is set)
+    Disconnected(String),
+    /// Finished event (when maskDisconnected(true) is set)
+    Finished(String),
+}
+
+impl fmt::Display for MonitorEvent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            MonitorEvent::Connected(msg) => write!(f, "Monitor connected: {}", msg),
+            MonitorEvent::Disconnected(msg) => write!(f, "Monitor disconnected: {}", msg),
+            MonitorEvent::Finished(msg) => write!(f, "Monitor finished: {}", msg),
+        }
+    }
+}
+
+impl std::error::Error for MonitorEvent {}
+
 /// A PVXS client context for performing PVAccess operations
 /// 
 /// The Context is the main entry point for interacting with PVAccess.
@@ -918,21 +941,24 @@ impl Monitor {
     /// Pop the next update from the subscription queue (PVXS-style)
     /// 
     /// This follows the PVXS pattern where `pop()` returns a Value if available,
-    /// or throws specific exceptions for connection events.
+    /// or returns Err with MonitorEvent for connection/disconnection events.
     /// 
     /// # Returns
     /// 
-    /// A `Value` if an update is available, `None` if the queue is empty.
+    /// - `Ok(Some(Value))` if an update is available
+    /// - `Ok(None)` if the queue is empty
+    /// - `Err(MonitorEvent::Connected)` if connection event (when connection_events(false))
+    /// - `Err(MonitorEvent::Disconnected)` if disconnection event (when disconnection_events(false))
+    /// - `Err(MonitorEvent::Finished)` if finished event (when disconnection_events(false))
     /// 
-    /// # Errors
-    /// 
-    /// May return errors for connection events (Connected, Disconnect, Finished)
-    /// or other subscription-related issues.
+    /// Note: The mask configuration controls whether events are queued or thrown:
+    /// - connection_events(true) -> maskConnected(false) -> events are queued as data
+    /// - connection_events(false) -> maskConnected(true) -> events thrown as MonitorEvent::Connected
     /// 
     /// # Example
     /// 
     /// ```no_run
-    /// # use epics_pvxs_sys::Context;
+    /// # use epics_pvxs_sys::{Context, MonitorEvent};
     /// # let mut ctx = Context::from_env().unwrap();
     /// # let mut monitor = ctx.monitor("MY:PV").unwrap();
     /// # monitor.start();
@@ -940,14 +966,18 @@ impl Monitor {
     ///     match monitor.pop() {
     ///         Ok(Some(value)) => println!("Update: {}", value),
     ///         Ok(None) => break, // Queue empty
+    ///         Err(e) if e.to_string().contains("connected") => {
+    ///             println!("Connection event");
+    ///             break;
+    ///         }
     ///         Err(e) => {
-    ///             println!("Event or error: {}", e);
+    ///             println!("Other error: {}", e);
     ///             break;
     ///         }
     ///     }
     /// }
     /// ```
-    pub fn pop(&mut self) -> Result<Option<Value>> {
+    pub fn pop(&mut self) -> std::result::Result<Option<Value>, MonitorEvent> {
         match bridge::monitor_pop(self.inner.pin_mut()) {
             Ok(value_wrapper) => {
                 if value_wrapper.is_null() {
@@ -956,7 +986,22 @@ impl Monitor {
                     Ok(Some(Value { inner: value_wrapper }))
                 }
             },
-            Err(e) => Err(e.into()),
+            Err(e) => {
+                let err_msg = e.what();
+                // Check if this is one of our monitor event exceptions
+                if err_msg.contains("Monitor connected:") {
+                    Err(MonitorEvent::Connected(err_msg.to_string()))
+                } else if err_msg.contains("Monitor disconnected:") {
+                    Err(MonitorEvent::Disconnected(err_msg.to_string()))
+                } else if err_msg.contains("Monitor finished:") {
+                    Err(MonitorEvent::Finished(err_msg.to_string()))
+                } else {
+                    // For other errors, panic or convert to a general error
+                    // Since the signature is Result<Option<Value>, MonitorEvent>, 
+                    // we need to handle non-monitor errors differently
+                    panic!("Unexpected error in pop(): {}", err_msg);
+                }
+            },
         }
     }
     

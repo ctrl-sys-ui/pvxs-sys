@@ -33,6 +33,27 @@ namespace pvxs_wrapper
         explicit PvxsError(const std::string &msg) : std::runtime_error(msg) {}
     };
 
+    /// Exception for monitor connection events (when maskConnected(true))
+    class MonitorConnected : public PvxsError
+    {
+    public:
+        explicit MonitorConnected(const std::string &msg) : PvxsError(msg) {}
+    };
+
+    /// Exception for monitor disconnection events (when maskDisconnected(true))
+    class MonitorDisconnected : public PvxsError
+    {
+    public:
+        explicit MonitorDisconnected(const std::string &msg) : PvxsError(msg) {}
+    };
+
+    /// Exception for monitor finished events (when maskDisconnected(true))
+    class MonitorFinished : public PvxsError
+    {
+    public:
+        explicit MonitorFinished(const std::string &msg) : PvxsError(msg) {}
+    };
+
     /// Wraps pvxs::Value for safe Rust access
     class ValueWrapper
     {

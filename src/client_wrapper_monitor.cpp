@@ -8,13 +8,20 @@ namespace pvxs_wrapper {
     // ============================================================================
 
     void MonitorWrapper::start() {
+        // If monitor already exists (e.g., created by builder), don't recreate it
+        if (monitor_) {
+            // Already started via builder, subscription is already configured
+            return;
+        }
+        
+        // Only create a new subscription if one doesn't exist (e.g., old monitor() API)
         if (!monitor_) {
             try {
                 // Create a Connect object to track connection state
                 // connect() returns a shared_ptr<Connect>
                 connect_ = context_.connect(pv_name_).exec();
                 
-                // Create the subscription
+                // Create the subscription with default masks (for backward compatibility)
                 auto sub = context_.monitor(pv_name_).maskConnected(true).maskDisconnected(true).exec();
                 monitor_ = std::move(sub);
             } catch (const std::exception& e) {
@@ -90,7 +97,7 @@ namespace pvxs_wrapper {
         }
         
         try {
-            // PVXS-style pop() - returns update or throws
+            // PVXS-style pop() - returns update or throws exceptions for masked events
             auto result = monitor_->pop();
             if (result.valid()) {
                 return std::make_unique<ValueWrapper>(std::move(result));
@@ -98,14 +105,18 @@ namespace pvxs_wrapper {
                 return nullptr; // Empty queue
             }
         } catch (const pvxs::client::Connected& e) {
-            // Connection event - could be handled differently
-            throw PvxsError("Connected: " + std::string(e.what()));
+            // Connection event thrown because maskConnected(true) was set
+            // Propagate as MonitorConnected so Rust can distinguish it
+            throw MonitorConnected(std::string("Monitor connected: ") + e.what());
         } catch (const pvxs::client::Disconnect& e) {
-            // Disconnection event
-            throw PvxsError("Disconnected: " + std::string(e.what()));
+            // Disconnection event thrown because maskDisconnected(true) was set
+            throw MonitorDisconnected(std::string("Monitor disconnected: ") + e.what());
         } catch (const pvxs::client::Finished& e) {
-            // Finished event
-            throw PvxsError("Finished: " + std::string(e.what()));
+            // Finished event thrown because maskDisconnected(true) was set
+            throw MonitorFinished(std::string("Monitor finished: ") + e.what());
+        } catch (const pvxs::client::RemoteError& e) {
+            // Error from server - convert to PvxsError
+            throw PvxsError("Remote error: " + std::string(e.what()));
         } catch (const std::exception& e) {
             throw PvxsError(std::string("Error popping monitor update for '") + pv_name_ + "': " + e.what());
         }

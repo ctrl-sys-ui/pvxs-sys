@@ -56,18 +56,27 @@ mod test_pvxs_monitor_callbacks {
         // Check that callback was invoked
         let event_count = EVENT_COUNTER.load(Ordering::SeqCst);
         assert!(event_count > 0, "Expected callback to be invoked on start, got {} events", event_count);
-        println!("✓ Callback invoked {} times on start", event_count);
 
         // Cleanup
         monitor.stop().expect("Failed to stop monitor");
+        // I expect no increase in counter after stop
+        thread::sleep(Duration::from_millis(500));
+        assert!(EVENT_COUNTER.load(Ordering::SeqCst) == event_count, "Expected no new events after stop");
         srv.stop().expect("Failed to stop server");
     }
 
     #[test]
     fn test_monitor_callback_on_stop() {
-        // Reset counters
-        EVENT_COUNTER.store(0, Ordering::SeqCst);
-
+        // Test the mask configuration by verifying that exceptions are thrown
+        // 
+        // PVXS behavior with masks:
+        // - connection_events(false) -> maskConnected(true) -> pop() throws MonitorEvent::Connected
+        // - connection_events(true) -> maskConnected(false) -> connection events queued as data
+        // - disconnection_events(false) -> maskDisconnected(true) -> pop() throws MonitorEvent::Disconnected
+        // - disconnection_events(true) -> maskDisconnected(false) -> disconnection events queued as data
+        
+        use epics_pvxs_sys::MonitorEvent;
+        
         // Create a server with a PV
         let mut srv = Server::from_env().expect("Failed to create server");
         let _pv = srv.create_pv_double("callback:test:stop", 2.71, NTScalarMetadataBuilder::new())
@@ -76,33 +85,100 @@ mod test_pvxs_monitor_callbacks {
 
         thread::sleep(Duration::from_millis(500));
 
-        // Create monitor with disconnection events enabled
         let mut ctx = Context::from_env().expect("Failed to create context");
-        let mut monitor = ctx.monitor_builder("callback:test:stop")
+
+        // Test 1: connection_events(false) should cause Connected exception when popping
+        let mut monitor1 = ctx.monitor_builder("callback:test:stop")
             .expect("Failed to create monitor builder")
-            .connection_events(false)
-            .disconnection_events(true)  // Enable disconnection events
-            .event(generic_event_callback)
+            .connection_events(false)  // maskConnected(true) - throws exception
+            .disconnection_events(false)  // maskDisconnected(true) - throws exception
             .exec()
-            .expect("Failed to create monitor");
+            .expect("Failed to create monitor1");
 
-        monitor.start().expect("Failed to start monitor");
+        monitor1.start().expect("Failed to start monitor1");
         thread::sleep(Duration::from_millis(500));
-
-        // Reset counter after connection
-        EVENT_COUNTER.store(0, Ordering::SeqCst);
-
-        // Stop the monitor - should trigger disconnection callback
-        monitor.stop().expect("Failed to stop monitor");
         
-        // Small delay to allow callback to be processed
+        // Pop events - we expect to get either data or Connected exception
+        let mut got_connected_exception = false;
+        let mut got_disconnected_exception = false;
+        let mut got_finished_exception = false;
+        let mut got_another_exception = false;
+
+        let mut data_count1 = 0;
+        for _ in 0..20 {
+            match monitor1.pop() {
+                Ok(Some(_)) => data_count1 += 1,
+                Ok(None) => break,
+                Err(MonitorEvent::Connected(_)) => {
+                    got_connected_exception = true;
+                },
+                Err(MonitorEvent::Disconnected(_)) => {
+                    got_disconnected_exception = true;
+                },
+                Err(MonitorEvent::Finished(_)) => {
+                    got_finished_exception = true;
+                },
+                Err(_) => {
+                    got_another_exception = true;
+                }
+            }
+        }
+        
+        monitor1.stop().expect("Failed to stop monitor1");
+
+        // Verify: with connection_events(false), do not get a connection exception
+        assert!(!got_connected_exception, "Did not expect a connection exception with connection_events(false)");
+        assert!(!got_disconnected_exception, "Did not expect a disconnection exception with disconnection_events(false)");
+        assert!(!got_finished_exception, "Did not expect a finished exception with disconnection_events(false)");
+        assert!(!got_another_exception, "Did not expect other exceptions");
+        assert_eq!(data_count1, 1, "Expected some data with as pop returns data after the initial connection");
+
+        // Reset flags for next test
+        got_connected_exception = false;
+        got_disconnected_exception = false;
+        got_finished_exception = false;
+        got_another_exception = false;
+        
+        // Test 2: connection_events(true) should queue connection events as data (no exception)
+        let mut monitor2 = ctx.monitor_builder("callback:test:stop")
+            .expect("Failed to create monitor builder")
+            .connection_events(true)  // maskConnected(false) - events queued
+            .disconnection_events(false)  // maskDisconnected(true) - throws exception
+            .exec()
+            .expect("Failed to create monitor2");
+
+        monitor2.start().expect("Failed to start monitor2");
         thread::sleep(Duration::from_millis(500));
+        
+        let mut data_count2 = 0;
+        for _ in 0..20 {
+            match monitor2.pop() {
+                Ok(Some(_)) => data_count2 += 1,
+                Ok(None) => break,
+                Err(MonitorEvent::Connected(_)) => {
+                    got_connected_exception = true;
+                },
+                Err(MonitorEvent::Disconnected(_)) => {
+                    got_disconnected_exception = true;
+                },
+                Err(MonitorEvent::Finished(_)) => {
+                    got_finished_exception = true;
+                },
+                Err(e) => {
+                    got_another_exception = true;
+                }
+            }
+        }
+        
+        monitor2.stop().expect("Failed to stop monitor2");
 
-        let event_count = EVENT_COUNTER.load(Ordering::SeqCst);
-        println!("Event count after stop: {}", event_count);
-        // Note: Disconnection events might not always trigger on explicit stop
-        // This is testing the API, not necessarily guaranteeing the event
+        assert!(got_connected_exception, "Expected connection event to be queued as data with connection_events(true)");
+        assert!(!got_disconnected_exception, "Did not expect disconnection exception with disconnection_events(false)");
+        assert!(!got_finished_exception, "Did not expect finished exception");
+        assert!(!got_another_exception, "Did not expect other exceptions");
+        assert!(data_count2 >= 1, "Expected at least one data event including connection event");
 
+        // Cleanup
         srv.stop().expect("Failed to stop server");
     }
 

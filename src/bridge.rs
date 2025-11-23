@@ -15,6 +15,11 @@ mod ffi {
         #[cfg(feature = "async")]
         type OperationWrapper; // Re-enabled for async operations
         
+        // Exception types for monitor events (C++ types, not Rust)
+        type MonitorConnected;
+        type MonitorDisconnected;
+        type MonitorFinished;
+        
         // Metadata structs (defined in C++ with std::optional)
         type NTScalarAlarm;
         type NTScalarTime;
