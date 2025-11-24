@@ -54,6 +54,20 @@ namespace pvxs_wrapper
         explicit MonitorFinished(const std::string &msg) : PvxsError(msg) {}
     };
 
+    /// Exception for monitor remote error events from server
+    class MonitorRemoteError : public PvxsError
+    {
+    public:
+        explicit MonitorRemoteError(const std::string &msg) : PvxsError(msg) {}
+    };
+
+    /// Exception for monitor client side errors
+    class MonitorClientError : public PvxsError
+    {
+    public:
+        explicit MonitorClientError(const std::string &msg) : PvxsError(msg) {}
+    };
+
     /// Wraps pvxs::Value for safe Rust access
     class ValueWrapper
     {

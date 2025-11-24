@@ -68,8 +68,13 @@ pub enum MonitorEvent {
     Connected(String),
     /// Disconnection event (when maskDisconnected(true) is set)
     Disconnected(String),
-    /// Finished event (when maskDisconnected(true) is set)
+    /// Finished event (when maskDisconnected(true) is set).
+    /// Subscription has completed normally and no more events will ever be received.
     Finished(String),
+    /// Remote error event from server
+    RemoteError(String),
+    /// Standard client side error. Catchs std::exception for client side failures.
+    ClientError(String),
 }
 
 impl fmt::Display for MonitorEvent {
@@ -78,6 +83,8 @@ impl fmt::Display for MonitorEvent {
             MonitorEvent::Connected(msg) => write!(f, "Monitor connected: {}", msg),
             MonitorEvent::Disconnected(msg) => write!(f, "Monitor disconnected: {}", msg),
             MonitorEvent::Finished(msg) => write!(f, "Monitor finished: {}", msg),
+            MonitorEvent::RemoteError(msg) => write!(f, "Monitor remote error: {}", msg),
+            MonitorEvent::ClientError(msg) => write!(f, "Monitor client error: {}", msg),
         }
     }
 }
@@ -995,11 +1002,13 @@ impl Monitor {
                     Err(MonitorEvent::Disconnected(err_msg.to_string()))
                 } else if err_msg.contains("Monitor finished:") {
                     Err(MonitorEvent::Finished(err_msg.to_string()))
+                } else if err_msg.contains("Monitor remote error:") {
+                    Err(MonitorEvent::RemoteError(err_msg.to_string()))
+                } else if err_msg.contains("Monitor client error:") {
+                    Err(MonitorEvent::ClientError(err_msg.to_string()))
                 } else {
-                    // For other errors, panic or convert to a general error
-                    // Since the signature is Result<Option<Value>, MonitorEvent>, 
-                    // we need to handle non-monitor errors differently
-                    panic!("Unexpected error in pop(): {}", err_msg);
+                    // For other errors, panic or convert to a ClientError
+                    Err(MonitorEvent::ClientError(err_msg.to_string()))
                 }
             },
         }

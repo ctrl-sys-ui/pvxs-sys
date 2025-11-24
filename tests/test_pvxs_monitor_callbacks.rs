@@ -67,14 +67,6 @@ mod test_pvxs_monitor_callbacks {
 
     #[test]
     fn test_monitor_callback_on_stop() {
-        // Test the mask configuration by verifying that exceptions are thrown
-        // 
-        // PVXS behavior with masks:
-        // - connection_events(false) -> maskConnected(true) -> pop() throws MonitorEvent::Connected
-        // - connection_events(true) -> maskConnected(false) -> connection events queued as data
-        // - disconnection_events(false) -> maskDisconnected(true) -> pop() throws MonitorEvent::Disconnected
-        // - disconnection_events(true) -> maskDisconnected(false) -> disconnection events queued as data
-        
         use epics_pvxs_sys::MonitorEvent;
         
         // Create a server with a PV
@@ -102,7 +94,8 @@ mod test_pvxs_monitor_callbacks {
         let mut got_connected_exception = false;
         let mut got_disconnected_exception = false;
         let mut got_finished_exception = false;
-        let mut got_another_exception = false;
+        let mut got_remote_error_exception = false;
+        let mut got_generic_exception = false;
 
         let mut data_count1 = 0;
         for _ in 0..20 {
@@ -118,8 +111,11 @@ mod test_pvxs_monitor_callbacks {
                 Err(MonitorEvent::Finished(_)) => {
                     got_finished_exception = true;
                 },
-                Err(_) => {
-                    got_another_exception = true;
+                Err(MonitorEvent::RemoteError(_)) => {
+                    got_remote_error_exception = true;
+                },
+                Err(MonitorEvent::ClientError(_)) => {
+                    got_generic_exception = true;
                 }
             }
         }
@@ -130,14 +126,16 @@ mod test_pvxs_monitor_callbacks {
         assert!(!got_connected_exception, "Did not expect a connection exception with connection_events(false)");
         assert!(!got_disconnected_exception, "Did not expect a disconnection exception with disconnection_events(false)");
         assert!(!got_finished_exception, "Did not expect a finished exception with disconnection_events(false)");
-        assert!(!got_another_exception, "Did not expect other exceptions");
-        assert_eq!(data_count1, 1, "Expected some data with as pop returns data after the initial connection");
+        assert!(!got_remote_error_exception, "Did not expect a remote error exception");
+        assert!(!got_generic_exception, "Did not expect a generic client error exception");
+        assert_eq!(data_count1, 1, "Expected data with as pop returns data after the initial connection");
 
         // Reset flags for next test
         got_connected_exception = false;
         got_disconnected_exception = false;
         got_finished_exception = false;
-        got_another_exception = false;
+        got_remote_error_exception = false;
+        got_generic_exception = false;
         
         // Test 2: connection_events(true) should queue connection events as data (no exception)
         let mut monitor2 = ctx.monitor_builder("callback:test:stop")
@@ -163,9 +161,12 @@ mod test_pvxs_monitor_callbacks {
                 },
                 Err(MonitorEvent::Finished(_)) => {
                     got_finished_exception = true;
+                }
+                Err(MonitorEvent::RemoteError(_)) => {
+                    got_remote_error_exception = true;
                 },
-                Err(e) => {
-                    got_another_exception = true;
+                Err(MonitorEvent::ClientError(_)) => {
+                    got_generic_exception = true;
                 }
             }
         }
@@ -175,11 +176,82 @@ mod test_pvxs_monitor_callbacks {
         assert!(got_connected_exception, "Expected connection event to be queued as data with connection_events(true)");
         assert!(!got_disconnected_exception, "Did not expect disconnection exception with disconnection_events(false)");
         assert!(!got_finished_exception, "Did not expect finished exception");
-        assert!(!got_another_exception, "Did not expect other exceptions");
-        assert!(data_count2 >= 1, "Expected at least one data event including connection event");
+        assert!(!got_remote_error_exception, "Did not expect a remote error exception");
+        assert!(!got_generic_exception, "Did not expect a generic client error exception");
+        assert_eq!(data_count2, data_count1, "Expected data count to be 1 (initial value) as no new data posted, but got {}", data_count2);
 
+
+        // Reset flags for next test
+        got_connected_exception = false;
+        got_disconnected_exception = false;
+        got_finished_exception = false;
+        got_remote_error_exception = false;
+        got_generic_exception = false;
+
+        // Test 3: disconnection_events(true) should queue disconnection events as data
+        let mut monitor3 = ctx.monitor_builder("callback:test:stop")
+            .expect("Failed to create monitor builder")
+            .connection_events(false)  // maskConnected(true) - throws exception
+            .disconnection_events(true)  // maskDisconnected(false) - events queued
+            .exec()
+            .expect("Failed to create monitor3");
+
+        monitor3.start().expect("Failed to start monitor3");
+
+        let mut data_count3 = 0;
+        for i in 0..20 {
+            match monitor3.pop() {
+                Ok(Some(_)) => data_count3 += 1,
+                Ok(None) => {// Do nothing, continue
+                },
+                Err(MonitorEvent::Connected(e)) => {
+                    got_connected_exception = true;
+                    println!("Unexpected connected exception: {}", e);
+                },
+                Err(MonitorEvent::Disconnected(e)) => {
+                    got_disconnected_exception = true;
+                    println!("Disconnection event detected: {}", e);
+                },
+                Err(MonitorEvent::Finished(e)) => {
+                    got_finished_exception = true;
+                    println!("Finished event detected: {}", e);
+                }
+                Err(MonitorEvent::RemoteError(e)) => {
+                    got_remote_error_exception = true;
+                    println!("Remote error event detected: {}", e);
+                },
+                Err(MonitorEvent::ClientError(e)) => {
+                    got_generic_exception = true;
+                    println!("Generic client error: {}", e);
+                }
+            }
+            if i == 10 {
+                // Stop the server to trigger disconnection
+                monitor3.stop().expect("Failed to stop server to trigger disconnection");
+                thread::sleep(Duration::from_millis(500));
+            }
+        }
+
+        
         // Cleanup
         srv.stop().expect("Failed to stop server");
+        thread::sleep(Duration::from_millis(500));
+
+        // Print results
+        println!("Connection exception: {}", got_connected_exception);
+        println!("Disconnection exception: {}", got_disconnected_exception);
+        println!("Finished exception: {}", got_finished_exception);
+        println!("Remote error exception: {}", got_remote_error_exception);
+        println!("Generic exception: {}", got_generic_exception);
+        
+        assert!(!got_connected_exception, "Did not expect a connection exception with connection_events(false)");
+        assert!(!got_finished_exception, "Did not expect finished exception");
+        assert!(got_disconnected_exception, "Expected disconnection event to be queued as data with disconnection_events(true)");
+        assert!(!got_remote_error_exception, "Did not expect a remote error exception");
+        assert!(!got_generic_exception, "Did not expect a generic client error exception");
+        assert_eq!(data_count3, data_count1, "Expected no data as no disconnection occurred, but got {}", data_count3);
+
+        
     }
 
     #[test]

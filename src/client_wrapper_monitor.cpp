@@ -58,7 +58,7 @@ namespace pvxs_wrapper {
 
     std::unique_ptr<ValueWrapper> MonitorWrapper::get_update(double timeout) {
         if (!monitor_) {
-            throw PvxsError("Monitor not started for '" + pv_name_ + "'");
+            throw PvxsError("Monitor client error: '" + pv_name_ + "' doesn't have an active monitor");
         }
         
         try {
@@ -75,7 +75,7 @@ namespace pvxs_wrapper {
 
     std::unique_ptr<ValueWrapper> MonitorWrapper::try_get_update() {
         if (!monitor_) {
-            throw PvxsError("Monitor not started for '" + pv_name_ + "'");
+            throw PvxsError("Monitor client error: '" + pv_name_ + "' doesn't have an active monitor");
         }
         
         try {
@@ -93,7 +93,7 @@ namespace pvxs_wrapper {
 
     std::unique_ptr<ValueWrapper> MonitorWrapper::pop() {
         if (!monitor_) {
-            throw PvxsError("Monitor not started for '" + pv_name_ + "'");
+            throw PvxsError("Monitor client error: '" + pv_name_ + "' doesn't have an active monitor");
         }
         
         try {
@@ -116,9 +116,10 @@ namespace pvxs_wrapper {
             throw MonitorFinished(std::string("Monitor finished: ") + e.what());
         } catch (const pvxs::client::RemoteError& e) {
             // Error from server - convert to PvxsError
-            throw PvxsError("Remote error: " + std::string(e.what()));
+            throw MonitorRemoteError(std::string("Monitor remote error: ") + e.what());
         } catch (const std::exception& e) {
-            throw PvxsError(std::string("Error popping monitor update for '") + pv_name_ + "': " + e.what());
+             // Client side error - convert to PvxsError
+            throw MonitorClientError(std::string("Monitor client error: ") + e.what());
         }
     }
 
