@@ -24,8 +24,8 @@ mod test_pvxs_monitor_builder {
         
         // Attempt to create monitor using builder from remote client context
         let monitor_result: Result<Monitor, PvxsError> = ctx.monitor_builder("TEST:MonitorBuilder:LocalFail")?
-            .mask_connected(true)
-            .mask_disconnected(true)
+            .connect_exception(false)  // Suppress connection exceptions
+            .disconnect_exception(false)  // Suppress disconnection exceptions
             .exec();
         
         match monitor_result {
@@ -59,8 +59,8 @@ mod test_pvxs_monitor_builder {
         let mut ctx = Context::from_env()?;
         // Test MonitorBuilder creation again - this time server is running
         let mut _monitor: Result<Monitor, PvxsError> = ctx.monitor_builder(pv_name)?
-            .mask_connected(true)        
-            .mask_disconnected(true)     
+            .connect_exception(false)  // Suppress connection exceptions
+            .disconnect_exception(false)  // Suppress disconnection exceptions     
             .exec();
         match _monitor {
             Ok(mut mon) => {
@@ -106,10 +106,10 @@ mod test_pvxs_monitor_builder {
         
         let mut ctx = Context::from_env()?;
         
-        // Test with both masks enabled
+        // Test with both masks enabled (suppress exceptions)
         let mut monitor1 = ctx.monitor_builder("TEST:MonitorBuilder:Masks")?
-            .mask_connected(true)
-            .mask_disconnected(true)
+            .connect_exception(false)  // Suppress connection exceptions
+            .disconnect_exception(false)  // Suppress disconnection exceptions
             .exec()?;
         
         // When both connected and disconnected masks are enabled, we should see connection events
@@ -117,10 +117,10 @@ mod test_pvxs_monitor_builder {
         thread::sleep(Duration::from_millis(500));
         monitor1.stop()?;
 
-        // Test with both masks disabled
+        // Test with both masks disabled (throw exceptions)
         let mut monitor2 = ctx.monitor_builder("TEST:MonitorBuilder:Masks")?
-            .mask_connected(false)
-            .mask_disconnected(false)
+            .connect_exception(true)  // Throw connection exceptions
+            .disconnect_exception(true)  // Throw disconnection exceptions
             .exec()?;
         // Test default configuration (no explicit mask calls)
         let _monitor3 = ctx.monitor_builder("TEST:MonitorBuilder:Masks")?
@@ -145,11 +145,10 @@ mod test_pvxs_monitor_builder {
         
         // Create monitor using builder
         let mut monitor = ctx.monitor_builder("TEST:MonitorBuilder:Pop")?
-            .mask_connected(false)
             .exec()?;
         
         // Start monitoring
-        monitor.start();
+        monitor.start().expect("Failed to start monitor");
         
         // Give time for initial connection
         thread::sleep(Duration::from_millis(200));
@@ -212,7 +211,7 @@ mod test_pvxs_monitor_builder {
     #[test]
     fn test_monitor_builder_with_callback() -> Result<(), PvxsError> {
         // Create isolated server for testing
-        let mut server = Server::create_isolated()?;
+        let mut server = Server::from_env()?;
         
         server.create_pv_double("TEST:MonitorBuilder:Callback", 42.0, NTScalarMetadataBuilder::new())?;
         server.start()?;
@@ -223,8 +222,8 @@ mod test_pvxs_monitor_builder {
         
         // Create monitor with actual Rust callback function
         let mut monitor = ctx.monitor_builder("TEST:MonitorBuilder:Callback")?
-            .connection_events(true)      // Include connection events in queue
-            .disconnection_events(true)   // Include disconnection events in queue
+            .connect_exception(true)      // Throw connection exceptions in queue
+            .disconnect_exception(true)   // Throw disconnection exceptions in queue
             .event(simple_test_callback)  // Set a simple callback
             .exec()?;
         
@@ -286,7 +285,7 @@ mod test_pvxs_monitor_builder {
     /// Test MonitorBuilder with string PV
     #[test]
     fn test_monitor_builder_string_pv() -> Result<(), PvxsError> {
-        let mut server = Server::create_isolated()?;
+        let mut server = Server::from_env()?;
         
         server.create_pv_string("TEST:MonitorBuilder:String", "Hello MonitorBuilder", NTScalarMetadataBuilder::new())?;
         server.start()?;
@@ -296,8 +295,8 @@ mod test_pvxs_monitor_builder {
         let mut ctx = Context::from_env()?;
         
         let mut monitor = ctx.monitor_builder("TEST:MonitorBuilder:String")?
-            .mask_connected(false)
-            .mask_disconnected(false)
+            .connect_exception(false)
+            .disconnect_exception(false)
             .exec()?;
         
         monitor.start();
@@ -351,7 +350,7 @@ mod test_pvxs_monitor_builder {
         let mut ctx = Context::from_env()?;
         
         let mut monitor = ctx.monitor_builder("TEST:MonitorBuilder:Rapid")?
-            .mask_connected(false)
+            .connect_exception(true)  // Throw connection exceptions
             .exec()?;
         
         monitor.start();
@@ -404,7 +403,7 @@ mod test_pvxs_monitor_builder {
         
         // Create monitor using builder
         let mut builder_monitor = ctx.monitor_builder("TEST:MonitorBuilder:Compare")?
-            .mask_connected(false)
+            .connect_exception(true)  // Throw connection exceptions
             .exec()?;
         builder_monitor.start();
         
@@ -444,8 +443,8 @@ mod test_pvxs_monitor_builder {
         
         // Create monitor with callback
         let mut monitor = ctx.monitor_builder("TEST:MonitorBuilder:Counter")?
-            .connection_events(true)
-            .disconnection_events(true)
+            .connect_exception(true)
+            .disconnect_exception(true)
             .event(simple_test_callback)
             .exec()?;
         
@@ -554,7 +553,7 @@ mod test_pvxs_monitor_builder {
             "Expected to receive both posted values, got first={} second={}", 
             values_popped, values_popped_2);
         
-        monitor.stop();
+        monitor.stop().expect("Monitor stop failed");
         server.stop()?;
         Ok(())
     }

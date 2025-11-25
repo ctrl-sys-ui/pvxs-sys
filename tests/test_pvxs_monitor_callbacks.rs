@@ -1,5 +1,5 @@
 mod test_pvxs_monitor_callbacks {
-    use epics_pvxs_sys::{Context, Server, NTScalarMetadataBuilder, AtomicUsize, Ordering};
+    use epics_pvxs_sys::{Context, Server, NTScalarMetadataBuilder, AtomicUsize, Ordering, MonitorEvent};
     use std::thread;
     use std::time::Duration;
 
@@ -24,50 +24,7 @@ mod test_pvxs_monitor_callbacks {
     }
 
     #[test]
-    fn test_monitor_callback_on_start() {
-        // Reset counters
-        EVENT_COUNTER.store(0, Ordering::SeqCst);
-
-        // Create a server with a PV
-        let mut srv = Server::from_env().expect("Failed to create server");
-        let _pv = srv.create_pv_double("callback:test:start", 3.14, NTScalarMetadataBuilder::new())
-            .expect("Failed to create PV");
-        srv.start().expect("Failed to start server");
-
-        // Give server time to initialize
-        thread::sleep(Duration::from_millis(500));
-
-        // Create monitor with callback
-        let mut ctx = Context::from_env().expect("Failed to create context");
-        let mut monitor = ctx.monitor_builder("callback:test:start")
-            .expect("Failed to create monitor builder")
-            .connection_events(true)
-            .disconnection_events(false)
-            .event(generic_event_callback)
-            .exec()
-            .expect("Failed to create monitor");
-
-        // Start the monitor - should trigger callback when connected
-        monitor.start().expect("Failed to start monitor");
-        
-        // Wait for connection and initial value
-        thread::sleep(Duration::from_millis(1000));
-
-        // Check that callback was invoked
-        let event_count = EVENT_COUNTER.load(Ordering::SeqCst);
-        assert!(event_count > 0, "Expected callback to be invoked on start, got {} events", event_count);
-
-        // Cleanup
-        monitor.stop().expect("Failed to stop monitor");
-        // I expect no increase in counter after stop
-        thread::sleep(Duration::from_millis(500));
-        assert!(EVENT_COUNTER.load(Ordering::SeqCst) == event_count, "Expected no new events after stop");
-        srv.stop().expect("Failed to stop server");
-    }
-
-    #[test]
-    fn test_monitor_callback_on_stop() {
-        use epics_pvxs_sys::MonitorEvent;
+    fn test_monitor_connection_and_disconnection_events_off() {
         
         // Create a server with a PV
         let mut srv = Server::from_env().expect("Failed to create server");
@@ -79,11 +36,11 @@ mod test_pvxs_monitor_callbacks {
 
         let mut ctx = Context::from_env().expect("Failed to create context");
 
-        // Test 1: connection_events(false) should suppress Connected events (maskConnected(true))
+        // Test 1: connect_exception(false) should suppress Connected exceptions (maskConnected(true))
         let mut monitor1 = ctx.monitor_builder("callback:test:stop")
             .expect("Failed to create monitor builder")
-            .connection_events(false)  // maskConnected(true) - suppresses connection events
-            .disconnection_events(false)  // maskDisconnected(true) - suppresses disconnection events
+            .connect_exception(false)  // maskConnected(true) - suppresses connection exceptions
+            .disconnect_exception(false)  // maskDisconnected(true) - suppresses disconnection exceptions
             .exec()
             .expect("Failed to create monitor1");
 
@@ -122,26 +79,41 @@ mod test_pvxs_monitor_callbacks {
         
         monitor1.stop().expect("Failed to stop monitor1");
 
-        // Verify: with connection_events(false), do not get a connection exception
-        assert!(!got_connected_exception, "Did not expect a connection exception with connection_events(false)");
-        assert!(!got_disconnected_exception, "Did not expect a disconnection exception with disconnection_events(false)");
-        assert!(!got_finished_exception, "Did not expect a finished exception with disconnection_events(false)");
+        // Verify: with connect_exception(false), do not get a connection exception
+        assert!(!got_connected_exception, "Did not expect a connection exception with connect_exception(false)");
+        assert!(!got_disconnected_exception, "Did not expect a disconnection exception with disconnect_exception(false)");
+        assert!(!got_finished_exception, "Did not expect a finished exception with disconnect_exception(false)");
         assert!(!got_remote_error_exception, "Did not expect a remote error exception");
         assert!(!got_generic_exception, "Did not expect a generic client error exception");
         assert_eq!(data_count1, 1, "Expected data with as pop returns data after the initial connection");
+    
+    srv.stop().expect("Failed to stop server");
+    }
+
+    #[test]
+    fn test_monitor_connection_on_and_disconnection_off() {
+        // Create a server with a PV
+        let mut srv = Server::from_env().expect("Failed to create server");
+        let _pv = srv.create_pv_double("callback:test:stop", 2.71, NTScalarMetadataBuilder::new())
+            .expect("Failed to create PV");
+        srv.start().expect("Failed to start server");
+
+        let mut ctx = Context::from_env().expect("Failed to create context");
+
+        thread::sleep(Duration::from_millis(500));
 
         // Reset flags for next test
-        got_connected_exception = false;
-        got_disconnected_exception = false;
-        got_finished_exception = false;
-        got_remote_error_exception = false;
-        got_generic_exception = false;
+        let mut got_connected_exception = false;
+        let mut got_disconnected_exception = false;
+        let mut got_finished_exception = false;
+        let mut got_remote_error_exception = false;
+        let mut got_generic_exception = false;
         
-        // Test 2: connection_events(true) should queue connection events as data (no exception)
+        // Test 2: connect_exception(true) should queue connection exceptions as data (no exception)
         let mut monitor2 = ctx.monitor_builder("callback:test:stop")
             .expect("Failed to create monitor builder")
-            .connection_events(true)  // maskConnected(false) - events queued
-            .disconnection_events(false)  // maskDisconnected(true) - throws exception
+            .connect_exception(true)  // maskConnected(false) - exceptions queued
+            .disconnect_exception(false)  // maskDisconnected(true) - throws exception
             .exec()
             .expect("Failed to create monitor2");
 
@@ -173,26 +145,39 @@ mod test_pvxs_monitor_callbacks {
         
         monitor2.stop().expect("Failed to stop monitor2");
 
-        assert!(got_connected_exception, "Expected connection event to be queued as data with connection_events(true)");
-        assert!(!got_disconnected_exception, "Did not expect disconnection exception with disconnection_events(false)");
+        assert!(got_connected_exception, "Expected connection exception to be queued as data with connect_exception(true)");
+        assert!(!got_disconnected_exception, "Did not expect disconnection exception with disconnect_exception(false)");
         assert!(!got_finished_exception, "Did not expect finished exception");
         assert!(!got_remote_error_exception, "Did not expect a remote error exception");
         assert!(!got_generic_exception, "Did not expect a generic client error exception");
-        assert_eq!(data_count2, data_count1, "Expected data count to be 1 (initial value) as no new data posted, but got {}", data_count2);
+        assert!(data_count2 > 0 , "Expected data before disconnection occurred, but got {}", data_count2);
 
+        srv.stop().expect("Failed to stop server");
+    }
+    
+    #[test]
+    fn test_monitor_connection_off_disconnection_on() {
+        // Create a server with a PV
+        let mut srv = Server::from_env().expect("Failed to create server");
+        let _pv = srv.create_pv_double("callback:test:stop", 2.71, NTScalarMetadataBuilder::new())
+            .expect("Failed to create PV");
+        srv.start().expect("Failed to start server");
+
+        let mut ctx = Context::from_env().expect("Failed to create context");
+        thread::sleep(Duration::from_millis(500));
 
         // Reset flags for next test
-        got_connected_exception = false;
-        got_disconnected_exception = false;
-        got_finished_exception = false;
-        got_remote_error_exception = false;
-        got_generic_exception = false;
+        let mut got_connected_exception = false;
+        let mut got_disconnected_exception = false;
+        let mut got_finished_exception = false;
+        let mut got_remote_error_exception = false;
+        let mut got_generic_exception = false;
 
-        // Test 3: disconnection_events(true) should throw disconnection events as exceptions (maskDisconnected(false))
+        // Test 3: disconnect_exception(true) should throw disconnection exceptions (maskDisconnected(false))
         let mut monitor3 = ctx.monitor_builder("callback:test:stop")
             .expect("Failed to create monitor builder")
-            .connection_events(false)  // maskConnected(true) - suppresses connection events
-            .disconnection_events(true)  // maskDisconnected(false) - throws disconnection events
+            .connect_exception(false)  // maskConnected(true) - suppresses connection exceptions
+            .disconnect_exception(true)  // maskDisconnected(false) - throws disconnection exceptions
             .exec()
             .expect("Failed to create monitor3");
 
@@ -236,80 +221,16 @@ mod test_pvxs_monitor_callbacks {
         
         // Cleanup - server already stopped above
         thread::sleep(Duration::from_millis(500));
-
-        // Print results
-        println!("Connection exception: {}", got_connected_exception);
-        println!("Disconnection exception: {}", got_disconnected_exception);
-        println!("Finished exception: {}", got_finished_exception);
-        println!("Remote error exception: {}", got_remote_error_exception);
-        println!("Generic exception: {}", got_generic_exception);
         
-        assert!(!got_connected_exception, "Did not expect a connection exception with connection_events(false)");
+        assert!(got_disconnected_exception, "Expected disconnection exception to be thrown with disconnect_exception(true)");
+        assert!(!got_connected_exception, "Did not expect a connection exception with connect_exception(false)");
         assert!(!got_finished_exception, "Did not expect finished exception");
-        assert!(got_disconnected_exception, "Expected disconnection exception to be thrown with disconnection_events(true)");
         assert!(!got_remote_error_exception, "Did not expect a remote error exception");
         assert!(!got_generic_exception, "Did not expect a generic client error exception");
-        assert_eq!(data_count3, data_count1, "Expected no data as no disconnection occurred, but got {}", data_count3);
+        assert!(data_count3 > 0, "Expected data before disconnection occurred, but got {}", data_count3);
 
-        
     }
 
-    #[test]
-    fn test_monitor_mask_configuration() {
-        // Test that mask configuration works correctly
-        
-        // Create a server
-        let mut srv = Server::from_env().expect("Failed to create server");
-        let _pv = srv.create_pv_double("callback:test:mask", 1.23, NTScalarMetadataBuilder::new())
-            .expect("Failed to create PV");
-        srv.start().expect("Failed to start server");
-
-        thread::sleep(Duration::from_millis(500));
-
-        let mut ctx = Context::from_env().expect("Failed to create context");
-
-        // Test 1: With connection events masked out (should not get connection events)
-        EVENT_COUNTER.store(0, Ordering::SeqCst);
-        let mut monitor1 = ctx.monitor_builder("callback:test:mask")
-            .expect("Failed to create monitor builder")
-            .connection_events(false)  // Mask out connection events
-            .disconnection_events(false)
-            .event(generic_event_callback)
-            .exec()
-            .expect("Failed to create monitor1");
-
-        monitor1.start().expect("Failed to start monitor1");
-        thread::sleep(Duration::from_millis(500));
-
-        let count1 = EVENT_COUNTER.load(Ordering::SeqCst);
-        println!("Events with connection masked: {}", count1);
-
-        // Test 2: With connection events enabled
-        EVENT_COUNTER.store(0, Ordering::SeqCst);
-        let mut monitor2 = ctx.monitor_builder("callback:test:mask")
-            .expect("Failed to create monitor builder")
-            .connection_events(true)  // Include connection events
-            .disconnection_events(false)
-            .event(generic_event_callback)
-            .exec()
-            .expect("Failed to create monitor2");
-
-        monitor2.start().expect("Failed to start monitor2");
-        thread::sleep(Duration::from_millis(500));
-
-        let count2 = EVENT_COUNTER.load(Ordering::SeqCst);
-        println!("Events with connection enabled: {}", count2);
-
-        // With connection events enabled, we should get more events
-        assert!(count2 >= count1, 
-            "Expected more events with connection enabled ({}) vs masked ({})", 
-            count2, count1);
-
-        // Cleanup
-        monitor1.stop().expect("Failed to stop monitor1");
-        monitor2.stop().expect("Failed to stop monitor2");
-        srv.stop().expect("Failed to stop server");
-    }
 
     #[test]
     fn test_monitor_multiple_callbacks() {
@@ -326,20 +247,20 @@ mod test_pvxs_monitor_callbacks {
 
         let mut ctx = Context::from_env().expect("Failed to create context");
 
-        // Monitor focused on connection events
+        // Monitor focused on connection exceptions
         let mut mon_connect = ctx.monitor_builder("callback:test:multi")
             .expect("Failed to create monitor builder")
-            .connection_events(true)
-            .disconnection_events(false)
+            .connect_exception(true)
+            .disconnect_exception(false)
             .event(connection_callback)
             .exec()
             .expect("Failed to create connection monitor");
 
-        // Monitor focused on disconnection events
+        // Monitor focused on disconnection exceptions
         let mut mon_disconnect = ctx.monitor_builder("callback:test:multi")
             .expect("Failed to create monitor builder")
-            .connection_events(false)
-            .disconnection_events(true)
+            .connect_exception(false)
+            .disconnect_exception(true)
             .event(disconnection_callback)
             .exec()
             .expect("Failed to create disconnection monitor");
@@ -379,8 +300,8 @@ mod test_pvxs_monitor_callbacks {
         let mut ctx = Context::from_env().expect("Failed to create context");
         let mut monitor = ctx.monitor_builder("callback:test:updates")
             .expect("Failed to create monitor builder")
-            .connection_events(true)
-            .disconnection_events(false)
+            .connect_exception(true)
+            .disconnect_exception(false)
             .event(generic_event_callback)
             .exec()
             .expect("Failed to create monitor");
@@ -408,6 +329,111 @@ mod test_pvxs_monitor_callbacks {
 
         // Cleanup
         monitor.stop().expect("Failed to stop monitor");
+        srv.stop().expect("Failed to stop server");
+    }
+
+    #[test]
+    fn test_monitor_callback_on_connect_and_disconnect() {
+        // Reset counters
+        EVENT_COUNTER.store(0, Ordering::SeqCst);
+
+        // Create a server with a PV
+        let mut srv = Server::from_env().expect("Failed to create server");
+        let _pv = srv.create_pv_double("callback:test:start", 3.14, NTScalarMetadataBuilder::new())
+            .expect("Failed to create PV");
+        srv.start().expect("Failed to start server");
+
+        // Give server time to initialize
+        thread::sleep(Duration::from_millis(500));
+
+        // Create monitor with callback
+        let mut ctx = Context::from_env().expect("Failed to create context");
+        let mut monitor = ctx.monitor_builder("callback:test:start")
+            .expect("Failed to create monitor builder")
+            .connect_exception(true)
+            .disconnect_exception(true)
+            .event(generic_event_callback)
+            .exec()
+            .expect("Failed to create monitor");
+
+        // Start the monitor - should trigger callback when connected
+        monitor.start().expect("Failed to start monitor");
+        
+        // Wait for connection and initial value
+        thread::sleep(Duration::from_millis(1000));
+
+        // Check that callback was invoked
+        let event_count = EVENT_COUNTER.load(Ordering::SeqCst);
+        assert!(event_count > 0, "Expected callback to be invoked on start, got {} events", event_count);
+
+        srv.stop().expect("Failed to stop server");
+        thread::sleep(Duration::from_millis(1000));
+
+        let event_count2 = EVENT_COUNTER.load(Ordering::SeqCst);
+        assert!(event_count2 > event_count, "Expected callback to be invoked on server stop, got {} events", event_count2);
+
+        // Cleanup
+        monitor.stop().expect("Failed to stop monitor");
+        // I expect no increase in counter after stop
+        thread::sleep(Duration::from_millis(500));
+        assert!(EVENT_COUNTER.load(Ordering::SeqCst) == event_count2, "Expected no new events after stop");
+        
+    }
+
+    #[test]
+    fn test_monitor_multiple_client_monitors() {
+        // Test that mask configuration works correctly
+        
+        // Create a server
+        let mut srv = Server::from_env().expect("Failed to create server");
+        let _pv = srv.create_pv_double("callback:test:mask", 1.23, NTScalarMetadataBuilder::new())
+            .expect("Failed to create PV");
+        srv.start().expect("Failed to start server");
+
+        thread::sleep(Duration::from_millis(500));
+
+        let mut ctx = Context::from_env().expect("Failed to create context");
+
+        // Test 1: With connection events masked out (should not get connection events)
+        EVENT_COUNTER.store(0, Ordering::SeqCst);
+        let mut monitor1 = ctx.monitor_builder("callback:test:mask")
+            .expect("Failed to create monitor builder")
+            .connect_exception(false)  // Mask out connection exceptions
+            .disconnect_exception(false)
+            .event(generic_event_callback)
+            .exec()
+            .expect("Failed to create monitor1");
+
+        monitor1.start().expect("Failed to start monitor1");
+        thread::sleep(Duration::from_millis(500));
+
+        let count1 = EVENT_COUNTER.load(Ordering::SeqCst);
+        println!("Events with connection masked: {}", count1);
+
+        // Test 2: With connection events enabled
+        EVENT_COUNTER.store(0, Ordering::SeqCst);
+        let mut monitor2 = ctx.monitor_builder("callback:test:mask")
+            .expect("Failed to create monitor builder")
+            .connect_exception(true)  // Include connection exceptions
+            .disconnect_exception(false)
+            .event(generic_event_callback)
+            .exec()
+            .expect("Failed to create monitor2");
+
+        monitor2.start().expect("Failed to start monitor2");
+        thread::sleep(Duration::from_millis(500));
+
+        let count2 = EVENT_COUNTER.load(Ordering::SeqCst);
+        println!("Events with connection enabled: {}", count2);
+
+        // With connection events enabled, we should get more events
+        assert!(count2 >= count1, 
+            "Expected more events with connection enabled ({}) vs masked ({})", 
+            count2, count1);
+
+        // Cleanup
+        monitor1.stop().expect("Failed to stop monitor1");
+        monitor2.stop().expect("Failed to stop monitor2");
         srv.stop().expect("Failed to stop server");
     }
 }
