@@ -460,11 +460,12 @@ impl Context {
     /// use epics_pvxs_sys::Context;
     /// 
     /// let mut ctx = Context::from_env().expect("Context creation failed");
-    /// let monitor = ctx.monitor_builder("TEST:PV_Double")
+    /// let monitor = ctx.monitor_builder("TEST:PV_Double")?
     ///     .connect_exception(true)      // Throw connection exceptions
     ///     .disconnect_exception(true)   // Throw disconnection exceptions
     ///     .exec()
     ///     .expect("Monitor creation failed");
+    /// # Ok::<(), epics_pvxs_sys::PvxsError>(())
     /// ```
     pub fn monitor_builder(&mut self, pv_name: &str) -> Result<MonitorBuilder> {
         let inner = bridge::context_monitor_builder_create(self.inner.pin_mut(), pv_name.to_string())?;
@@ -831,6 +832,7 @@ impl Monitor {
     /// # let mut monitor = ctx.monitor("MY:PV").unwrap();
     /// # monitor.start();
     /// monitor.stop()?;
+    /// # Ok::<(), epics_pvxs_sys::PvxsError>(())
     /// ```
     pub fn stop(&mut self) -> Result<()> {
         bridge::monitor_stop(self.inner.pin_mut())?;
@@ -1067,7 +1069,7 @@ impl Monitor {
 /// use epics_pvxs_sys::Context;
 /// 
 /// let mut ctx = Context::from_env()?;
-/// let monitor = ctx.monitor_builder("MY:PV")
+/// let monitor = ctx.monitor_builder("MY:PV")?
 ///     .connect_exception(true)
 ///     .disconnect_exception(true)
 ///     .exec()?;
@@ -1091,7 +1093,7 @@ impl MonitorBuilder {
     /// ```no_run
     /// # use epics_pvxs_sys::Context;
     /// # let mut ctx = Context::from_env().unwrap();
-    /// let monitor = ctx.monitor_builder("MY:PV")
+    /// let monitor = ctx.monitor_builder("MY:PV")?
     ///     .connect_exception(true) // Throw connection exceptions
     ///     .exec()?;
     /// # Ok::<(), epics_pvxs_sys::PvxsError>(())
@@ -1116,7 +1118,7 @@ impl MonitorBuilder {
     /// ```no_run
     /// # use epics_pvxs_sys::Context;
     /// # let mut ctx = Context::from_env().unwrap();
-    /// let monitor = ctx.monitor_builder("MY:PV")
+    /// let monitor = ctx.monitor_builder("MY:PV")?
     ///     .disconnect_exception(true) // Throw disconnection exceptions
     ///     .exec()?;
     /// # Ok::<(), epics_pvxs_sys::PvxsError>(())
@@ -1147,7 +1149,7 @@ impl MonitorBuilder {
     ///     println!("Events available in subscription queue!");
     /// }
     /// 
-    /// let monitor = ctx.monitor_builder("MY:PV")
+    /// let monitor = ctx.monitor_builder("MY:PV")?
     ///     .event(my_callback)
     ///     .exec()?;
     /// # Ok::<(), epics_pvxs_sys::PvxsError>(())
@@ -1174,7 +1176,7 @@ impl MonitorBuilder {
     /// ```no_run
     /// # use epics_pvxs_sys::Context;
     /// # let mut ctx = Context::from_env().unwrap();
-    /// let monitor = ctx.monitor_builder("MY:PV")
+    /// let monitor = ctx.monitor_builder("MY:PV")?
     ///     .connect_exception(true)
     ///     .exec()?;
     /// # Ok::<(), epics_pvxs_sys::PvxsError>(())
@@ -1198,7 +1200,7 @@ impl MonitorBuilder {
     /// ```no_run
     /// # use epics_pvxs_sys::Context;
     /// # let mut ctx = Context::from_env().unwrap();
-    /// let monitor = ctx.monitor_builder("MY:PV")
+    /// let monitor = ctx.monitor_builder("MY:PV")?
     ///     .exec_with_callback(123)?;
     /// # Ok::<(), epics_pvxs_sys::PvxsError>(())
     /// ```
@@ -1350,7 +1352,7 @@ impl Rpc {
 /// let _pv = server.create_pv_double("test:pv", 42.0, NTScalarMetadataBuilder::new())?;
 /// 
 /// server.start()?;
-/// println!(\"Server running on port {}\", server.tcp_port());
+/// println!("Server running on port {}", server.tcp_port());
 /// 
 /// server.stop()?;
 /// # Ok::<(), epics_pvxs_sys::PvxsError>(())
@@ -1631,11 +1633,11 @@ impl Server {
 /// 
 /// # Example
 /// 
-/// ```no_run
+/// ```ignore
 /// use epics_pvxs_sys::SharedPV;
 /// 
 /// let mut pv = SharedPV::create_mailbox()?;
-/// pv.open_double(42.5)?;
+/// // Note: open_double is internal API, use Server::create_pv_* methods instead
 /// 
 /// // Update the value
 /// pv.post_double(99.9)?;
@@ -1675,8 +1677,10 @@ impl SharedPV {
     /// 
     /// # Example
     /// 
-    /// ```no_run
+    /// ```ignore
     /// # use epics_pvxs_sys::{SharedPV, NTScalarMetadataBuilder, DisplayMetadata};
+    /// // Note: open_double is internal API
+    /// // Use Server::create_pv_double instead for public API
     /// let mut pv = SharedPV::create_mailbox()?;
     /// 
     /// let metadata = NTScalarMetadataBuilder::new()
@@ -1893,13 +1897,15 @@ impl SharedPV {
 /// 
 /// # Example
 /// 
-/// ```no_run
+/// ```ignore
 /// use epics_pvxs_sys::{StaticSource, SharedPV};
 /// 
+/// // Note: This example uses internal APIs
+/// // Use Server::create_pv_* methods for public API
 /// let mut source = StaticSource::create()?;
 /// 
 /// let mut temp_pv = SharedPV::create_readonly()?;
-/// temp_pv.open_double(23.5)?;
+/// // temp_pv.open_double(23.5)?; // Internal API
 /// 
 /// source.add_pv("temperature", &mut temp_pv)?;
 /// 

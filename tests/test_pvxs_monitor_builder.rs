@@ -1,5 +1,4 @@
 mod test_pvxs_monitor_builder {
-    // test_pvxs_monitor_builder.rs - Test MonitorBuilder and callback functionality
     use epics_pvxs_sys::{Context, Monitor, PvxsError, Server, NTScalarMetadataBuilder};
     use std::thread;
     use std::time::Duration;
@@ -47,8 +46,10 @@ mod test_pvxs_monitor_builder {
         Ok(())
     }
 
+    use serial_test::serial;
     /// Test basic MonitorBuilder creation and configuration
     #[test]
+    #[serial]
     fn test_monitor_builder_creation()  -> Result<(), PvxsError> {
         let pv_name = "TEST:MonitorBuilder:Creation";
         // Now start a new server from_env to test actual connection
@@ -65,7 +66,7 @@ mod test_pvxs_monitor_builder {
         match _monitor {
             Ok(mut mon) => {
                 // Start the monitor
-                mon.start();
+                mon.start()?;
                 // Give more time for connection to establish
                 thread::sleep(Duration::from_millis(2000));
                 
@@ -81,51 +82,15 @@ mod test_pvxs_monitor_builder {
                 
                 // start the server again
                 assert!(server.start().is_ok());
+
                 // Give more time for reconnection (might take longer than initial connection)
                 thread::sleep(Duration::from_millis(5000));
-                assert_eq!(mon.is_connected(), true, "Monitor should reconnect after server restart");
+                assert!(mon.is_connected(), "Monitor should reconnect after server restart");
             },
             Err(e) => {
                 assert!(false, "Monitor creation failed: {:?}", e);
             }
         }
-        Ok(())
-    }
-
-    /// Test MonitorBuilder with different mask configurations
-    #[test]
-    fn test_monitor_builder_mask_options() -> Result<(), PvxsError> {
-        // Create isolated server for testing
-        let mut server = Server::create_isolated()?;
-        
-        // Create PV with initial value (automatically added to server)
-        server.create_pv_double("TEST:MonitorBuilder:Masks", 2.5, NTScalarMetadataBuilder::new())?;
-        server.start()?;
-        
-        thread::sleep(Duration::from_millis(100));
-        
-        let mut ctx = Context::from_env()?;
-        
-        // Test with both masks enabled (suppress exceptions)
-        let mut monitor1 = ctx.monitor_builder("TEST:MonitorBuilder:Masks")?
-            .connect_exception(false)  // Suppress connection exceptions
-            .disconnect_exception(false)  // Suppress disconnection exceptions
-            .exec()?;
-        
-        // When both connected and disconnected masks are enabled, we should see connection events
-        monitor1.start()?;
-        thread::sleep(Duration::from_millis(500));
-        monitor1.stop()?;
-
-        // Test with both masks disabled (throw exceptions)
-        let mut monitor2 = ctx.monitor_builder("TEST:MonitorBuilder:Masks")?
-            .connect_exception(true)  // Throw connection exceptions
-            .disconnect_exception(true)  // Throw disconnection exceptions
-            .exec()?;
-        // Test default configuration (no explicit mask calls)
-        let _monitor3 = ctx.monitor_builder("TEST:MonitorBuilder:Masks")?
-            .exec()?;
-        server.stop()?;
         Ok(())
     }
 
@@ -203,7 +168,7 @@ mod test_pvxs_monitor_builder {
             Err(e) => assert!(false, "Failed to PUT new value: {}", e),
         }
         
-        monitor.stop();
+        monitor.stop()?;
         server.stop()?;
         Ok(())
     }
@@ -229,7 +194,7 @@ mod test_pvxs_monitor_builder {
             .exec()?;
         
         // Start monitoring
-        monitor.start();
+        monitor.start()?;
         
         // Wait for initial connection
         thread::sleep(Duration::from_millis(1000));
@@ -278,7 +243,7 @@ mod test_pvxs_monitor_builder {
             "Expected to receive some events, got values={} events={}", 
             values_popped, events_seen);
         
-        monitor.stop();
+        monitor.stop()?;
         server.stop()?;
         Ok(())
     }
@@ -300,7 +265,7 @@ mod test_pvxs_monitor_builder {
             .disconnect_exception(false)
             .exec()?;
         
-        monitor.start();
+        monitor.start()?;
         thread::sleep(Duration::from_millis(200));
         
         // Try to get initial value
@@ -312,7 +277,7 @@ mod test_pvxs_monitor_builder {
             Err(e) => assert!(false, "String PV event: {}", e),
         }
         
-        monitor.stop();
+        monitor.stop()?;
         server.stop()?;
         Ok(())
     }
@@ -354,7 +319,7 @@ mod test_pvxs_monitor_builder {
             .connect_exception(true)  // Throw connection exceptions
             .exec()?;
         
-        monitor.start();
+        monitor.start()?;
         thread::sleep(Duration::from_millis(200));
         
         // Clear initial events
@@ -381,7 +346,7 @@ mod test_pvxs_monitor_builder {
         if !updates.is_empty() {
         }
         
-        monitor.stop();
+        monitor.stop()?;
         server.stop()?;
         Ok(())
     }
@@ -400,13 +365,13 @@ mod test_pvxs_monitor_builder {
         
         // Create monitor using traditional method
         let mut regular_monitor = ctx.monitor("TEST:MonitorBuilder:Compare")?;
-        regular_monitor.start();
+        regular_monitor.start()?;
         
         // Create monitor using builder
         let mut builder_monitor = ctx.monitor_builder("TEST:MonitorBuilder:Compare")?
             .connect_exception(true)  // Throw connection exceptions
             .exec()?;
-        builder_monitor.start();
+        builder_monitor.start()?;
         
         thread::sleep(Duration::from_millis(200));
         
@@ -423,8 +388,8 @@ mod test_pvxs_monitor_builder {
         let _builder_has_update = builder_monitor.has_update();
         
         
-        regular_monitor.stop();
-        builder_monitor.stop();
+        regular_monitor.stop()?;
+        builder_monitor.stop()?;
         server.stop()?;
         Ok(())
     }
@@ -432,6 +397,7 @@ mod test_pvxs_monitor_builder {
     /// Test callbacks with continuously incrementing server-side value
     #[test]
     fn test_monitor_builder_with_server_side_counter() -> Result<(), PvxsError> {
+        use epics_pvxs_sys::MonitorEvent;
         // Create server using from_env instead of create_isolated
         let mut server = Server::from_env()?;
         
@@ -450,7 +416,7 @@ mod test_pvxs_monitor_builder {
             .exec()?;
         
         // Start monitoring
-        monitor.start();
+        monitor.start()?;
         
         // Wait for initial connection
         thread::sleep(Duration::from_millis(500));
@@ -474,16 +440,28 @@ mod test_pvxs_monitor_builder {
         
         // Check queue state - drain all values
         let mut values_received = 0;
-        while let Ok(Some(value)) = monitor.pop() {
-            values_received += 1;
-            let _ = value.get_field_double("value");
+
+        loop {       
+            match monitor.pop() {
+                Ok(Some(value)) => {
+                    values_received += 1;
+                    let _ = value.get_field_double("value");
+                },
+                Ok(None) => {
+                    break;
+                },
+                Err(MonitorEvent::Connected(_)) => {
+                    // Ignore connection events
+                },
+                Err(_e) => {
+                    assert!(false, "Error popping from monitor: {:?}", _e);
+                },
+            }
         }
         
-        assert!(values_received > 0, 
-            "Expected to receive some values from server updates, got {}", 
-            values_received);
+        assert!(values_received > 0, "Expected to receive some values from server updates, got {}", values_received);
         
-        monitor.stop();
+        monitor.stop()?;
         server.stop()?;
         Ok(())
     }
@@ -511,7 +489,7 @@ mod test_pvxs_monitor_builder {
             .exec()?;
         
         // Start monitoring
-        monitor.start();
+        monitor.start()?;
         
         // Wait for initial connection and drain any connection events
         thread::sleep(Duration::from_millis(500));

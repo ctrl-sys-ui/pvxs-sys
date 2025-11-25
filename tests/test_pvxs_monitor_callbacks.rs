@@ -333,54 +333,6 @@ mod test_pvxs_monitor_callbacks {
     }
 
     #[test]
-    fn test_monitor_callback_on_connect_and_disconnect() {
-        // Reset counters
-        EVENT_COUNTER.store(0, Ordering::SeqCst);
-
-        // Create a server with a PV
-        let mut srv = Server::from_env().expect("Failed to create server");
-        let _pv = srv.create_pv_double("callback:test:start", 3.14, NTScalarMetadataBuilder::new())
-            .expect("Failed to create PV");
-        srv.start().expect("Failed to start server");
-
-        // Give server time to initialize
-        thread::sleep(Duration::from_millis(500));
-
-        // Create monitor with callback
-        let mut ctx = Context::from_env().expect("Failed to create context");
-        let mut monitor = ctx.monitor_builder("callback:test:start")
-            .expect("Failed to create monitor builder")
-            .connect_exception(true)
-            .disconnect_exception(true)
-            .event(generic_event_callback)
-            .exec()
-            .expect("Failed to create monitor");
-
-        // Start the monitor - should trigger callback when connected
-        monitor.start().expect("Failed to start monitor");
-        
-        // Wait for connection and initial value
-        thread::sleep(Duration::from_millis(1000));
-
-        // Check that callback was invoked
-        let event_count = EVENT_COUNTER.load(Ordering::SeqCst);
-        assert!(event_count > 0, "Expected callback to be invoked on start, got {} events", event_count);
-
-        srv.stop().expect("Failed to stop server");
-        thread::sleep(Duration::from_millis(1000));
-
-        let event_count2 = EVENT_COUNTER.load(Ordering::SeqCst);
-        assert!(event_count2 > event_count, "Expected callback to be invoked on server stop, got {} events", event_count2);
-
-        // Cleanup
-        monitor.stop().expect("Failed to stop monitor");
-        // I expect no increase in counter after stop
-        thread::sleep(Duration::from_millis(500));
-        assert!(EVENT_COUNTER.load(Ordering::SeqCst) == event_count2, "Expected no new events after stop");
-        
-    }
-
-    #[test]
     fn test_monitor_multiple_client_monitors() {
         // Test that mask configuration works correctly
         

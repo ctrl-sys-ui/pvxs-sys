@@ -24,7 +24,10 @@ default = ["async"]
 async = ["tokio", "futures"]
 
 [build-dependencies]
-cxx-build = "1.0.120"
+cxx-build = "1.0.189"
+
+[dev-dependencies]
+serial_test = "3.0"
 
 [lib]
 name = "epics_pvxs_sys"

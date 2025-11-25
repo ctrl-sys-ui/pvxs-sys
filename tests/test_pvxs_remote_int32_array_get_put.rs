@@ -42,7 +42,7 @@ fn test_pv_remote_int32_array_get_put() {
                 Err(e) => assert!(false, "Failed to get value from remote pv: {:?}", e),
             }
         },
-        Err(e) => {
+        Err(_) => {
             // Skip the test if arrays aren't supported
             srv.stop().expect("Failed to stop server");
             return;
