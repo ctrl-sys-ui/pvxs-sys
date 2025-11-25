@@ -145,6 +145,7 @@ mod test_pvxs_monitor_builder {
         
         // Create monitor using builder
         let mut monitor = ctx.monitor_builder("TEST:MonitorBuilder:Pop")?
+            .connect_exception(false) 
             .exec()?;
         
         // Start monitoring
