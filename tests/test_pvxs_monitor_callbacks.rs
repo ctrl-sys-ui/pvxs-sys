@@ -79,11 +79,11 @@ mod test_pvxs_monitor_callbacks {
 
         let mut ctx = Context::from_env().expect("Failed to create context");
 
-        // Test 1: connection_events(false) should cause Connected exception when popping
+        // Test 1: connection_events(false) should suppress Connected events (maskConnected(true))
         let mut monitor1 = ctx.monitor_builder("callback:test:stop")
             .expect("Failed to create monitor builder")
-            .connection_events(false)  // maskConnected(true) - throws exception
-            .disconnection_events(false)  // maskDisconnected(true) - throws exception
+            .connection_events(false)  // maskConnected(true) - suppresses connection events
+            .disconnection_events(false)  // maskDisconnected(true) - suppresses disconnection events
             .exec()
             .expect("Failed to create monitor1");
 
@@ -188,15 +188,16 @@ mod test_pvxs_monitor_callbacks {
         got_remote_error_exception = false;
         got_generic_exception = false;
 
-        // Test 3: disconnection_events(true) should queue disconnection events as data
+        // Test 3: disconnection_events(true) should throw disconnection events as exceptions (maskDisconnected(false))
         let mut monitor3 = ctx.monitor_builder("callback:test:stop")
             .expect("Failed to create monitor builder")
-            .connection_events(false)  // maskConnected(true) - throws exception
-            .disconnection_events(true)  // maskDisconnected(false) - events queued
+            .connection_events(false)  // maskConnected(true) - suppresses connection events
+            .disconnection_events(true)  // maskDisconnected(false) - throws disconnection events
             .exec()
             .expect("Failed to create monitor3");
 
         monitor3.start().expect("Failed to start monitor3");
+        thread::sleep(Duration::from_millis(500));  // Wait for connection
 
         let mut data_count3 = 0;
         for i in 0..20 {
@@ -226,15 +227,14 @@ mod test_pvxs_monitor_callbacks {
                 }
             }
             if i == 10 {
-                // Stop the server to trigger disconnection
-                monitor3.stop().expect("Failed to stop server to trigger disconnection");
+                // Stop the SERVER to trigger disconnection event
+                srv.stop().expect("Failed to stop server to trigger disconnection");
                 thread::sleep(Duration::from_millis(500));
             }
         }
 
         
-        // Cleanup
-        srv.stop().expect("Failed to stop server");
+        // Cleanup - server already stopped above
         thread::sleep(Duration::from_millis(500));
 
         // Print results
@@ -246,7 +246,7 @@ mod test_pvxs_monitor_callbacks {
         
         assert!(!got_connected_exception, "Did not expect a connection exception with connection_events(false)");
         assert!(!got_finished_exception, "Did not expect finished exception");
-        assert!(got_disconnected_exception, "Expected disconnection event to be queued as data with disconnection_events(true)");
+        assert!(got_disconnected_exception, "Expected disconnection exception to be thrown with disconnection_events(true)");
         assert!(!got_remote_error_exception, "Did not expect a remote error exception");
         assert!(!got_generic_exception, "Did not expect a generic client error exception");
         assert_eq!(data_count3, data_count1, "Expected no data as no disconnection occurred, but got {}", data_count3);

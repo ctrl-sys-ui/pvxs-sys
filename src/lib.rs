@@ -954,13 +954,13 @@ impl Monitor {
     /// 
     /// - `Ok(Some(Value))` if an update is available
     /// - `Ok(None)` if the queue is empty
-    /// - `Err(MonitorEvent::Connected)` if connection event (when connection_events(false))
-    /// - `Err(MonitorEvent::Disconnected)` if disconnection event (when disconnection_events(false))
-    /// - `Err(MonitorEvent::Finished)` if finished event (when disconnection_events(false))
+    /// - `Err(MonitorEvent::Connected)` if connection event (when connection_events(true), i.e. maskConnected(false))
+    /// - `Err(MonitorEvent::Disconnected)` if disconnection event (when disconnection_events(true), i.e. maskDisconnected(false))
+    /// - `Err(MonitorEvent::Finished)` if finished event (when disconnection_events(true), i.e. maskDisconnected(false))
     /// 
-    /// Note: The mask configuration controls whether events are queued or thrown:
-    /// - connection_events(true) -> maskConnected(false) -> events are queued as data
-    /// - connection_events(false) -> maskConnected(true) -> events thrown as MonitorEvent::Connected
+    /// Note: The mask configuration controls whether events are suppressed or thrown:
+    /// - connection_events(true) -> maskConnected(false) -> events are thrown as MonitorEvent::Connected
+    /// - connection_events(false) -> maskConnected(true) -> events are suppressed/masked out
     /// 
     /// # Example
     /// 
@@ -1097,7 +1097,8 @@ impl MonitorBuilder {
     /// # Ok::<(), epics_pvxs_sys::PvxsError>(())
     /// ```
     pub fn connection_events(mut self, enable: bool) -> Self {
-        // Invert the logic: enable=true means mask=false (don't mask out)
+        // PVXS maskConnected(false) = don't mask = throw events, maskConnected(true) = mask = suppress events
+        // So enable=true means mask=false (don't suppress), enable=false means mask=true (suppress)
         let _ = bridge::monitor_builder_mask_connected(self.inner.pin_mut(), !enable);
         self
     }
@@ -1121,7 +1122,8 @@ impl MonitorBuilder {
     /// # Ok::<(), epics_pvxs_sys::PvxsError>(())
     /// ```
     pub fn disconnection_events(mut self, enable: bool) -> Self {
-        // Invert the logic: enable=true means mask=false (don't mask out)
+        // PVXS maskDisconnected(false) = don't mask = throw events, maskDisconnected(true) = mask = suppress events
+        // So enable=true means mask=false (don't suppress), enable=false means mask=true (suppress)
         let _ = bridge::monitor_builder_mask_disconnected(self.inner.pin_mut(), !enable);
         self
     }
@@ -1133,7 +1135,7 @@ impl MonitorBuilder {
     /// 
     /// # Arguments
     /// 
-    /// * `mask` - true to mask out (exclude) connection events, false to include them
+    /// * `mask` - true to suppress/mask connection events, false to throw them as exceptions
     /// 
     /// # Example
     /// 
@@ -1141,7 +1143,7 @@ impl MonitorBuilder {
     /// # use epics_pvxs_sys::Context;
     /// # let mut ctx = Context::from_env().unwrap();
     /// let monitor = ctx.monitor_builder("MY:PV")
-    ///     .mask_connected(false) // false = don't mask = include events
+    ///     .mask_connected(false) // false = don't suppress = throw as exceptions
     ///     .exec()?;
     /// # Ok::<(), epics_pvxs_sys::PvxsError>(())
     /// ```
@@ -1157,7 +1159,7 @@ impl MonitorBuilder {
     /// 
     /// # Arguments
     /// 
-    /// * `mask` - true to mask out (exclude) disconnection events, false to include them
+    /// * `mask` - true to suppress/mask disconnection events, false to throw them as exceptions
     /// 
     /// # Example
     /// 

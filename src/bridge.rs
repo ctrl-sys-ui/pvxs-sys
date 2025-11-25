@@ -19,6 +19,8 @@ mod ffi {
         type MonitorConnected;
         type MonitorDisconnected;
         type MonitorFinished;
+        type MonitorRemoteError;
+        type MonitorClientError;
         
         // Metadata structs (defined in C++ with std::optional)
         type NTScalarAlarm;

@@ -68,8 +68,20 @@ namespace pvxs_wrapper {
                 throw PvxsError("No update available for '" + pv_name_ + "'");
             }
             return std::make_unique<ValueWrapper>(std::move(result));
+        } catch (const pvxs::client::Connected& e) {
+            // Connection event - propagate it
+            throw MonitorConnected(std::string("Monitor connected: ") + e.what());
+        } catch (const pvxs::client::Disconnect& e) {
+            // Disconnection event - propagate it
+            throw MonitorDisconnected(std::string("Monitor disconnected: ") + e.what());
+        } catch (const pvxs::client::Finished& e) {
+            // Finished event - propagate it
+            throw MonitorFinished(std::string("Monitor finished: ") + e.what());
+        } catch (const pvxs::client::RemoteError& e) {
+            // Error from server
+            throw MonitorRemoteError(std::string("Monitor remote error: ") + e.what());
         } catch (const std::exception& e) {
-            throw PvxsError(std::string("Error getting monitor update for '") + pv_name_ + "': " + e.what());
+            throw MonitorClientError(std::string("Monitor client error: ") + e.what());
         }
     }
 
@@ -86,8 +98,20 @@ namespace pvxs_wrapper {
             } else {
                 return nullptr;
             }
+        } catch (const pvxs::client::Connected& e) {
+            // Connection event - propagate it
+            throw MonitorConnected(std::string("Monitor connected: ") + e.what());
+        } catch (const pvxs::client::Disconnect& e) {
+            // Disconnection event - propagate it
+            throw MonitorDisconnected(std::string("Monitor disconnected: ") + e.what());
+        } catch (const pvxs::client::Finished& e) {
+            // Finished event - propagate it
+            throw MonitorFinished(std::string("Monitor finished: ") + e.what());
+        } catch (const pvxs::client::RemoteError& e) {
+            // Error from server
+            throw MonitorRemoteError(std::string("Monitor remote error: ") + e.what());
         } catch (const std::exception& e) {
-            throw PvxsError(std::string("Error trying to get monitor update for '") + pv_name_ + "': " + e.what());
+            throw MonitorClientError(std::string("Monitor client error: ") + e.what());
         }
     }
 
@@ -225,18 +249,18 @@ namespace pvxs_wrapper {
                     callback_ptr();
                 }).exec();
                 
-                // Create wrapper with the subscription, connect, and callback
+                // Create wrapper with the subscription, connect, callback, and mask settings
                 auto wrapper = std::make_unique<MonitorWrapper>(
-                    std::move(subscription), pv_name_, context_, rust_callback_);
+                    std::move(subscription), pv_name_, context_, rust_callback_, mask_connected_, mask_disconnected_);
                 wrapper->set_connect(std::move(connect));
                 return wrapper;
             } else {
                 // No callback, just exec directly
                 auto subscription = builder.exec();
                 
-                // Create wrapper with the subscription and connect
+                // Create wrapper with the subscription, connect, and mask settings
                 auto wrapper = std::make_unique<MonitorWrapper>(
-                    std::move(subscription), pv_name_, context_, nullptr);
+                    std::move(subscription), pv_name_, context_, nullptr, mask_connected_, mask_disconnected_);
                 wrapper->set_connect(std::move(connect));
                 return wrapper;
             }

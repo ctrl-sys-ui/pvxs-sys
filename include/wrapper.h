@@ -152,6 +152,8 @@ namespace pvxs_wrapper
         std::shared_ptr<pvxs::client::Connect> connect_;  // Track connection state
         std::string pv_name_;
         void (*rust_callback_)() = nullptr;  // Function pointer to Rust callback (no parameters)
+        bool mask_connected_ = true;  // Default masks (filter out connection events)
+        bool mask_disconnected_ = true;  // Default masks (filter out disconnection events)
 
     public:
         MonitorWrapper() = delete; // Must have context and PV name
@@ -161,6 +163,9 @@ namespace pvxs_wrapper
             : context_(ctx), monitor_(std::move(monitor)), pv_name_(pv_name) {}
         explicit MonitorWrapper(std::shared_ptr<pvxs::client::Subscription> &&monitor, const std::string &pv_name, pvxs::client::Context &ctx, void (*callback)())
             : context_(ctx), monitor_(std::move(monitor)), pv_name_(pv_name), rust_callback_(callback) {}
+        // Constructor with mask settings
+        explicit MonitorWrapper(std::shared_ptr<pvxs::client::Subscription> &&monitor, const std::string &pv_name, pvxs::client::Context &ctx, void (*callback)(), bool mask_connected, bool mask_disconnected)
+            : context_(ctx), monitor_(std::move(monitor)), pv_name_(pv_name), rust_callback_(callback), mask_connected_(mask_connected), mask_disconnected_(mask_disconnected) {}
 
         // Start monitoring
         void start();
@@ -201,8 +206,8 @@ namespace pvxs_wrapper
     private:
         pvxs::client::Context &context_;
         std::string pv_name_;
-        bool mask_connected_ = true;
-        bool mask_disconnected_ = false;
+        bool mask_connected_ = false;  // Default: false = don't suppress connection events (per PVXS default)
+        bool mask_disconnected_ = true; // Default: true = suppress disconnection events (per PVXS default)
         uint64_t callback_id_ = 0;
         void (*rust_callback_)() = nullptr;  // Function pointer to Rust callback (no parameters)
 

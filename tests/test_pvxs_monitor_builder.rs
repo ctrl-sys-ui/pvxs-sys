@@ -107,26 +107,18 @@ mod test_pvxs_monitor_builder {
         let mut ctx = Context::from_env()?;
         
         // Test with both masks enabled
-        let _monitor1 = ctx.monitor_builder("TEST:MonitorBuilder:Masks")?
+        let mut monitor1 = ctx.monitor_builder("TEST:MonitorBuilder:Masks")?
             .mask_connected(true)
             .mask_disconnected(true)
-            .event(callback)
             .exec()?;
+        
         // When both connected and disconnected masks are enabled, we should see connection events
-        match _monitor1 {
-            Ok(mut mon) => {
-                mon.start();
-                thread::sleep(Duration::from_millis(500));
-                
-                mon.stop();
-            },
-            Err(e) => {
-                assert!(false, "Monitor creation failed: {:?}", e);
-            }
-        }
+        monitor1.start()?;
+        thread::sleep(Duration::from_millis(500));
+        monitor1.stop()?;
 
         // Test with both masks disabled
-        let _monitor2 = ctx.monitor_builder("TEST:MonitorBuilder:Masks")?
+        let mut monitor2 = ctx.monitor_builder("TEST:MonitorBuilder:Masks")?
             .mask_connected(false)
             .mask_disconnected(false)
             .exec()?;
