@@ -13,43 +13,22 @@
 //! - **GET operations**: Read process variable values
 //! - **PUT operations**: Write process variable values  
 //! - **INFO operations**: Query PV type information
+//! - **MONITOR operations**: Subscribe to value changes with callbacks
+//! - **MonitorBuilder**: Advanced monitor configuration with PVXS-style API
+//! - **Array support**: Read/write arrays of double, int32, and string values
+//! - **Server support**: Create and manage PVAccess servers
 //! - Thread-safe client context
 //! 
-//! ## Example
-//! 
-//! ```no_run
-//! use epics_pvxs_sys::{Context, PvxsError};
-//! 
-//! fn main() -> Result<(), PvxsError> {
-//!     // Create a client context from environment variables
-//!     let ctx = Context::from_env()?;
-//!     
-//!     // Read a PV value (timeout after 5 seconds)
-//!     let value = ctx.get("my:pv:name", 5.0)?;
-//!     
-//!     // Access the value field as a double
-//!     let val = value.get_field_double("value")?;
-//!     println!("Value: {}", val);
-//!     
-//!     // Write a new value
-//!     ctx.put_double("my:pv:name", 42.0, 5.0)?;
-//!     
-//!     Ok(())
-//! }
-//! ```
-//! 
-//! ## Requirements
-//! 
-//! - EPICS Base (set `EPICS_BASE` environment variable)
-//! - PVXS library (set `PVXS_DIR` or built within EPICS)
-//! - `EPICS_HOST_ARCH` environment variable (auto-detected if not set)
 
 pub mod bridge;
 
 use cxx::UniquePtr;
 use std::fmt;
 
-pub use bridge::{ContextWrapper, ValueWrapper, RpcWrapper, MonitorWrapper, ServerWrapper, SharedPVWrapper, StaticSourceWrapper};
+pub use bridge::{ContextWrapper, ValueWrapper, RpcWrapper, MonitorWrapper, MonitorBuilderWrapper, ServerWrapper, SharedPVWrapper, StaticSourceWrapper};
+
+// Re-export for testing callbacks
+pub use std::sync::atomic::{AtomicUsize, Ordering};
 
 // Re-export for convenience
 pub type Result<T> = std::result::Result<T, PvxsError>;
@@ -81,6 +60,36 @@ impl From<cxx::Exception> for PvxsError {
         Self::new(e.what())
     }
 }
+
+/// Monitor event types that can be returned by pop()
+#[derive(Debug, Clone, PartialEq)]
+pub enum MonitorEvent {
+    /// Connection event (when maskConnected(true) is set)
+    Connected(String),
+    /// Disconnection event (when maskDisconnected(true) is set)
+    Disconnected(String),
+    /// Finished event (when maskDisconnected(true) is set).
+    /// Subscription has completed normally and no more events will ever be received.
+    Finished(String),
+    /// Remote error event from server
+    RemoteError(String),
+    /// Standard client side error. Catchs std::exception for client side failures.
+    ClientError(String),
+}
+
+impl fmt::Display for MonitorEvent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            MonitorEvent::Connected(msg) => write!(f, "Monitor connected: {}", msg),
+            MonitorEvent::Disconnected(msg) => write!(f, "Monitor disconnected: {}", msg),
+            MonitorEvent::Finished(msg) => write!(f, "Monitor finished: {}", msg),
+            MonitorEvent::RemoteError(msg) => write!(f, "Monitor remote error: {}", msg),
+            MonitorEvent::ClientError(msg) => write!(f, "Monitor client error: {}", msg),
+        }
+    }
+}
+
+impl std::error::Error for MonitorEvent {}
 
 /// A PVXS client context for performing PVAccess operations
 /// 
@@ -144,7 +153,7 @@ impl Context {
     /// println!("Value: {}", value);
     /// ```
     pub fn get(&mut self, pv_name: &str, timeout: f64) -> Result<Value> {
-        let inner = bridge::context_get_sync(self.inner.pin_mut(), pv_name, timeout)?;
+        let inner = bridge::context_get(self.inner.pin_mut(), pv_name, timeout)?;
         Ok(Value { inner })
     }
     
@@ -170,12 +179,186 @@ impl Context {
     /// ```no_run
     /// # use epics_pvxs_sys::Context;
     /// # let mut ctx = Context::from_env().unwrap();
-    /// ctx.put_double("my:pv:name", 42.0, 5.0).expect("PUT failed");
+    /// ctx.put_double("my:pv:double", 42.0, 5.0).expect("PUT failed");
     /// ```
     pub fn put_double(&mut self, pv_name: &str, value: f64, timeout: f64) -> Result<()> {
         bridge::context_put_double(self.inner.pin_mut(), pv_name, value, timeout)?;
         Ok(())
     }
+
+    /// Perform a synchronous PUT operation with an int32 value
+    /// 
+    /// Sets the "value" field of a process variable to an int32.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `pv_name` - The name of the process variable
+    /// * `value` - The value to write
+    /// * `timeout` - Maximum time to wait in seconds
+    /// # Errors
+    /// 
+    /// Returns an error if:
+    /// - The PV doesn't exist or is read-only
+    /// - The operation times out
+    /// - The value type doesn't match
+    /// # Example
+    /// 
+    /// ```no_run
+    /// # use epics_pvxs_sys::Context;
+    /// # let mut ctx = Context::from_env().unwrap();
+    /// ctx.put_int32("my:pv:int", 42, 5.0).expect("PUT failed");
+    /// ```
+    pub fn put_int32(&mut self, pv_name: &str, value: i32, timeout: f64) -> Result<()> {
+        bridge::context_put_int32(self.inner.pin_mut(), pv_name, value, timeout)?;
+        Ok(())
+    }
+
+    /// Perform a synchronous PUT operation with a string value
+    /// 
+    /// Sets the "value" field of a process variable to a string.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `pv_name` - The name of the process variable
+    /// * `value` - The value to write
+    /// * `timeout` - Maximum time to wait in seconds
+    /// 
+    /// # Errors
+    /// 
+    /// Returns an error if:
+    /// - The PV doesn't exist or is read-only
+    /// - The operation times out
+    /// - The value type doesn't match
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// # use epics_pvxs_sys::Context;
+    /// # let mut ctx = Context::from_env().unwrap();
+    /// ctx.put_string("my:pv:string", "Hello, EPICS!", 5.0).expect("PUT failed");
+    /// ```
+    pub fn put_string(&mut self, pv_name: &str, value: &str, timeout: f64) -> Result<()> {
+        bridge::context_put_string(self.inner.pin_mut(), pv_name, value.to_string(), timeout)?;
+        Ok(())
+    }
+
+    /// Perform a synchronous PUT operation with an enum value
+    /// 
+    /// Sets the "value" field of a process variable to an enum (i16).
+    /// 
+    /// # Arguments
+    /// 
+    /// * `pv_name` - The name of the process variable
+    /// * `value` - The enum value to write
+    /// * `timeout` - Maximum time to wait in seconds
+    /// 
+    /// # Errors
+    /// 
+    /// Returns an error if:
+    /// - The PV doesn't exist or is read-only
+    /// - The operation times out
+    /// - The value is not a valid enum choice
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// # use epics_pvxs_sys::Context;
+    /// # let mut ctx = Context::from_env().unwrap();
+    /// ctx.put_enum("my:pv:enum", 2, 5.0).expect("PUT failed");
+    /// ```
+    pub fn put_enum(&mut self, pv_name: &str, value: i16, timeout: f64) -> Result<()> {
+        bridge::context_put_enum(self.inner.pin_mut(), pv_name, value, timeout)?;
+        Ok(())
+    }
+
+    /// Perform a synchronous PUT operation with a double array
+    /// 
+    /// Sets the "value" field of a process variable to an array of doubles.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `pv_name` - The name of the process variable
+    /// * `value` - The array of values to write
+    /// * `timeout` - Maximum time to wait in seconds
+    /// 
+    /// # Errors
+    /// 
+    /// Returns an error if:
+    /// - The PV doesn't exist or is read-only
+    /// - The operation times out
+    /// - The value type doesn't match
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// # use epics_pvxs_sys::Context;
+    /// # let mut ctx = Context::from_env().unwrap();
+    /// ctx.put_double_array("my:pv:array", vec![1.0, 2.0, 3.0], 5.0).expect("PUT failed");
+    /// ```
+    pub fn put_double_array(&mut self, pv_name: &str, value: Vec<f64>, timeout: f64) -> Result<()> {
+        bridge::context_put_double_array(self.inner.pin_mut(), pv_name, value, timeout)?;
+        Ok(())
+    }
+
+    /// Perform a synchronous PUT operation with an int32 array
+    /// 
+    /// Sets the "value" field of a process variable to an array of int32s.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `pv_name` - The name of the process variable
+    /// * `value` - The array of values to write
+    /// * `timeout` - Maximum time to wait in seconds
+    /// 
+    /// # Errors
+    /// 
+    /// Returns an error if:
+    /// - The PV doesn't exist or is read-only
+    /// - The operation times out
+    /// - The value type doesn't match
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// # use epics_pvxs_sys::Context;
+    /// # let mut ctx = Context::from_env().unwrap();
+    /// ctx.put_int32_array("my:pv:array", vec![10, 20, 30], 5.0).expect("PUT failed");
+    /// ```
+    pub fn put_int32_array(&mut self, pv_name: &str, value: Vec<i32>, timeout: f64) -> Result<()> {
+        bridge::context_put_int32_array(self.inner.pin_mut(), pv_name, value, timeout)?;
+        Ok(())
+    }
+
+    /// Perform a synchronous PUT operation with a string array
+    /// 
+    /// Sets the "value" field of a process variable to an array of strings.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `pv_name` - The name of the process variable
+    /// * `value` - The array of string values to write
+    /// * `timeout` - Maximum time to wait in seconds
+    /// 
+    /// # Errors
+    /// 
+    /// Returns an error if:
+    /// - The PV doesn't exist or is read-only
+    /// - The operation times out
+    /// - The value type doesn't match
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// # use epics_pvxs_sys::Context;
+    /// # let mut ctx = Context::from_env().unwrap();
+    /// ctx.put_string_array("my:pv:array", vec!["one".to_string(), "two".to_string()], 5.0).expect("PUT failed");
+    /// ```
+    pub fn put_string_array(&mut self, pv_name: &str, value: Vec<String>, timeout: f64) -> Result<()> {
+        bridge::context_put_string_array(self.inner.pin_mut(), pv_name, value, timeout)?;
+        Ok(())
+    }
+
+
     
     /// Get type information about a process variable
     /// 
@@ -196,7 +379,7 @@ impl Context {
     /// println!("PV structure: {}", info);
     /// ```
     pub fn info(&mut self, pv_name: &str, timeout: f64) -> Result<Value> {
-        let inner = bridge::context_info_sync(self.inner.pin_mut(), pv_name, timeout)?;
+        let inner = bridge::context_info(self.inner.pin_mut(), pv_name, timeout)?;
         Ok(Value { inner })
     }
     
@@ -256,6 +439,37 @@ impl Context {
     pub fn monitor(&mut self, pv_name: &str) -> Result<Monitor> {
         let inner = bridge::context_monitor_create(self.inner.pin_mut(), pv_name.to_string())?;
         Ok(Monitor { inner })
+    }
+
+    /// Create a MonitorBuilder for advanced monitor configuration
+    /// 
+    /// Returns a builder that allows configuring event masks and callbacks before
+    /// creating the monitor subscription.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `pv_name` - Name of the process variable to monitor
+    /// 
+    /// # Returns
+    /// 
+    /// A `MonitorBuilder` instance for configuring the monitor.
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// use epics_pvxs_sys::Context;
+    /// 
+    /// let mut ctx = Context::from_env().expect("Context creation failed");
+    /// let monitor = ctx.monitor_builder("TEST:PV_Double")?
+    ///     .connect_exception(true)      // Throw connection exceptions
+    ///     .disconnect_exception(true)   // Throw disconnection exceptions
+    ///     .exec()
+    ///     .expect("Monitor creation failed");
+    /// # Ok::<(), epics_pvxs_sys::PvxsError>(())
+    /// ```
+    pub fn monitor_builder(&mut self, pv_name: &str) -> Result<MonitorBuilder> {
+        let inner = bridge::context_monitor_builder_create(self.inner.pin_mut(), pv_name.to_string())?;
+        Ok(MonitorBuilder { inner })
     }
 }
 
@@ -372,7 +586,7 @@ impl Context {
 /// 
 /// ```no_run
 /// # use epics_pvxs_sys::{Context, Value};
-/// # let ctx = Context::from_env().unwrap();
+/// # let mut ctx = Context::from_env().unwrap();
 /// let value: Value = ctx.get("my:pv:name", 5.0).unwrap();
 /// 
 /// // Access different field types
@@ -419,6 +633,107 @@ impl Value {
     /// converted to a string.
     pub fn get_field_string(&self, field_name: &str) -> Result<String> {
         Ok(bridge::value_get_field_string(&self.inner, field_name.to_string())?)
+    }
+
+    /// Get a field value as a enum
+    /// 
+    /// # Errors
+    /// 
+    /// Returns an error if the field doesn't exist or cannot be
+    /// converted to a enum.
+    pub fn get_field_enum(&self, field_name: &str) -> Result<i16> {
+        Ok(bridge::value_get_field_enum(&self.inner, field_name.to_string())?)
+    }
+
+    /// Get a field value as an array of doubles
+    /// 
+    /// Extracts a field containing an array of double-precision floating point values.
+    /// Commonly used for waveform data, measurement arrays, or multi-point setpoints.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `field_name` - The field path (e.g., "value", "waveform.data")
+    /// 
+    /// # Errors
+    /// 
+    /// Returns an error if the field doesn't exist or cannot be
+    /// converted to an array of doubles.
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// # use epics_pvxs_sys::Context;
+    /// # let mut ctx = Context::from_env().unwrap();
+    /// let value = ctx.get("waveform:double:pv", 5.0).unwrap();
+    /// let array = value.get_field_double_array("value").unwrap();
+    /// println!("Double array length: {}", array.len());
+    /// for (i, val) in array.iter().enumerate().take(5) {
+    ///     println!("  [{}] = {}", i, val);
+    /// }
+    /// ```
+    pub fn get_field_double_array(&self, field_name: &str) -> Result<Vec<f64>> {
+        Ok(bridge::value_get_field_double_array(&self.inner, field_name.to_string())?)
+    }
+
+    /// Get a field value as an array of int32
+    /// 
+    /// Extracts a field containing an array of 32-bit signed integers.
+    /// Often used for status arrays, configuration parameters, or indexed data.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `field_name` - The field path (e.g., "value", "status.codes")
+    /// 
+    /// # Errors
+    /// 
+    /// Returns an error if the field doesn't exist or cannot be
+    /// converted to an array of int32.
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// # use epics_pvxs_sys::Context;
+    /// # let mut ctx = Context::from_env().unwrap();
+    /// let value = ctx.get("array:int32:pv", 5.0).unwrap();
+    /// let array = value.get_field_int32_array("value").unwrap();
+    /// println!("Int32 array length: {}", array.len());
+    /// for (i, val) in array.iter().enumerate().take(5) {
+    ///     println!("  [{}] = {}", i, val);
+    /// }
+    /// ```
+    pub fn get_field_int32_array(&self, field_name: &str) -> Result<Vec<i32>> {
+        Ok(bridge::value_get_field_int32_array(&self.inner, field_name.to_string())?)
+    }
+
+    /// Get a field value as an array of strings
+    /// 
+    /// Extracts a field containing an array of string values.
+    /// Commonly used for enum choices, device names, status messages, or text lists.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `field_name` - The field path (e.g., "value.choices", "devices.names")
+    /// 
+    /// # Errors
+    /// 
+    /// Returns an error if the field doesn't exist or cannot be
+    /// converted to an array of strings.
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// # use epics_pvxs_sys::Context;
+    /// # let mut ctx = Context::from_env().unwrap();
+    /// // Get enum choices for an NTEnum PV
+    /// let value = ctx.get("enum:pv", 5.0).unwrap();
+    /// let choices = value.get_field_string_array("value.choices").unwrap();
+    /// println!("Available choices:");
+    /// for (i, choice) in choices.iter().enumerate() {
+    ///     println!("  [{}] = '{}'", i, choice);
+    /// }
+    /// ```
+    pub fn get_field_string_array(&self, field_name: &str) -> Result<Vec<String>> {
+        Ok(bridge::value_get_field_string_array(&self.inner, field_name.to_string())?)
     }
 }
 
@@ -500,8 +815,9 @@ impl Monitor {
     /// # let mut monitor = ctx.monitor("MY:PV").unwrap();
     /// monitor.start();
     /// ```
-    pub fn start(&mut self) {
-        bridge::monitor_start(self.inner.pin_mut());
+    pub fn start(&mut self) -> Result<()> {
+        bridge::monitor_start(self.inner.pin_mut())?;
+        Ok(())
     }
     
     /// Stop monitoring for value changes
@@ -515,10 +831,12 @@ impl Monitor {
     /// # let mut ctx = Context::from_env().unwrap();
     /// # let mut monitor = ctx.monitor("MY:PV").unwrap();
     /// # monitor.start();
-    /// monitor.stop();
+    /// monitor.stop()?;
+    /// # Ok::<(), epics_pvxs_sys::PvxsError>(())
     /// ```
-    pub fn stop(&mut self) {
-        bridge::monitor_stop(self.inner.pin_mut());
+    pub fn stop(&mut self) -> Result<()> {
+        bridge::monitor_stop(self.inner.pin_mut())?;
+        Ok(())
     }
     
     /// Check if the monitor is currently running
@@ -629,6 +947,75 @@ impl Monitor {
         }
     }
     
+    /// Pop the next update from the subscription queue (PVXS-style)
+    /// 
+    /// This follows the PVXS pattern where `pop()` returns a Value if available,
+    /// or returns Err with MonitorEvent for connection/disconnection events.
+    /// 
+    /// # Returns
+    /// 
+    /// - `Ok(Some(Value))` if an update is available
+    /// - `Ok(None)` if the queue is empty
+    /// - `Err(MonitorEvent::Connected)` if connection exception (when connect_exception(true), i.e. maskConnected(false))
+    /// - `Err(MonitorEvent::Disconnected)` if disconnection exception (when disconnect_exception(true), i.e. maskDisconnected(false))
+    /// - `Err(MonitorEvent::Finished)` if finished exception (when disconnect_exception(true), i.e. maskDisconnected(false))
+    /// 
+    /// Note: The mask configuration controls whether exceptions are suppressed or thrown:
+    /// - connect_exception(true) -> maskConnected(false) -> exceptions are thrown as MonitorEvent::Connected
+    /// - connect_exception(false) -> maskConnected(true) -> exceptions are suppressed/masked out
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// # use epics_pvxs_sys::{Context, MonitorEvent};
+    /// # let mut ctx = Context::from_env().unwrap();
+    /// # let mut monitor = ctx.monitor("MY:PV").unwrap();
+    /// # monitor.start();
+    /// loop {
+    ///     match monitor.pop() {
+    ///         Ok(Some(value)) => println!("Update: {}", value),
+    ///         Ok(None) => break, // Queue empty
+    ///         Err(e) if e.to_string().contains("connected") => {
+    ///             println!("Connection event");
+    ///             break;
+    ///         }
+    ///         Err(e) => {
+    ///             println!("Other error: {}", e);
+    ///             break;
+    ///         }
+    ///     }
+    /// }
+    /// ```
+    pub fn pop(&mut self) -> std::result::Result<Option<Value>, MonitorEvent> {
+        match bridge::monitor_pop(self.inner.pin_mut()) {
+            Ok(value_wrapper) => {
+                if value_wrapper.is_null() {
+                    Ok(None)
+                } else {
+                    Ok(Some(Value { inner: value_wrapper }))
+                }
+            },
+            Err(e) => {
+                let err_msg = e.what();
+                // Check if this is one of our monitor event exceptions
+                if err_msg.contains("Monitor connected:") {
+                    Err(MonitorEvent::Connected(err_msg.to_string()))
+                } else if err_msg.contains("Monitor disconnected:") {
+                    Err(MonitorEvent::Disconnected(err_msg.to_string()))
+                } else if err_msg.contains("Monitor finished:") {
+                    Err(MonitorEvent::Finished(err_msg.to_string()))
+                } else if err_msg.contains("Monitor remote error:") {
+                    Err(MonitorEvent::RemoteError(err_msg.to_string()))
+                } else if err_msg.contains("Monitor client error:") {
+                    Err(MonitorEvent::ClientError(err_msg.to_string()))
+                } else {
+                    // For other errors, panic or convert to a ClientError
+                    Err(MonitorEvent::ClientError(err_msg.to_string()))
+                }
+            },
+        }
+    }
+    
     /// Check if the monitor is connected to the PV
     /// 
     /// # Returns
@@ -668,6 +1055,158 @@ impl Monitor {
     /// ```
     pub fn name(&self) -> String {
         bridge::monitor_get_name(&self.inner)
+    }
+}
+
+/// MonitorBuilder provides a builder pattern for creating monitors with advanced configuration
+/// 
+/// This follows the PVXS MonitorBuilder pattern, allowing configuration of event masks
+/// and callbacks before creating the subscription.
+/// 
+/// # Example
+/// 
+/// ```no_run
+/// use epics_pvxs_sys::Context;
+/// 
+/// let mut ctx = Context::from_env()?;
+/// let monitor = ctx.monitor_builder("MY:PV")?
+///     .connect_exception(true)
+///     .disconnect_exception(true)
+///     .exec()?;
+/// # Ok::<(), epics_pvxs_sys::PvxsError>(())
+/// ```
+pub struct MonitorBuilder {
+    inner: UniquePtr<bridge::MonitorBuilderWrapper>,
+}
+
+impl MonitorBuilder {
+    /// Enable or disable connection exceptions in the monitor queue
+    /// 
+    /// This is the user-friendly API - think in terms of what you want to enable.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `enable` - true to throw connection exceptions, false to suppress them (default: false)
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// # use epics_pvxs_sys::Context;
+    /// # let mut ctx = Context::from_env().unwrap();
+    /// let monitor = ctx.monitor_builder("MY:PV")?
+    ///     .connect_exception(true) // Throw connection exceptions
+    ///     .exec()?;
+    /// # Ok::<(), epics_pvxs_sys::PvxsError>(())
+    /// ```
+    pub fn connect_exception(mut self, enable: bool) -> Self {
+        // PVXS maskConnected(false) = don't mask = throw events, maskConnected(true) = mask = suppress events
+        // So enable=true means mask=false (don't suppress), enable=false means mask=true (suppress)
+        let _ = bridge::monitor_builder_mask_connected(self.inner.pin_mut(), !enable);
+        self
+    }
+    
+    /// Enable or disable disconnection exceptions in the monitor queue
+    /// 
+    /// This is the user-friendly API - think in terms of what you want to enable.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `enable` - true to throw disconnection exceptions, false to suppress them (default: true)
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// # use epics_pvxs_sys::Context;
+    /// # let mut ctx = Context::from_env().unwrap();
+    /// let monitor = ctx.monitor_builder("MY:PV")?
+    ///     .disconnect_exception(true) // Throw disconnection exceptions
+    ///     .exec()?;
+    /// # Ok::<(), epics_pvxs_sys::PvxsError>(())
+    /// ```
+    pub fn disconnect_exception(mut self, enable: bool) -> Self {
+        // PVXS maskDisconnected(false) = don't mask = throw events, maskDisconnected(true) = mask = suppress events
+        // So enable=true means mask=false (don't suppress), enable=false means mask=true (suppress)
+        let _ = bridge::monitor_builder_mask_disconnected(self.inner.pin_mut(), !enable);
+        self
+    }
+    
+    /// Set an event callback function that will be invoked when the subscription queue becomes not-empty
+    /// 
+    /// This follows the PVXS pattern where the callback is invoked when events are available,
+    /// not for each individual event. The callback should then use `pop()` to retrieve events.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `callback` - Function to be called when events are available
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// # use epics_pvxs_sys::Context;
+    /// # let mut ctx = Context::from_env().unwrap();
+    /// 
+    /// extern "C" fn my_callback() {
+    ///     println!("Events available in subscription queue!");
+    /// }
+    /// 
+    /// let monitor = ctx.monitor_builder("MY:PV")?
+    ///     .event(my_callback)
+    ///     .exec()?;
+    /// # Ok::<(), epics_pvxs_sys::PvxsError>(())
+    /// ```
+    pub fn event(mut self, callback: extern "C" fn()) -> Self {
+        // Convert function pointer to usize for C++
+        let callback_ptr = callback as usize;
+        
+        // Set the callback in C++
+        let _ = bridge::monitor_builder_set_event_callback(self.inner.pin_mut(), callback_ptr);
+        self
+    }
+    
+    /// Execute and create the monitor subscription
+    /// 
+    /// Creates the actual monitor subscription with the configured settings.
+    /// 
+    /// # Returns
+    /// 
+    /// A `Monitor` instance ready for use.
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// # use epics_pvxs_sys::Context;
+    /// # let mut ctx = Context::from_env().unwrap();
+    /// let monitor = ctx.monitor_builder("MY:PV")?
+    ///     .connect_exception(true)
+    ///     .exec()?;
+    /// # Ok::<(), epics_pvxs_sys::PvxsError>(())
+    /// ```
+    pub fn exec(mut self) -> Result<Monitor> {
+        let inner = bridge::monitor_builder_exec(self.inner.pin_mut())?;
+        Ok(Monitor { inner })
+    }
+    
+    /// Execute with an event callback (for future implementation)
+    /// 
+    /// This is a placeholder for future callback support. Currently behaves
+    /// the same as `exec()`.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `callback_id` - Identifier for the callback (currently unused)
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// # use epics_pvxs_sys::Context;
+    /// # let mut ctx = Context::from_env().unwrap();
+    /// let monitor = ctx.monitor_builder("MY:PV")?
+    ///     .exec_with_callback(123)?;
+    /// # Ok::<(), epics_pvxs_sys::PvxsError>(())
+    /// ```
+    pub fn exec_with_callback(mut self, callback_id: u64) -> Result<Monitor> {
+        let inner = bridge::monitor_builder_exec_with_callback(self.inner.pin_mut(), callback_id)?;
+        Ok(Monitor { inner })
     }
 }
 
@@ -804,13 +1343,13 @@ impl Rpc {
 /// # Example
 /// 
 /// ```no_run
-/// use epics_pvxs_sys::Server;
+/// use epics_pvxs_sys::{Server, NTScalarMetadataBuilder};
 /// 
 /// let mut server = Server::from_env()?; // Create server from environment
 /// //let mut server = Server::create_isolated()?; // Create an isolated server
 /// 
-/// let mut pv = server.create_pv_double("test:pv", 42.0)?;
-/// server.add_pv("test:pv", &mut pv)?;
+/// // Create and add PV (returns SharedPV for local testing if needed)
+/// let _pv = server.create_pv_double("test:pv", 42.0, NTScalarMetadataBuilder::new())?;
 /// 
 /// server.start()?;
 /// println!("Server running on port {}", server.tcp_port());
@@ -880,25 +1419,16 @@ impl Server {
         Ok(())
     }
     
-    /// Add a PV to the server
+    /// Add a PV to the server (internal use only)
     /// 
     /// Makes a process variable available to clients under the given name.
+    /// This is now internal - use create_pv_* methods instead.
     /// 
     /// # Arguments
     /// 
     /// * `name` - The PV name that clients will use
     /// * `pv` - The SharedPV to add
-    /// 
-    /// # Example
-    /// 
-    /// ```no_run
-    /// # use epics_pvxs_sys::Server;
-    /// # let mut server = Server::create_isolated().unwrap();
-    /// let mut pv = server.create_pv_double("counter", 0.0)?;
-    /// server.add_pv("test:counter", &mut pv)?;
-    /// # Ok::<(), epics_pvxs_sys::PvxsError>(())
-    /// ```
-    pub fn add_pv(&mut self, name: &str, pv: &mut SharedPV) -> Result<()> {
+    pub(crate) fn add_pv(&mut self, name: &str, pv: &mut SharedPV) -> Result<()> {
         bridge::server_add_pv(self.inner.pin_mut(), name.to_string(), pv.inner.pin_mut())?;
         Ok(())
     }
@@ -943,55 +1473,155 @@ impl Server {
         bridge::server_get_udp_port(&self.inner)
     }
     
-    /// Create a new mailbox SharedPV with a double value
+    /// Create and add a new mailbox SharedPV with a double value and metadata
     /// 
     /// Mailbox PVs allow both reading and writing by clients.
+    /// The PV is automatically added to the server with the given name.
     /// 
     /// # Arguments
     /// 
-    /// * `_name` - Name for debugging/logging (not the PV name)
+    /// * `name` - The PV name that clients will use
     /// * `initial_value` - Initial value for the PV
-    pub fn create_pv_double(&self, _name: &str, initial_value: f64) -> Result<SharedPV> {
+    /// * `metadata` - Metadata for the scalar PV
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// # use epics_pvxs_sys::{Server, NTScalarMetadataBuilder};
+    /// # let mut server = Server::create_isolated().unwrap();
+    /// let pv = server.create_pv_double("test:double", 42.5, NTScalarMetadataBuilder::new())?;
+    /// # Ok::<(), epics_pvxs_sys::PvxsError>(())
+    /// ```
+    pub fn create_pv_double(&mut self, name: &str, initial_value: f64, metadata: NTScalarMetadataBuilder) -> Result<SharedPV> {
         let mut pv = SharedPV::create_mailbox()?;
-        pv.open_double(initial_value)?;
+        pv.open_double(initial_value, metadata)?;
+        self.add_pv(name, &mut pv)?;
         Ok(pv)
     }
-    
-    /// Create a new mailbox SharedPV with an int32 value
+
+    /// Create and add a new mailbox SharedPV with a double array value and metadata
+    /// 
+    /// Create should fail if array is empty.
+    /// The PV is automatically added to the server with the given name.
     /// 
     /// # Arguments
     /// 
-    /// * `_name` - Name for debugging/logging (not the PV name)  
-    /// * `initial_value` - Initial value for the PV
-    pub fn create_pv_int32(&self, _name: &str, initial_value: i32) -> Result<SharedPV> {
+    /// * `name` - The PV name that clients will use
+    /// * `initial_value` - Initial array value for the PV
+    /// * `metadata` - Metadata for the scalar array PV
+    pub fn create_pv_double_array(&mut self, name: &str, initial_value: Vec<f64>, metadata: NTScalarMetadataBuilder) -> Result<SharedPV> {
+        if initial_value.is_empty() {
+            return Err(PvxsError::new("Initial double array cannot be empty"));
+        }
         let mut pv = SharedPV::create_mailbox()?;
-        pv.open_int32(initial_value)?;
+        pv.open_double_array(initial_value, metadata)?;
+        self.add_pv(name, &mut pv)?;
         Ok(pv)
     }
     
-    /// Create a new mailbox SharedPV with a string value
+    /// Create and add a new mailbox SharedPV with an int32 value and metadata
+    /// 
+    /// The PV is automatically added to the server with the given name.
     /// 
     /// # Arguments
     /// 
-    /// * `_name` - Name for debugging/logging (not the PV name)
+    /// * `name` - The PV name that clients will use
     /// * `initial_value` - Initial value for the PV
-    pub fn create_pv_string(&self, _name: &str, initial_value: &str) -> Result<SharedPV> {
+    /// * `metadata` - Metadata for the scalar PV
+    pub fn create_pv_int32(&mut self, name: &str, initial_value: i32, metadata: NTScalarMetadataBuilder) -> Result<SharedPV> {
         let mut pv = SharedPV::create_mailbox()?;
-        pv.open_string(initial_value)?;
+        pv.open_int32(initial_value, metadata)?;
+        self.add_pv(name, &mut pv)?;
         Ok(pv)
     }
     
-    /// Create a new readonly SharedPV with a double value
+    /// Create and add a new mailbox SharedPV with an int32 array value and metadata
+    /// 
+    /// Create should fail if array is empty.
+    /// The PV is automatically added to the server with the given name.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `name` - The PV name that clients will use
+    /// * `initial_value` - Initial array value for the PV
+    /// * `metadata` - Metadata for the array PV
+    pub fn create_pv_int32_array(&mut self, name: &str, initial_value: Vec<i32>, metadata: NTScalarMetadataBuilder) -> Result<SharedPV> {
+        if initial_value.is_empty() {
+            return Err(PvxsError::new("Initial int32 array cannot be empty"));
+        }
+        let mut pv = SharedPV::create_mailbox()?;
+        pv.open_int32_array(initial_value, metadata)?;
+        self.add_pv(name, &mut pv)?;
+        Ok(pv)
+    }
+    
+    /// Create and add a new mailbox SharedPV with a string value and metadata
+    /// 
+    /// The PV is automatically added to the server with the given name.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `name` - The PV name that clients will use
+    /// * `initial_value` - Initial value for the PV
+    /// * `metadata` - Metadata for the string PV
+    pub fn create_pv_string(&mut self, name: &str, initial_value: &str, metadata: NTScalarMetadataBuilder) -> Result<SharedPV> {
+        let mut pv = SharedPV::create_mailbox()?;
+        pv.open_string(initial_value, metadata)?;
+        self.add_pv(name, &mut pv)?;
+        Ok(pv)
+    }
+    
+    /// Create and add a new mailbox SharedPV with a string array value and metadata
+    /// 
+    /// Create should fail if array is empty.
+    /// The PV is automatically added to the server with the given name.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `name` - The PV name that clients will use
+    /// * `initial_value` - Initial array value for the PV
+    /// * `metadata` - Metadata for the string array PV
+    pub fn create_pv_string_array(&mut self, name: &str, initial_value: Vec<String>, metadata: NTScalarMetadataBuilder) -> Result<SharedPV> {
+        if initial_value.is_empty() {
+            return Err(PvxsError::new("Initial string array cannot be empty"));
+        }
+        let mut pv = SharedPV::create_mailbox()?;
+        pv.open_string_array(initial_value, metadata)?;
+        self.add_pv(name, &mut pv)?;
+        Ok(pv)
+    }
+
+    /// Create and add a new mailbox SharedPV with an enum value and metadata
+    /// 
+    /// The PV is automatically added to the server with the given name.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `name` - The PV name that clients will use
+    /// * `choices` - List of string choices for the enum
+    /// * `selected_index` - Initial selected index (0-based)
+    /// * `metadata` - Metadata for the enum PV
+    pub fn create_pv_enum(&mut self, name: &str, choices: Vec<&str>, selected_index: i16, metadata: NTEnumMetadataBuilder) -> Result<SharedPV> {
+        let mut pv = SharedPV::create_mailbox()?;
+        pv.open_enum(choices, selected_index, metadata)?;
+        self.add_pv(name, &mut pv)?;
+        Ok(pv)
+    }
+    
+    /// Create and add a new readonly SharedPV with a double value and metadata
     /// 
     /// Readonly PVs only allow reading by clients.
+    /// The PV is automatically added to the server with the given name.
     /// 
     /// # Arguments
     /// 
-    /// * `_name` - Name for debugging/logging (not the PV name)
+    /// * `name` - The PV name that clients will use
     /// * `initial_value` - Initial value for the PV
-    pub fn create_readonly_pv_double(&self, _name: &str, initial_value: f64) -> Result<SharedPV> {
+    /// * `metadata` - Metadata for the scalar PV
+    pub fn create_readonly_pv_double(&mut self, name: &str, initial_value: f64, metadata: NTScalarMetadataBuilder) -> Result<SharedPV> {
         let mut pv = SharedPV::create_readonly()?;
-        pv.open_double(initial_value)?;
+        pv.open_double(initial_value, metadata)?;
+        self.add_pv(name, &mut pv)?;
         Ok(pv)
     }
 }
@@ -1003,11 +1633,11 @@ impl Server {
 /// 
 /// # Example
 /// 
-/// ```no_run
+/// ```ignore
 /// use epics_pvxs_sys::SharedPV;
 /// 
 /// let mut pv = SharedPV::create_mailbox()?;
-/// pv.open_double(42.5)?;
+/// // Note: open_double is internal API, use Server::create_pv_* methods instead
 /// 
 /// // Update the value
 /// pv.post_double(99.9)?;
@@ -1038,33 +1668,112 @@ impl SharedPV {
         Ok(Self { inner })
     }
     
-    /// Open the PV with a double value
+    /// Open the PV with a double value and metadata
     /// 
     /// # Arguments
     /// 
     /// * `initial_value` - The initial value for the PV
-    pub fn open_double(&mut self, initial_value: f64) -> Result<()> {
-        bridge::shared_pv_open_double(self.inner.pin_mut(), initial_value)?;
+    /// * `metadata` - Metadata builder for the scalar PV
+    /// 
+    /// # Example
+    /// 
+    /// ```ignore
+    /// # use epics_pvxs_sys::{SharedPV, NTScalarMetadataBuilder, DisplayMetadata};
+    /// // Note: open_double is internal API
+    /// // Use Server::create_pv_double instead for public API
+    /// let mut pv = SharedPV::create_mailbox()?;
+    /// 
+    /// let metadata = NTScalarMetadataBuilder::new()
+    ///     .alarm(0, 0, "OK")
+    ///     .display(DisplayMetadata {
+    ///         limit_low: 0,
+    ///         limit_high: 100,
+    ///         description: "Temperature".to_string(),
+    ///         units: "°C".to_string(),
+    ///         precision: 2,
+    ///     })
+    ///     .with_form(true);
+    /// 
+    /// pv.open_double(25.5, metadata)?;
+    /// # Ok::<(), epics_pvxs_sys::PvxsError>(())
+    /// ```
+    pub(crate) fn open_double(&mut self, initial_value: f64, metadata: NTScalarMetadataBuilder) -> Result<()> {
+        let meta = metadata.build()?;
+        bridge::shared_pv_open_double(self.inner.pin_mut(), initial_value, &meta)?;
+        Ok(())
+    }
+
+    /// Open the PV with a double array value and metadata
+    /// 
+    /// # Arguments
+    /// 
+    /// * `initial_value` - The initial array value for the PV
+    /// * `metadata` - Metadata builder for the scalar array PV
+    pub(crate) fn open_double_array(&mut self, initial_value: Vec<f64>, metadata: NTScalarMetadataBuilder) -> Result<()> {
+        let meta = metadata.build()?;
+        bridge::shared_pv_open_double_array(self.inner.pin_mut(), initial_value, &meta)?;
+        Ok(())
+    }
+
+    /// Open the PV with an enum value and metadata
+    /// 
+    /// # Arguments
+    /// 
+    /// * `choices` - List of string choices for the enum
+    /// * `selected_index` - Initial selected index (0-based)
+    /// * `metadata` - Metadata builder for the enum PV
+    pub(crate) fn open_enum(&mut self, choices: Vec<&str>, selected_index: i16, metadata: NTEnumMetadataBuilder) -> Result<()> {
+        let meta = metadata.build()?;
+        let choices_vec: Vec<String> = choices.iter().map(|s| s.to_string()).collect();
+        bridge::shared_pv_open_enum(self.inner.pin_mut(), choices_vec, selected_index, &meta)?;
         Ok(())
     }
     
-    /// Open the PV with an int32 value
+    /// Open the PV with an int32 value and metadata
     /// 
     /// # Arguments
     /// 
     /// * `initial_value` - The initial value for the PV
-    pub fn open_int32(&mut self, initial_value: i32) -> Result<()> {
-        bridge::shared_pv_open_int32(self.inner.pin_mut(), initial_value)?;
+    /// * `metadata` - Metadata builder for the int32 PV
+    pub(crate) fn open_int32(&mut self, initial_value: i32, metadata: NTScalarMetadataBuilder) -> Result<()> {
+        let meta = metadata.build()?;
+        bridge::shared_pv_open_int32(self.inner.pin_mut(), initial_value, &meta)?;
         Ok(())
     }
     
-    /// Open the PV with a string value
+    /// Open the PV with an int32 array value and metadata
+    /// 
+    /// # Arguments
+    /// 
+    /// * `initial_value` - The initial array value for the PV
+    /// * `metadata` - Metadata builder for the int32 array PV
+    pub(crate) fn open_int32_array(&mut self, initial_value: Vec<i32>, metadata: NTScalarMetadataBuilder) -> Result<()> {
+        let meta = metadata.build()?;
+        bridge::shared_pv_open_int32_array(self.inner.pin_mut(), initial_value, &meta)?;
+        Ok(())
+    }
+    
+    /// Open the PV with a string value and metadata
     /// 
     /// # Arguments
     /// 
     /// * `initial_value` - The initial value for the PV
-    pub fn open_string(&mut self, initial_value: &str) -> Result<()> {
-        bridge::shared_pv_open_string(self.inner.pin_mut(), initial_value.to_string())?;
+    /// * `metadata` - Metadata builder for the string PV
+    pub(crate) fn open_string(&mut self, initial_value: &str, metadata: NTScalarMetadataBuilder) -> Result<()> {
+        let meta = metadata.build()?;
+        bridge::shared_pv_open_string(self.inner.pin_mut(), initial_value.to_string(), &meta)?;
+        Ok(())
+    }
+    
+    /// Open the PV with a string array value and metadata
+    /// 
+    /// # Arguments
+    /// 
+    /// * `initial_value` - The initial array value for the PV
+    /// * `metadata` - Metadata builder for the string array PV
+    pub(crate) fn open_string_array(&mut self, initial_value: Vec<String>, metadata: NTScalarMetadataBuilder) -> Result<()> {
+        let meta = metadata.build()?;
+        bridge::shared_pv_open_string_array(self.inner.pin_mut(), initial_value, &meta)?;
         Ok(())
     }
     
@@ -1082,6 +1791,7 @@ impl SharedPV {
     /// Post a new double value to the PV
     /// 
     /// This updates the PV value and notifies connected clients.
+    /// If the PV is a double array, this will just replace the value at position 0.
     /// 
     /// # Arguments
     /// 
@@ -1092,6 +1802,9 @@ impl SharedPV {
     }
     
     /// Post a new int32 value to the PV
+    /// 
+    /// This updates the PV value and notifies connected clients.
+    /// If the PV is an int32 array, this will just replace the value at position 0.
     /// 
     /// # Arguments
     /// 
@@ -1111,44 +1824,60 @@ impl SharedPV {
         Ok(())
     }
     
-    /// Post a new double value to the PV with alarm information
+    /// Post a new enum value to the PV
     /// 
-    /// This updates the PV value and alarm fields, then notifies connected clients.
+    /// Updates the enum index (value.index field) and notifies connected clients.
     /// 
     /// # Arguments
     /// 
-    /// * `value` - The new value to post
-    /// * `severity` - Alarm severity (0=NO_ALARM, 1=MINOR, 2=MAJOR, 3=INVALID)
-    /// * `status` - Alarm status code (0=NO_ALARM, various status codes)
-    /// * `message` - Alarm message string
-    pub fn post_double_with_alarm(&mut self, value: f64, severity: i32, status: i32, message: &str) -> Result<()> {
-        bridge::shared_pv_post_double_with_alarm(self.inner.pin_mut(), value, severity, status, message.to_string())?;
+    /// * `value` - The enum index to post (should be valid for the choices array)
+    pub fn post_enum(&mut self, value: i16) -> Result<()> {
+        bridge::shared_pv_post_enum(self.inner.pin_mut(), value)?;
         Ok(())
     }
     
-    /// Post a new int32 value to the PV with alarm information
+    /// Post a new double array to the PV
+    /// 
+    /// Updates the array value and notifies connected clients.
     /// 
     /// # Arguments
     /// 
-    /// * `value` - The new value to post
-    /// * `severity` - Alarm severity (0=NO_ALARM, 1=MINOR, 2=MAJOR, 3=INVALID)
-    /// * `status` - Alarm status code (0=NO_ALARM, various status codes)
-    /// * `message` - Alarm message string
-    pub fn post_int32_with_alarm(&mut self, value: i32, severity: i32, status: i32, message: &str) -> Result<()> {
-        bridge::shared_pv_post_int32_with_alarm(self.inner.pin_mut(), value, severity, status, message.to_string())?;
+    /// * `value` - The new array to post
+    pub fn post_double_array(&mut self, value: &[f64]) -> Result<()> {
+        if value.is_empty() {
+            return Err(PvxsError::new("Cannot post empty double array"));
+        }
+        bridge::shared_pv_post_double_array(self.inner.pin_mut(), value.to_vec())?;
         Ok(())
     }
     
-    /// Post a new string value to the PV with alarm information
+    /// Post a new int32 array to the PV
+    /// 
+    /// Updates the array value and notifies connected clients.
     /// 
     /// # Arguments
     /// 
-    /// * `value` - The new value to post
-    /// * `severity` - Alarm severity (0=NO_ALARM, 1=MINOR, 2=MAJOR, 3=INVALID)
-    /// * `status` - Alarm status code (0=NO_ALARM, various status codes)
-    /// * `message` - Alarm message string
-    pub fn post_string_with_alarm(&mut self, value: &str, severity: i32, status: i32, message: &str) -> Result<()> {
-        bridge::shared_pv_post_string_with_alarm(self.inner.pin_mut(), value.to_string(), severity, status, message.to_string())?;
+    /// * `value` - The new array to post
+    pub fn post_int32_array(&mut self, value: &[i32]) -> Result<()> {
+        if value.is_empty() {
+            return Err(PvxsError::new("Cannot post empty int32 array"));
+        }
+        bridge::shared_pv_post_int32_array(self.inner.pin_mut(), value.to_vec())?;
+        Ok(())
+    }
+    
+    /// Post a new string array to the PV
+    /// 
+    /// Updates the array value and notifies connected clients.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `value` - The new array to post
+    pub fn post_string_array(&mut self, value: &[String]) -> Result<()> {
+        if value.is_empty() {
+            return Err(PvxsError::new("Cannot post empty string array"));
+        }
+        bridge::shared_pv_post_string_array(self.inner.pin_mut(), value.to_vec())?;
         Ok(())
     }
     
@@ -1168,13 +1897,15 @@ impl SharedPV {
 /// 
 /// # Example
 /// 
-/// ```no_run
+/// ```ignore
 /// use epics_pvxs_sys::{StaticSource, SharedPV};
 /// 
+/// // Note: This example uses internal APIs
+/// // Use Server::create_pv_* methods for public API
 /// let mut source = StaticSource::create()?;
 /// 
 /// let mut temp_pv = SharedPV::create_readonly()?;
-/// temp_pv.open_double(23.5)?;
+/// // temp_pv.open_double(23.5)?; // Internal API
 /// 
 /// source.add_pv("temperature", &mut temp_pv)?;
 /// 
@@ -1221,24 +1952,306 @@ impl StaticSource {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+// ============================================================================
+// NTScalar Metadata Support with C++ std::optional
+// ============================================================================
 
-    #[test]
-    fn test_context_creation() {
-        // This test requires EPICS environment to be set up
-        // In a real environment, this should succeed
-        let result = Context::from_env();
+/// Builder for creating NTScalar metadata with optional fields
+/// 
+/// This provides a clean, type-safe API for configuring PV metadata.
+/// The metadata is constructed using C++ builder functions that support std::optional.
+/// 
+/// ```text
+/// epics:nt/NTScalar:1.0
+/// double value
+/// alarm_t alarm
+///     int severity
+///     int status
+///     string message
+/// structure timeStamp
+///     long secondsPastEpoch
+///     int nanoseconds
+///     int userTag
+/// structure display
+///     double limitLow
+///     double limitHigh
+///     string description
+///     string units
+///     int precision
+///     enum_t form
+///         int index
+///         string[] choices
+/// control_t control
+///     double limitLow
+///     double limitHigh
+///     double minStep
+/// valueAlarm_t valueAlarm
+///     boolean active
+///     double lowAlarmLimit
+///     double lowWarningLimit
+///     double highWarningLimit
+///     double highAlarmLimit
+///     int lowAlarmSeverity
+///     int lowWarningSeverity
+///     int highWarningSeverity
+///     int highAlarmSeverity
+///     byte hysteresis
+/// ```
+pub struct NTScalarMetadataBuilder {
+    alarm_severity: i32,
+    alarm_status: i32,
+    alarm_message: String,
+    timestamp_seconds: i64,
+    timestamp_nanos: i32,
+    timestamp_user_tag: i32,
+    display: Option<DisplayMetadata>,
+    control: Option<ControlMetadata>,
+    value_alarm: Option<ValueAlarmMetadata>,
+    with_form: bool,
+}
+
+/// Display metadata for NTScalar
+#[derive(Clone, Debug, Default)]
+pub struct DisplayMetadata {
+    pub limit_low: i64,
+    pub limit_high: i64,
+    pub description: String,
+    pub units: String,
+    pub precision: i32,
+}
+
+/// Control metadata for NTScalar
+#[derive(Clone, Debug, Default)]
+pub struct ControlMetadata {
+    pub limit_low: f64,
+    pub limit_high: f64,
+    pub min_step: f64,
+}
+
+/// Value alarm metadata for NTScalar
+#[derive(Clone, Debug, Default)]
+pub struct ValueAlarmMetadata {
+    pub active: bool,
+    pub low_alarm_limit: f64,
+    pub low_warning_limit: f64,
+    pub high_warning_limit: f64,
+    pub high_alarm_limit: f64,
+    pub low_alarm_severity: i32,
+    pub low_warning_severity: i32,
+    pub high_warning_severity: i32,
+    pub high_alarm_severity: i32,
+    pub hysteresis: u8,
+}
+
+impl NTScalarMetadataBuilder {
+    /// Create a new metadata builder with default values
+    pub fn new() -> Self {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
         
-        // We can't assert success without a running EPICS environment
-        // but we can check that the function doesn't panic
-        match result {
-            Ok(_) => println!("Context created successfully"),
-            Err(e) => println!("Expected error without EPICS environment: {}", e),
+        Self {
+            alarm_severity: 0,
+            alarm_status: 0,
+            alarm_message: String::new(),
+            timestamp_seconds: now.as_secs() as i64,
+            timestamp_nanos: now.subsec_nanos() as i32,
+            timestamp_user_tag: 0,
+            display: None,
+            control: None,
+            value_alarm: None,
+            with_form: false,
         }
+    }
+    
+    /// Set alarm information
+    pub fn alarm(mut self, severity: i32, status: i32, message: impl Into<String>) -> Self {
+        self.alarm_severity = severity;
+        self.alarm_status = status;
+        self.alarm_message = message.into();
+        self
+    }
+    
+    /// Set timestamp (defaults to current time)
+    pub fn timestamp(mut self, seconds: i64, nanos: i32, user_tag: i32) -> Self {
+        self.timestamp_seconds = seconds;
+        self.timestamp_nanos = nanos;
+        self.timestamp_user_tag = user_tag;
+        self
+    }
+    
+    /// Add display metadata
+    pub fn display(mut self, meta: DisplayMetadata) -> Self {
+        self.display = Some(meta);
+        self
+    }
+    
+    /// Add control metadata
+    pub fn control(mut self, meta: ControlMetadata) -> Self {
+        self.control = Some(meta);
+        self
+    }
+    
+    /// Add value alarm metadata
+    pub fn value_alarm(mut self, meta: ValueAlarmMetadata) -> Self {
+        self.value_alarm = Some(meta);
+        self
+    }
+    
+    /// Enable form field (precision for numeric displays)
+    pub fn with_form(mut self, enable: bool) -> Self {
+        self.with_form = enable;
+        self
+    }
+    
+    /// Build the metadata using C++ builder functions with std::optional support
+    fn build(self) -> Result<cxx::UniquePtr<bridge::NTScalarMetadata>> {
+        // Create alarm and timestamp (always required)
+        let alarm = bridge::create_alarm(self.alarm_severity, self.alarm_status, self.alarm_message);
+        let time_stamp = bridge::create_time(self.timestamp_seconds, self.timestamp_nanos, self.timestamp_user_tag);
+        
+        // Build metadata based on which optional fields are present
+        let metadata = match (&self.display, &self.control, &self.value_alarm) {
+            (None, None, None) => {
+                bridge::create_metadata_no_optional(&alarm, &time_stamp, self.with_form)
+            }
+            (Some(d), None, None) => {
+                let display = bridge::create_display(d.limit_low, d.limit_high, d.description.clone(), d.units.clone(), d.precision);
+                bridge::create_metadata_with_display(&alarm, &time_stamp, &display, self.with_form)
+            }
+            (None, Some(c), None) => {
+                let control = bridge::create_control(c.limit_low, c.limit_high, c.min_step);
+                bridge::create_metadata_with_control(&alarm, &time_stamp, &control, self.with_form)
+            }
+            (None, None, Some(v)) => {
+                let value_alarm = bridge::create_value_alarm(
+                    v.active, v.low_alarm_limit, v.low_warning_limit,
+                    v.high_warning_limit, v.high_alarm_limit,
+                    v.low_alarm_severity, v.low_warning_severity,
+                    v.high_warning_severity, v.high_alarm_severity, v.hysteresis
+                );
+                bridge::create_metadata_with_value_alarm(&alarm, &time_stamp, &value_alarm, self.with_form)
+            }
+            (Some(d), Some(c), None) => {
+                let display = bridge::create_display(d.limit_low, d.limit_high, d.description.clone(), d.units.clone(), d.precision);
+                let control = bridge::create_control(c.limit_low, c.limit_high, c.min_step);
+                bridge::create_metadata_with_display_control(&alarm, &time_stamp, &display, &control, self.with_form)
+            }
+            (Some(d), None, Some(v)) => {
+                let display = bridge::create_display(d.limit_low, d.limit_high, d.description.clone(), d.units.clone(), d.precision);
+                let value_alarm = bridge::create_value_alarm(
+                    v.active, v.low_alarm_limit, v.low_warning_limit,
+                    v.high_warning_limit, v.high_alarm_limit,
+                    v.low_alarm_severity, v.low_warning_severity,
+                    v.high_warning_severity, v.high_alarm_severity, v.hysteresis
+                );
+                bridge::create_metadata_with_display_value_alarm(&alarm, &time_stamp, &display, &value_alarm, self.with_form)
+            }
+            (None, Some(c), Some(v)) => {
+                let control = bridge::create_control(c.limit_low, c.limit_high, c.min_step);
+                let value_alarm = bridge::create_value_alarm(
+                    v.active, v.low_alarm_limit, v.low_warning_limit,
+                    v.high_warning_limit, v.high_alarm_limit,
+                    v.low_alarm_severity, v.low_warning_severity,
+                    v.high_warning_severity, v.high_alarm_severity, v.hysteresis
+                );
+                bridge::create_metadata_with_control_value_alarm(&alarm, &time_stamp, &control, &value_alarm, self.with_form)
+            }
+            (Some(d), Some(c), Some(v)) => {
+                let display = bridge::create_display(d.limit_low, d.limit_high, d.description.clone(), d.units.clone(), d.precision);
+                let control = bridge::create_control(c.limit_low, c.limit_high, c.min_step);
+                let value_alarm = bridge::create_value_alarm(
+                    v.active, v.low_alarm_limit, v.low_warning_limit,
+                    v.high_warning_limit, v.high_alarm_limit,
+                    v.low_alarm_severity, v.low_warning_severity,
+                    v.high_warning_severity, v.high_alarm_severity, v.hysteresis
+                );
+                bridge::create_metadata_full(&alarm, &time_stamp, &display, &control, &value_alarm, self.with_form)
+            }
+        };
+        
+        Ok(metadata)
     }
 }
 
-#[cfg(test)]
-mod async_optional_test;  // Include the async optional test module
+impl Default for NTScalarMetadataBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ============================================================================
+// NTEnum Metadata support
+// ============================================================================
+/// Builder for creating NTEnum metadata
+/// 
+/// This provides a clean, type-safe API for configuring enum PV metadata.
+/// The metadata is constructed using C++ builder functions.
+/// 
+/// ```text
+/// epics:nt/NTEnum:1.0
+/// enum_t value
+///     int index
+///     string[] choices
+/// alarm_t alarm
+///     int severity
+///     int status
+///     string message
+/// structure timeStamp
+///     long secondsPastEpoch
+///     int nanoseconds
+///     int userTag
+/// ```
+pub struct NTEnumMetadataBuilder {
+    alarm_severity: i32,
+    alarm_status: i32,
+    alarm_message: String,
+    timestamp_seconds: i64,
+    timestamp_nanos: i32,
+    timestamp_user_tag: i32,
+}
+
+impl NTEnumMetadataBuilder {
+    /// Create a new metadata builder with default values
+    pub fn new() -> Self {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+        
+        Self {
+            alarm_severity: 0,
+            alarm_status: 0,
+            alarm_message: String::new(),
+            timestamp_seconds: now.as_secs() as i64,
+            timestamp_nanos: now.subsec_nanos() as i32,
+            timestamp_user_tag: 0,
+        }
+    }
+    
+    /// Set alarm information
+    pub fn alarm(mut self, severity: i32, status: i32, message: impl Into<String>) -> Self {
+        self.alarm_severity = severity;
+        self.alarm_status = status;
+        self.alarm_message = message.into();
+        self
+    }
+    
+    /// Set timestamp (defaults to current time)
+    pub fn timestamp(mut self, seconds: i64, nanos: i32, user_tag: i32) -> Self {
+        self.timestamp_seconds = seconds;
+        self.timestamp_nanos = nanos;
+        self.timestamp_user_tag = user_tag;
+        self
+    }
+
+    fn build(self) -> Result<cxx::UniquePtr<bridge::NTEnumMetadata>> {
+        let alarm = bridge::create_alarm(self.alarm_severity, self.alarm_status, self.alarm_message);
+        let time_stamp = bridge::create_time(self.timestamp_seconds, self.timestamp_nanos, self.timestamp_user_tag);
+        let metadata = bridge::create_enum_metadata(&alarm, &time_stamp);
+        Ok(metadata)
+    }
+}
+
+impl Default for NTEnumMetadataBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}

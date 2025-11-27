@@ -237,24 +237,365 @@ std::unique_ptr<SharedPVWrapper> shared_pv_create_readonly() {
     return SharedPVWrapper::create_readonly();
 }
 
-void shared_pv_open_double(SharedPVWrapper& pv, double initial_value) {
+// ============================================================================
+// Metadata Builder Functions
+// ============================================================================
+
+std::unique_ptr<NTScalarAlarm> create_alarm(int32_t severity, int32_t status, rust::String message) {
+    auto alarm = std::make_unique<NTScalarAlarm>();
+    alarm->severity = severity;
+    alarm->status = status;
+    alarm->message = std::move(message);
+    return alarm;
+}
+
+std::unique_ptr<NTScalarTime> create_time(int64_t seconds_past_epoch, int32_t nanoseconds, int32_t user_tag) {
+    auto time = std::make_unique<NTScalarTime>();
+    time->seconds_past_epoch = seconds_past_epoch;
+    time->nanoseconds = nanoseconds;
+    time->user_tag = user_tag;
+    return time;
+}
+
+std::unique_ptr<NTScalarDisplay> create_display(int64_t limit_low, int64_t limit_high, 
+                                                 rust::String description, rust::String units, int32_t precision) {
+    auto display = std::make_unique<NTScalarDisplay>();
+    display->limit_low = limit_low;
+    display->limit_high = limit_high;
+    display->description = std::move(description);
+    display->units = std::move(units);
+    display->precision = precision;
+    return display;
+}
+
+std::unique_ptr<NTScalarControl> create_control(double limit_low, double limit_high, double min_step) {
+    auto control = std::make_unique<NTScalarControl>();
+    control->limit_low = limit_low;
+    control->limit_high = limit_high;
+    control->min_step = min_step;
+    return control;
+}
+
+std::unique_ptr<NTScalarValueAlarm> create_value_alarm(bool active, double low_alarm_limit, double low_warning_limit, 
+                                                        double high_warning_limit, double high_alarm_limit,
+                                                        int32_t low_alarm_severity, int32_t low_warning_severity,
+                                                        int32_t high_warning_severity, int32_t high_alarm_severity, 
+                                                        uint8_t hysteresis) {
+    auto value_alarm = std::make_unique<NTScalarValueAlarm>();
+    value_alarm->active = active;
+    value_alarm->low_alarm_limit = low_alarm_limit;
+    value_alarm->low_warning_limit = low_warning_limit;
+    value_alarm->high_warning_limit = high_warning_limit;
+    value_alarm->high_alarm_limit = high_alarm_limit;
+    value_alarm->low_alarm_severity = low_alarm_severity;
+    value_alarm->low_warning_severity = low_warning_severity;
+    value_alarm->high_warning_severity = high_warning_severity;
+    value_alarm->high_alarm_severity = high_alarm_severity;
+    value_alarm->hysteresis = hysteresis;
+    return value_alarm;
+}
+
+std::unique_ptr<NTScalarMetadata> create_metadata(const NTScalarAlarm& alarm, const NTScalarTime& time_stamp,
+                                                   const NTScalarDisplay* display, const NTScalarControl* control,
+                                                   const NTScalarValueAlarm* value_alarm, bool has_form) {
+    auto metadata = std::make_unique<NTScalarMetadata>();
+    metadata->alarm = alarm;
+    metadata->time_stamp = time_stamp;
+    
+    if (display) {
+        metadata->display = *display;
+    }
+    
+    if (control) {
+        metadata->control = *control;
+    }
+    
+    if (value_alarm) {
+        metadata->value_alarm = *value_alarm;
+    }
+    
+    metadata->has_form = has_form;
+    return metadata;
+}
+
+// Helper functions for different combinations of optional fields
+std::unique_ptr<NTScalarMetadata> create_metadata_no_optional(const NTScalarAlarm& alarm, const NTScalarTime& time_stamp, bool has_form) {
+    auto metadata = std::make_unique<NTScalarMetadata>();
+    metadata->alarm = alarm;
+    metadata->time_stamp = time_stamp;
+    metadata->has_form = has_form;
+    return metadata;
+}
+
+std::unique_ptr<NTScalarMetadata> create_metadata_with_display(const NTScalarAlarm& alarm, const NTScalarTime& time_stamp, 
+                                                                const NTScalarDisplay& display, bool has_form) {
+    auto metadata = std::make_unique<NTScalarMetadata>();
+    metadata->alarm = alarm;
+    metadata->time_stamp = time_stamp;
+    metadata->display = display;
+    metadata->has_form = has_form;
+    return metadata;
+}
+
+std::unique_ptr<NTScalarMetadata> create_metadata_with_control(const NTScalarAlarm& alarm, const NTScalarTime& time_stamp, 
+                                                                const NTScalarControl& control, bool has_form) {
+    auto metadata = std::make_unique<NTScalarMetadata>();
+    metadata->alarm = alarm;
+    metadata->time_stamp = time_stamp;
+    metadata->control = control;
+    metadata->has_form = has_form;
+    return metadata;
+}
+
+std::unique_ptr<NTScalarMetadata> create_metadata_with_value_alarm(const NTScalarAlarm& alarm, const NTScalarTime& time_stamp, 
+                                                                    const NTScalarValueAlarm& value_alarm, bool has_form) {
+    auto metadata = std::make_unique<NTScalarMetadata>();
+    metadata->alarm = alarm;
+    metadata->time_stamp = time_stamp;
+    metadata->value_alarm = value_alarm;
+    metadata->has_form = has_form;
+    return metadata;
+}
+
+std::unique_ptr<NTScalarMetadata> create_metadata_with_display_control(const NTScalarAlarm& alarm, const NTScalarTime& time_stamp, 
+                                                                        const NTScalarDisplay& display, const NTScalarControl& control, bool has_form) {
+    auto metadata = std::make_unique<NTScalarMetadata>();
+    metadata->alarm = alarm;
+    metadata->time_stamp = time_stamp;
+    metadata->display = display;
+    metadata->control = control;
+    metadata->has_form = has_form;
+    return metadata;
+}
+
+std::unique_ptr<NTScalarMetadata> create_metadata_with_display_value_alarm(const NTScalarAlarm& alarm, const NTScalarTime& time_stamp, 
+                                                                            const NTScalarDisplay& display, const NTScalarValueAlarm& value_alarm, bool has_form) {
+    auto metadata = std::make_unique<NTScalarMetadata>();
+    metadata->alarm = alarm;
+    metadata->time_stamp = time_stamp;
+    metadata->display = display;
+    metadata->value_alarm = value_alarm;
+    metadata->has_form = has_form;
+    return metadata;
+}
+
+std::unique_ptr<NTScalarMetadata> create_metadata_with_control_value_alarm(const NTScalarAlarm& alarm, const NTScalarTime& time_stamp, 
+                                                                            const NTScalarControl& control, const NTScalarValueAlarm& value_alarm, bool has_form) {
+    auto metadata = std::make_unique<NTScalarMetadata>();
+    metadata->alarm = alarm;
+    metadata->time_stamp = time_stamp;
+    metadata->control = control;
+    metadata->value_alarm = value_alarm;
+    metadata->has_form = has_form;
+    return metadata;
+}
+
+std::unique_ptr<NTScalarMetadata> create_metadata_full(const NTScalarAlarm& alarm, const NTScalarTime& time_stamp, 
+                                                        const NTScalarDisplay& display, const NTScalarControl& control, 
+                                                        const NTScalarValueAlarm& value_alarm, bool has_form) {
+    auto metadata = std::make_unique<NTScalarMetadata>();
+    metadata->alarm = alarm;
+    metadata->time_stamp = time_stamp;
+    metadata->display = display;
+    metadata->control = control;
+    metadata->value_alarm = value_alarm;
+    metadata->has_form = has_form;
+    return metadata;
+}
+
+std::unique_ptr<NTEnumMetadata> create_enum_metadata(const NTScalarAlarm& alarm, const NTScalarTime& time_stamp) {
+    auto metadata = std::make_unique<NTEnumMetadata>();
+    metadata->alarm = alarm;
+    metadata->time_stamp = time_stamp;
+    return metadata;
+}
+
+// ============================================================================
+// SharedPV Operations
+// ============================================================================
+
+void shared_pv_open_double(SharedPVWrapper& pv, double initial_value, const NTScalarMetadata& metadata) {
     try {
-        // Create an NTScalar with double value
-        auto initial = pvxs::nt::NTScalar{pvxs::TypeCode::Float64}.create();
+        // Create NTScalar with flags from metadata
+        auto initial = pvxs::nt::NTScalar{
+            pvxs::TypeCode::Float64,
+            metadata.display.has_value(),
+            metadata.control.has_value(),
+            metadata.value_alarm.has_value(),
+            metadata.has_form
+        }.create();
+        
         initial["value"] = initial_value;
+        
+        // Always set alarm and timeStamp
+        initial["alarm.severity"] = metadata.alarm.severity;
+        initial["alarm.status"] = metadata.alarm.status;
+        initial["alarm.message"] = std::string(metadata.alarm.message);
+        
+        initial["timeStamp.secondsPastEpoch"] = metadata.time_stamp.seconds_past_epoch;
+        initial["timeStamp.nanoseconds"] = metadata.time_stamp.nanoseconds;
+        initial["timeStamp.userTag"] = metadata.time_stamp.user_tag;
+        
+        // Optional: display fields
+        if (metadata.display.has_value()) {
+            const auto& disp = metadata.display.value();
+            initial["display.limitLow"] = disp.limit_low;
+            initial["display.limitHigh"] = disp.limit_high;
+            initial["display.description"] = std::string(disp.description);
+            initial["display.units"] = std::string(disp.units);
+            if (metadata.has_form) {
+                initial["display.precision"] = disp.precision;
+            }
+        }
+        
+        // Optional: control fields
+        if (metadata.control.has_value()) {
+            const auto& ctrl = metadata.control.value();
+            initial["control.limitLow"] = ctrl.limit_low;
+            initial["control.limitHigh"] = ctrl.limit_high;
+            initial["control.minStep"] = ctrl.min_step;
+        }
+        
+        // Optional: valueAlarm fields
+        if (metadata.value_alarm.has_value()) {
+            const auto& valarm = metadata.value_alarm.value();
+            initial["valueAlarm.active"] = valarm.active;
+            initial["valueAlarm.lowAlarmLimit"] = valarm.low_alarm_limit;
+            initial["valueAlarm.lowWarningLimit"] = valarm.low_warning_limit;
+            initial["valueAlarm.highWarningLimit"] = valarm.high_warning_limit;
+            initial["valueAlarm.highAlarmLimit"] = valarm.high_alarm_limit;
+            initial["valueAlarm.lowAlarmSeverity"] = valarm.low_alarm_severity;
+            initial["valueAlarm.lowWarningSeverity"] = valarm.low_warning_severity;
+            initial["valueAlarm.highWarningSeverity"] = valarm.high_warning_severity;
+            initial["valueAlarm.highAlarmSeverity"] = valarm.high_alarm_severity;
+        }
         
         ValueWrapper wrapper(std::move(initial));
         pv.open(wrapper);
     } catch (const std::exception& e) {
-        throw PvxsError(std::string("Error opening SharedPV with double value: ") + e.what());
+        throw PvxsError(std::string("Error opening SharedPV with NTScalar metadata: ") + e.what());
     }
 }
 
-void shared_pv_open_int32(SharedPVWrapper& pv, int32_t initial_value) {
+void shared_pv_open_double_array(SharedPVWrapper& pv, rust::Vec<double> initial_value, const NTScalarMetadata& metadata) {
     try {
-        // Create an NTScalar with int32 value
-        auto initial = pvxs::nt::NTScalar{pvxs::TypeCode::Int32}.create();
+        // Create NTScalar with array value using flags from metadata
+        auto initial = pvxs::nt::NTScalar{
+            pvxs::TypeCode::Float64A,  // Float64A for arrays
+            metadata.display.has_value(),
+            metadata.control.has_value(),
+            metadata.value_alarm.has_value(),
+            metadata.has_form
+        }.create();
+        
+        // Convert rust::Vec to pvxs::shared_array
+        pvxs::shared_array<double> arr(initial_value.size());
+        for (size_t i = 0; i < initial_value.size(); ++i) {
+            arr[i] = initial_value[i];
+        }
+        initial["value"] = arr.freeze();
+        
+        // Always set alarm and timeStamp
+        initial["alarm.severity"] = metadata.alarm.severity;
+        initial["alarm.status"] = metadata.alarm.status;
+        initial["alarm.message"] = std::string(metadata.alarm.message);
+        
+        initial["timeStamp.secondsPastEpoch"] = metadata.time_stamp.seconds_past_epoch;
+        initial["timeStamp.nanoseconds"] = metadata.time_stamp.nanoseconds;
+        initial["timeStamp.userTag"] = metadata.time_stamp.user_tag;
+        
+        // Optional: display fields
+        if (metadata.display.has_value()) {
+            const auto& disp = metadata.display.value();
+            initial["display.limitLow"] = disp.limit_low;
+            initial["display.limitHigh"] = disp.limit_high;
+            initial["display.description"] = std::string(disp.description);
+            initial["display.units"] = std::string(disp.units);
+            if (metadata.has_form) {
+                initial["display.precision"] = disp.precision;
+            }
+        }
+        
+        // Optional: control fields
+        if (metadata.control.has_value()) {
+            const auto& ctrl = metadata.control.value();
+            initial["control.limitLow"] = ctrl.limit_low;
+            initial["control.limitHigh"] = ctrl.limit_high;
+            initial["control.minStep"] = ctrl.min_step;
+        }
+        
+        // Optional: valueAlarm fields
+        if (metadata.value_alarm.has_value()) {
+            const auto& valarm = metadata.value_alarm.value();
+            initial["valueAlarm.active"] = valarm.active;
+            initial["valueAlarm.lowAlarmLimit"] = valarm.low_alarm_limit;
+            initial["valueAlarm.lowWarningLimit"] = valarm.low_warning_limit;
+            initial["valueAlarm.highWarningLimit"] = valarm.high_warning_limit;
+            initial["valueAlarm.highAlarmLimit"] = valarm.high_alarm_limit;
+            initial["valueAlarm.lowAlarmSeverity"] = valarm.low_alarm_severity;;
+            initial["valueAlarm.lowWarningSeverity"] = valarm.low_warning_severity;
+            initial["valueAlarm.highWarningSeverity"] = valarm.high_warning_severity;
+            initial["valueAlarm.highAlarmSeverity"] = valarm.high_alarm_severity;
+        }
+
+        ValueWrapper wrapper(std::move(initial));
+        pv.open(wrapper);
+    } catch (const std::exception& e) {
+        throw PvxsError(std::string("Error opening SharedPV with double array metadata: ") + e.what());
+    }
+}
+
+void shared_pv_open_int32(SharedPVWrapper& pv, int32_t initial_value, const NTScalarMetadata& metadata) {
+    try {
+        // Create an NTScalar with int32 value using flags from metadata
+        auto initial = pvxs::nt::NTScalar{
+            pvxs::TypeCode::Int32,
+            metadata.display.has_value(),
+            metadata.control.has_value(),
+            metadata.value_alarm.has_value(),
+            metadata.has_form
+        }.create();
+
         initial["value"] = initial_value;
+
+        // Always set alarm and timeStamp
+        initial["alarm.severity"] = metadata.alarm.severity;
+        initial["alarm.status"] = metadata.alarm.status;
+        initial["alarm.message"] = std::string(metadata.alarm.message);
+        initial["timeStamp.secondsPastEpoch"] = metadata.time_stamp.seconds_past_epoch;
+        initial["timeStamp.nanoseconds"] = metadata.time_stamp.nanoseconds;
+        initial["timeStamp.userTag"] = metadata.time_stamp.user_tag;
+        // Optional: display fields
+        if (metadata.display.has_value()) {
+            const auto& disp = metadata.display.value();
+            initial["display.limitLow"] = disp.limit_low;
+            initial["display.limitHigh"] = disp.limit_high;
+            initial["display.description"] = std::string(disp.description);
+            initial["display.units"] = std::string(disp.units);
+            if (metadata.has_form) {
+                initial["display.precision"] = disp.precision;
+            }
+        }
+        // Optional: control fields
+        if (metadata.control.has_value()) {
+            const auto& ctrl = metadata.control.value();
+            initial["control.limitLow"] = ctrl.limit_low;
+            initial["control.limitHigh"] = ctrl.limit_high;
+            initial["control.minStep"] = ctrl.min_step;
+        }
+        // Optional: valueAlarm fields
+        if (metadata.value_alarm.has_value()) {
+            const auto& valarm = metadata.value_alarm.value();
+            initial["valueAlarm.active"] = valarm.active;
+            initial["valueAlarm.lowAlarmLimit"] = valarm.low_alarm_limit;
+            initial["valueAlarm.lowWarningLimit"] = valarm.low_warning_limit;
+            initial["valueAlarm.highWarningLimit"] = valarm.high_warning_limit;
+            initial["valueAlarm.highAlarmLimit"] = valarm.high_alarm_limit;
+            initial["valueAlarm.lowAlarmSeverity"] = valarm.low_alarm_severity;
+            initial["valueAlarm.lowWarningSeverity"] = valarm.low_warning_severity;
+            initial["valueAlarm.highWarningSeverity"] = valarm.high_warning_severity;
+            initial["valueAlarm.highAlarmSeverity"] = valarm.high_alarm_severity;
+        }
         
         ValueWrapper wrapper(std::move(initial));
         pv.open(wrapper);
@@ -263,16 +604,202 @@ void shared_pv_open_int32(SharedPVWrapper& pv, int32_t initial_value) {
     }
 }
 
-void shared_pv_open_string(SharedPVWrapper& pv, rust::String initial_value) {
+void shared_pv_open_int32_array(SharedPVWrapper& pv, rust::Vec<int32_t> initial_value, const NTScalarMetadata& metadata) {
     try {
-        // Create an NTScalar with string value
-        auto initial = pvxs::nt::NTScalar{pvxs::TypeCode::String}.create();
+        // Create NTScalar with array value using flags from metadata
+        auto initial = pvxs::nt::NTScalar{
+            pvxs::TypeCode::Int32A,  // Int32A for arrays
+            metadata.display.has_value(),
+            metadata.control.has_value(),
+            metadata.value_alarm.has_value(),
+            metadata.has_form
+        }.create();
+        
+        // Convert rust::Vec to pvxs::shared_array
+        pvxs::shared_array<int32_t> arr(initial_value.size());
+        for (size_t i = 0; i < initial_value.size(); ++i) {
+            arr[i] = initial_value[i];
+        }
+        initial["value"] = arr.freeze();
+        
+        // Always set alarm and timeStamp
+        initial["alarm.severity"] = metadata.alarm.severity;
+        initial["alarm.status"] = metadata.alarm.status;
+        initial["alarm.message"] = std::string(metadata.alarm.message);
+        
+        initial["timeStamp.secondsPastEpoch"] = metadata.time_stamp.seconds_past_epoch;
+        initial["timeStamp.nanoseconds"] = metadata.time_stamp.nanoseconds;
+        initial["timeStamp.userTag"] = metadata.time_stamp.user_tag;
+        
+        // Optional: display fields
+        if (metadata.display.has_value()) {
+            const auto& disp = metadata.display.value();
+            initial["display.limitLow"] = disp.limit_low;
+            initial["display.limitHigh"] = disp.limit_high;
+            initial["display.description"] = std::string(disp.description);
+            initial["display.units"] = std::string(disp.units);
+            if (metadata.has_form) {
+                initial["display.precision"] = disp.precision;
+            }
+        }
+        
+        // Optional: control fields
+        if (metadata.control.has_value()) {
+            const auto& ctrl = metadata.control.value();
+            initial["control.limitLow"] = ctrl.limit_low;
+            initial["control.limitHigh"] = ctrl.limit_high;
+            initial["control.minStep"] = ctrl.min_step;
+        }
+        
+        // Optional: valueAlarm fields
+        if (metadata.value_alarm.has_value()) {
+            const auto& valarm = metadata.value_alarm.value();
+            initial["valueAlarm.active"] = valarm.active;
+            initial["valueAlarm.lowAlarmLimit"] = valarm.low_alarm_limit;
+            initial["valueAlarm.lowWarningLimit"] = valarm.low_warning_limit;
+            initial["valueAlarm.highWarningLimit"] = valarm.high_warning_limit;
+            initial["valueAlarm.highAlarmLimit"] = valarm.high_alarm_limit;
+            initial["valueAlarm.lowAlarmSeverity"] = valarm.low_alarm_severity;;
+            initial["valueAlarm.lowWarningSeverity"] = valarm.low_warning_severity;
+            initial["valueAlarm.highWarningSeverity"] = valarm.high_warning_severity;
+            initial["valueAlarm.highAlarmSeverity"] = valarm.high_alarm_severity;
+        }
+
+        ValueWrapper wrapper(std::move(initial));
+        pv.open(wrapper);
+    } catch (const std::exception& e) {
+        throw PvxsError(std::string("Error opening SharedPV with int32 array metadata: ") + e.what());
+    }
+}
+
+void shared_pv_open_string(SharedPVWrapper& pv, rust::String initial_value, const NTScalarMetadata& metadata) {
+    try {
+        // Create NTScalar with string value using flags from metadata
+        auto initial = pvxs::nt::NTScalar{
+            pvxs::TypeCode::String,
+            metadata.display.has_value(),
+            metadata.control.has_value(),
+            metadata.value_alarm.has_value(),
+            metadata.has_form
+        }.create();
+        
         initial["value"] = std::string(initial_value);
+        
+        // Always set alarm and timeStamp
+        initial["alarm.severity"] = metadata.alarm.severity;
+        initial["alarm.status"] = metadata.alarm.status;
+        initial["alarm.message"] = std::string(metadata.alarm.message);
+        
+        initial["timeStamp.secondsPastEpoch"] = metadata.time_stamp.seconds_past_epoch;
+        initial["timeStamp.nanoseconds"] = metadata.time_stamp.nanoseconds;
+        initial["timeStamp.userTag"] = metadata.time_stamp.user_tag;
+        
+        // Optional: display fields (for strings, only description and units make sense)
+        if (metadata.display.has_value()) {
+            const auto& disp = metadata.display.value();
+            initial["display.description"] = std::string(disp.description);
+            initial["display.units"] = std::string(disp.units);
+        }
         
         ValueWrapper wrapper(std::move(initial));
         pv.open(wrapper);
     } catch (const std::exception& e) {
-        throw PvxsError(std::string("Error opening SharedPV with string value: ") + e.what());
+        throw PvxsError(std::string("Error opening SharedPV with string value and metadata: ") + e.what());
+    }
+}
+
+void shared_pv_open_string_array(SharedPVWrapper& pv, rust::Vec<rust::String> initial_value, const NTScalarMetadata& metadata) {
+    try {
+        // Create NTScalar with string array value using flags from metadata
+        auto initial = pvxs::nt::NTScalar{
+            pvxs::TypeCode::StringA,  // StringA for arrays
+            metadata.display.has_value(),
+            metadata.control.has_value(),
+            metadata.value_alarm.has_value(),
+            metadata.has_form
+        }.create();
+        
+        // Convert rust::Vec to pvxs::shared_array
+        pvxs::shared_array<std::string> arr(initial_value.size());
+        for (size_t i = 0; i < initial_value.size(); ++i) {
+            arr[i] = std::string(initial_value[i]);
+        }
+        initial["value"] = arr.freeze();
+        
+        // Always set alarm and timeStamp
+        initial["alarm.severity"] = metadata.alarm.severity;
+        initial["alarm.status"] = metadata.alarm.status;
+        initial["alarm.message"] = std::string(metadata.alarm.message);
+        
+        initial["timeStamp.secondsPastEpoch"] = metadata.time_stamp.seconds_past_epoch;
+        initial["timeStamp.nanoseconds"] = metadata.time_stamp.nanoseconds;
+        initial["timeStamp.userTag"] = metadata.time_stamp.user_tag;
+        
+        // Optional: display fields (for strings, only description and units make sense)
+        if (metadata.display.has_value()) {
+            const auto& disp = metadata.display.value();
+            initial["display.description"] = std::string(disp.description);
+            initial["display.units"] = std::string(disp.units);
+        }
+        
+        ValueWrapper wrapper(std::move(initial));
+        pv.open(wrapper);
+    } catch (const std::exception& e) {
+        throw PvxsError(std::string("Error opening SharedPV with string array metadata: ") + e.what());
+    }
+}
+
+void shared_pv_open_enum(SharedPVWrapper& pv, rust::Vec<rust::String> enum_choices, int16_t selected_choice, const NTEnumMetadata& metadata) {
+    try {
+        auto enums = pvxs::nt::NTEnum{}.create();
+
+        // Set the selected index
+        enums["value.index"] = selected_choice;
+
+        // Build a shared_array for the choices
+        pvxs::shared_array<const std::string> choices_array;
+        {
+            // Create a temporary vector and convert to shared_array
+            std::vector<std::string> temp_vec;
+            temp_vec.reserve(enum_choices.size());
+            for (const auto& choice : enum_choices) {
+                temp_vec.emplace_back(std::string(choice));
+            }
+            choices_array = pvxs::shared_array<const std::string>(temp_vec.begin(), temp_vec.end());
+        }
+        
+        // Try to assign the shared_array
+        enums["value.choices"].from(choices_array);
+
+        // Add an onPut handler to validate enum indices
+        auto onPut = [choices_array](pvxs::server::SharedPV& spv, std::unique_ptr<pvxs::server::ExecOp>&& op, pvxs::Value&& value) {
+            try {
+                // Check if value.index is being set
+                auto new_index = value["value.index"].as<int16_t>();
+                
+                // Validate the index
+                if (new_index < 0) {
+                    op->error("Enum index cannot be negative");
+                    return;
+                }
+                if (static_cast<size_t>(new_index) >= choices_array.size()) {
+                    op->error("Enum index " + std::to_string(new_index) + " is out of range (max: " + std::to_string(choices_array.size() - 1) + ")");
+                    return;
+                }
+                
+                // If validation passes, apply the update
+                spv.post(std::move(value));
+                op->reply();
+            } catch (const std::exception& e) {
+                op->error(std::string("Error validating enum PUT: ") + e.what());
+            }
+        };
+
+        ValueWrapper wrapper(std::move(enums));
+        pv.open(wrapper);
+        pv.get().onPut(onPut);
+    } catch (const std::exception& e) {
+        throw PvxsError(std::string("Error opening SharedPV with enum value: ") + e.what());
     }
 }
 
@@ -323,51 +850,74 @@ void shared_pv_post_string(SharedPVWrapper& pv, rust::String value) {
     }
 }
 
-void shared_pv_post_double_with_alarm(SharedPVWrapper& pv, double value, int32_t severity, int32_t status, rust::String message) {
+void shared_pv_post_enum(SharedPVWrapper& pv, int16_t value) {
     try {
-        // Use cloneEmpty() to get correct structure, then set the value and alarm fields
-        auto update = pv.get_template().cloneEmpty();
-        update["value"] = value;
-        update["alarm.severity"] = severity;
-        update["alarm.status"] = status;
-        update["alarm.message"] = std::string(message);
+        // Get the current template to validate against choices
+        auto current = pv.get_template();
+        
+        // Validate the enum index is within valid range
+        if (value < 0) {
+            throw PvxsError("Enum index cannot be negative");
+        }
+        
+        // Get the choices array to validate the index
+        auto choices = current["value.choices"].as<pvxs::shared_array<const std::string>>();
+        if (static_cast<size_t>(value) >= choices.size()) {
+            throw PvxsError("Enum index " + std::to_string(value) + " is out of range (max: " + std::to_string(choices.size() - 1) + ")");
+        }
+        
+        // Use cloneEmpty() to get correct structure, then set the enum index
+        auto update = current.cloneEmpty();
+        update["value.index"] = value;
         
         ValueWrapper wrapper(std::move(update));
         pv.post_value(wrapper);
     } catch (const std::exception& e) {
-        throw PvxsError(std::string("Error posting double value with alarm to SharedPV: ") + e.what());
+        throw PvxsError(std::string("Error posting enum value to SharedPV: ") + e.what());
     }
 }
 
-void shared_pv_post_int32_with_alarm(SharedPVWrapper& pv, int32_t value, int32_t severity, int32_t status, rust::String message) {
+void shared_pv_post_double_array(SharedPVWrapper& pv, rust::Vec<double> value) {
     try {
-        // Use cloneEmpty() to get correct structure, then set the value and alarm fields
         auto update = pv.get_template().cloneEmpty();
-        update["value"] = value;
-        update["alarm.severity"] = severity;
-        update["alarm.status"] = status;
-        update["alarm.message"] = std::string(message);
+        pvxs::shared_array<const double> arr(value.begin(), value.end());
+        update["value"] = arr;
         
         ValueWrapper wrapper(std::move(update));
         pv.post_value(wrapper);
     } catch (const std::exception& e) {
-        throw PvxsError(std::string("Error posting int32 value with alarm to SharedPV: ") + e.what());
+        throw PvxsError(std::string("Error posting double array to SharedPV: ") + e.what());
     }
 }
 
-void shared_pv_post_string_with_alarm(SharedPVWrapper& pv, rust::String value, int32_t severity, int32_t status, rust::String message) {
+void shared_pv_post_int32_array(SharedPVWrapper& pv, rust::Vec<int32_t> value) {
     try {
-        // Use cloneEmpty() to get correct structure, then set the value and alarm fields
         auto update = pv.get_template().cloneEmpty();
-        update["value"] = std::string(value);
-        update["alarm.severity"] = severity;
-        update["alarm.status"] = status;
-        update["alarm.message"] = std::string(message);
+        pvxs::shared_array<const int32_t> arr(value.begin(), value.end());
+        update["value"] = arr;
         
         ValueWrapper wrapper(std::move(update));
         pv.post_value(wrapper);
     } catch (const std::exception& e) {
-        throw PvxsError(std::string("Error posting string value with alarm to SharedPV: ") + e.what());
+        throw PvxsError(std::string("Error posting int32 array to SharedPV: ") + e.what());
+    }
+}
+
+void shared_pv_post_string_array(SharedPVWrapper& pv, rust::Vec<rust::String> value) {
+    try {
+        auto update = pv.get_template().cloneEmpty();
+        std::vector<std::string> cpp_vec;
+        cpp_vec.reserve(value.size());
+        for (const auto& s : value) {
+            cpp_vec.emplace_back(std::string(s));
+        }
+        pvxs::shared_array<const std::string> arr(cpp_vec.begin(), cpp_vec.end());
+        update["value"] = arr;
+        
+        ValueWrapper wrapper(std::move(update));
+        pv.post_value(wrapper);
+    } catch (const std::exception& e) {
+        throw PvxsError(std::string("Error posting string array to SharedPV: ") + e.what());
     }
 }
 
