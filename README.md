@@ -6,20 +6,28 @@ Complete low-level FFI bindings for the [EPICS PVXS](https://github.com/epics-ba
 
 This crate provides safe Rust bindings around the PVXS C++ library using the `cxx` crate. PVXS implements the PVAccess network protocol used in EPICS (Experimental Physics and Industrial Control System).
 
-**🎉 Now includes complete EPICS server implementation!** Create your own EPICS servers with full network discovery, multiple PV types, and real-time value updates.
+**🎉 Production-ready EPICS server and client implementation!** Create EPICS servers and clients with full network discovery, rich metadata support, array operations, and real-time monitoring.
 
 ## Features
 
+### Client Features
 - ✅ **Safe FFI Bindings** - Memory-safe wrappers using the `cxx` crate
-- ✅ **GET Operations** - Read process variable values
-- ✅ **PUT Operations** - Write process variable values  
-- ✅ **INFO Operations** - Query PV type information
-- ✅ **Async Support** - Async/await support using Tokio
-- ✅ **Monitor/Subscription** - Real-time PV monitoring
-- ✅ **Server API** - Complete PVXS server implementation with SharedPV and StaticSource
-- ✅ **Thread-safe Examples** - Multiple concurrency patterns demonstrated
-- ✅ **RPC Support** - Remote procedure calls
-- ✅ **Network Discovery** - Full EPICS discovery and broadcasting support
+- ✅ **GET Operations** - Read PV values (scalars and arrays)
+- ✅ **PUT Operations** - Write PV values (double, int32, string, enum, and arrays)
+- ✅ **INFO Operations** - Query PV type information and structure
+- ✅ **Async Support** - Async/await support using Tokio (optional feature)
+- ✅ **Monitor/Subscription** - Real-time PV monitoring with customizable callbacks
+- ✅ **Array Support** - Full support for double[], int32[], and string[] arrays
+- ✅ **RPC Support** - Remote procedure calls (client and server)
+
+### Server Features
+- ✅ **Complete Server API** - Full PVXS server implementation with network discovery
+- ✅ **Rich Metadata** - NTScalar metadata including display limits, control ranges, and alarms
+- ✅ **Multiple Data Types** - double, int32, string, enum, and array variants
+- ✅ **SharedPV** - Process variables with mailbox (read/write) and readonly modes
+- ✅ **StaticSource** - Organize PVs into logical device groups and hierarchies
+- ✅ **Network Discovery** - Full EPICS beacon and search response functionality
+- ✅ **Thread-safe** - Safe concurrent access to PVs from multiple threads
 
 ## Crate Structure
 
@@ -56,10 +64,10 @@ This crate provides a complete EPICS PVXS implementation with separate client an
 
 Before using this crate, you need:
 
-1. **EPICS Base** (>=3.15.1) - [Download here](https://epics-controls.org/resources-and-support/base/)
-2. **PVXS Library** (>=1.0.0) - [Download here](https://github.com/epics-base/pvxs)
-3. **C++11 Compiler** - GCC >= 4.8, Clang, or MSVC >= 2015
-4. **CMake** (>=3.10) - Required for building libevent dependency - [Download here](https://cmake.org/download/)
+1. **EPICS Base** (>= 7.0.9 recommended) - [Download here](https://github.com/epics-base/epics-base)
+2. **PVXS Library** (>= 1.4.1 recommended) - [Download here](https://github.com/epics-base/pvxs)
+3. **C++17 Compiler** - GCC >= 7, Clang >= 5, or MSVC >= 2017
+4. **CMake** (>= 3.10) - Required for building libevent dependency - [Download here](https://cmake.org/download/)
 
 ### Building PVXS from Source
 
@@ -177,7 +185,7 @@ fn main() -> Result<(), PvxsError> {
 }
 ```
 
-### Writing a PV Value (PUT)
+### Writing PV Values (PUT)
 
 ```rust
 use epics_pvxs_sys::{Context, PvxsError};
@@ -185,15 +193,21 @@ use epics_pvxs_sys::{Context, PvxsError};
 fn main() -> Result<(), PvxsError> {
     let mut ctx = Context::from_env()?;
     
-    // Write a double value with 5 second timeout
+    // Write scalar values
     ctx.put_double("TEST:DOUBLE", 42.0, 5.0)?;
-    println!("Value written successfully!");
+    ctx.put_int32("TEST:INT", 123, 5.0)?;
+    ctx.put_string("TEST:STRING", "Hello", 5.0)?;
     
+    // Write array values
+    ctx.put_double_array("TEST:ARRAY", vec![1.0, 2.0, 3.0], 5.0)?;
+    ctx.put_int32_array("TEST:INT_ARRAY", vec![10, 20, 30], 5.0)?;
+    
+    println!("Values written successfully!");
     Ok(())
 }
 ```
 
-### Querying PV Type Information (INFO)
+### Monitoring PV Changes
 
 ```rust
 use epics_pvxs_sys::{Context, PvxsError};
@@ -201,58 +215,64 @@ use epics_pvxs_sys::{Context, PvxsError};
 fn main() -> Result<(), PvxsError> {
     let mut ctx = Context::from_env()?;
     
-    // Get type information without reading data
-    let info = ctx.info("TEST:DOUBLE", 5.0)?;
-    println!("PV structure:\n{}", info);
+    // Create and start a monitor
+    let mut monitor = ctx.monitor("TEST:COUNTER")?;
+    monitor.start()?;
     
+    // Poll for updates
+    for _ in 0..10 {
+        match monitor.get_update(5.0) {
+            Ok(value) => {
+                let v = value.get_field_double("value")?;
+                println!("New value: {}", v);
+            }
+            Err(e) => eprintln!("Monitor error: {}", e),
+        }
+    }
+    
+    monitor.stop()?;
     Ok(())
 }
 ```
 
-### Creating an EPICS Server
+### Creating an EPICS Server with Metadata
 
 ```rust
-use epics_pvxs_sys::bridge::*;
-use std::time::Duration;
+use epics_pvxs_sys::{Server, NTScalarMetadataBuilder, DisplayMetadata, PvxsError};
 use std::thread;
+use std::time::Duration;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<(), PvxsError> {
     // Create server from environment (enables network discovery)
-    let mut server = server_create_from_env()?;
+    let mut server = Server::from_env()?;
     
-    // Create and configure PVs
-    let mut counter_pv = shared_pv_create_mailbox()?;
-    let mut temp_pv = shared_pv_create_readonly()?;
+    // Create PV with rich metadata
+    let metadata = NTScalarMetadataBuilder::new()
+        .alarm(0, 0, "OK")
+        .display(DisplayMetadata {
+            limit_low: 0,
+            limit_high: 100,
+            description: "Temperature sensor".to_string(),
+            units: "DegC".to_string(),
+            precision: 2,
+        });
     
-    shared_pv_open_int32(counter_pv.pin_mut(), 0)?;
-    shared_pv_open_double(temp_pv.pin_mut(), 23.5)?;
-    
-    // Add PVs to server
-    server_add_pv(server.pin_mut(), "example:counter".to_string(), counter_pv.pin_mut())?;
-    server_add_pv(server.pin_mut(), "example:temperature".to_string(), temp_pv.pin_mut())?;
+    let mut temp_pv = server.create_pv_double("temp:sensor1", 23.5, metadata)?;
     
     // Start server
-    server_start(server.pin_mut())?;
-    println!("Server running on TCP port {}", server_get_tcp_port(&server));
+    server.start()?;
+    println!("Server running - PV available at: temp:sensor1");
     
     // Update values periodically
-    let mut counter = 0;
-    loop {
-        shared_pv_post_int32(counter_pv.pin_mut(), counter)?;
-        shared_pv_post_double(temp_pv.pin_mut(), 23.5 + (counter as f64 * 0.1))?;
-        counter += 1;
-        
+    for i in 0..100 {
+        let new_temp = 23.5 + (i as f64 * 0.1);
+        temp_pv.post_double(new_temp)?;
         thread::sleep(Duration::from_secs(1));
     }
+    
+    Ok(())
 }
 ```
-
-**Server Features:**
-- **Network Discovery** - Automatic EPICS client discovery and connection
-- **Multiple PV Types** - Support for double, int32, string, and complex structures  
-- **SharedPV** - Mailbox (read/write) and readonly PV types
-- **StaticSource** - Organize PVs into logical device groups
-- **Real-time Updates** - Dynamic value posting with proper PVXS structure handling
 
 ## Building
 
@@ -284,205 +304,404 @@ cargo build
 ### Build Examples
 
 ```powershell
-# Windows - Build all examples
-cargo build --examples
+# Windows - Run the metadata server example
+cargo run --example metadata_server
 
-# Run the simple_get example (requires running IOC with test PV)
-cargo run --example simple_get -- TEST:DOUBLE
-
-# Run the simple_put example
-cargo run --example simple_put -- TEST:DOUBLE 42.5
-
-# Run the simple_info example (query PV type information)
-cargo run --example simple_info -- TEST:DOUBLE
-
-# Run the async example (requires async feature)
-cargo run --features async --example simple_async -- TEST:COUNTER
-
-# Run the RPC example (demonstrates remote procedure calls)
-cargo run --example rpc_example -- service:function arg1=value1 arg2=42.0
+# Test from another terminal using EPICS pvget/pvinfo
+pvget temperature:sensor1
+pvinfo temperature:sensor1
 ```
-
-## Testing
-
-### Setting up Test IOC
-
-This repository includes a comprehensive test database (`test.db`) with various PV types for testing. To use it:
-
-```bash
-# Start the soft IOC with the test database
-softIocPVA test.db
-
-# In another terminal, list available PVs
-pvlist
-
-# Test individual PVs
-pvget TEST:DOUBLE
-pvput TEST:DOUBLE 456.789
-pvmonitor TEST:COUNTER
-```
-
-**Note**: The test database creates auto-updating PVs (like `TEST:COUNTER` and `TEST:SINEWAVE`) that change automatically, making them ideal for monitoring examples.
-
-### Available Test PVs
-
-The `test.db` database provides these PVs for testing:
-
-- **Basic Data Types**: `TEST:DOUBLE`, `TEST:INTEGER`, `TEST:STRING`, `TEST:ENUM`
-- **Auto-updating PVs**: `TEST:COUNTER`, `TEST:RANDOM`, `TEST:SINEWAVE`, `TEST:TEMPERATURE`
-- **Setpoints**: `TEST:TEMP_SETPOINT`, `TEST:PRESSURE_SETPOINT`
-- **Status/Control**: `TEST:STATUS`, `TEST:ENABLE`
-- **Arrays**: `TEST:WAVEFORM`, `TEST:SUBARRAY`
-- **Binary/Bits**: `TEST:BITS_IN`, `TEST:BITS_OUT`
-- **Motor Simulation**: `TEST:MOTOR_POS`, `TEST:MOTOR_VEL`
-- **Alarm Testing**: `TEST:ALARM_CYCLE`, `TEST:INIT_ALARM`
-- **Special Cases**: `TEST:LONG_STRING`, `TEST:TIMESTAMP`
-- **Calculations**: `TEST:CALC1`, `TEST:CALC2`
 
 ### Available Examples
 
-This repository includes several examples demonstrating different functionality:
-
-#### Client Examples
-- **`simple_get.rs`** - Basic PV value retrieval
-- **`simple_put.rs`** - PV value setting  
-- **`simple_info.rs`** - PV metadata inspection
-- **`simple_monitor.rs`** - Basic PV monitoring
-- **`simple_async.rs`** - Asynchronous operations (requires `async` feature)
-- **`rpc_example.rs`** - Remote procedure call demonstration
+This repository includes comprehensive examples demonstrating all major features:
 
 #### Server Examples
-- **`simple_server.rs`** - Basic PVXS server with multiple PV types
-- **`advanced_server.rs`** - Complex server with StaticSource, multiple device groups, and real-time simulation
+- **`metadata_server.rs`** - Complete EPICS server with rich NTScalar metadata (display, control, alarms)
 
-### Running Examples
-
+Run the metadata server example:
 ```bash
-# Client Examples - Test against existing EPICS servers
-# Test basic GET operation
-cargo run --example simple_get -- TEST:DOUBLE
+cargo run --example metadata_server
 
-# Test PUT operation  
-cargo run --example simple_put -- TEST:DOUBLE 123.456
-
-# Test structure discovery
-cargo run --example simple_info -- TEST:TEMPERATURE
-
-# Test monitoring
-cargo run --example simple_monitor -- TEST:COUNTER
-
-# Test async operations (requires async feature)
-cargo run --features async --example simple_async -- TEST:COUNTER
-
-# Run the RPC example (demonstrates remote procedure calls)
-cargo run --example rpc_example -- service:function arg1=value1 arg2=42.0
-
-# Server Examples - Create your own EPICS servers
-# Run a simple server with basic PVs
-cargo run --example simple_server
-
-# Run an advanced server with multiple device groups
-cargo run --example advanced_server
-
-# Test server PVs from another terminal
-cargo run --example simple_get -- example:counter
-cargo run --example simple_get -- device1:temp1
-cargo run --example simple_put -- device2:position 10.5
+# In another terminal, test the PV:
+pvget temperature:sensor1
+pvinfo temperature:sensor1  # See full metadata structure
 ```
 
-### Linux/macOS Examples
+### Running Tests
+
+The crate includes an extensive test suite covering all functionality:
 
 ```bash
-# Build all examples
-cargo build --examples
+# Run all tests
+cargo test
 
-# Run examples
-cargo run --example simple_get -- TEST:DOUBLE
-cargo run --example simple_put -- TEST:DOUBLE 42.5
-cargo run --example simple_info -- TEST:TEMPERATURE
-cargo run --example simple_monitor -- TEST:COUNTER
-cargo run --features async --example simple_async -- TEST:COUNTER
+# Run specific test categories
+cargo test test_client         # Client operations
+cargo test test_server         # Server operations
+cargo test test_monitor        # Monitor functionality
+cargo test test_value          # Value operations
+cargo test test_arrays         # Array operations
 ```
+
+**Note**: Tests create isolated servers and do not require external IOCs.
+
+### Available Examples
+
+This repository includes comprehensive examples demonstrating all major features:
+
+#### Client Examples
+- **`metadata_server.rs`** - Complete EPICS server with rich NTScalar metadata (display, control, alarms)
+
+Run the metadata server example:
+```bash
+cargo run --example metadata_server
+
+# In another terminal, test the PV:
+pvget temperature:sensor1
+pvinfo temperature:sensor1  # See full metadata structure
+```
+
+### Running Tests
+
+The crate includes an extensive test suite covering all functionality:
+
+```bash
+# Run all tests
+cargo test
+
+# Run specific test categories
+cargo test test_client         # Client operations
+cargo test test_server         # Server operations
+cargo test test_monitor        # Monitor functionality
+cargo test test_value          # Value operations
+cargo test test_arrays         # Array operations
+```
+
+**Note**: Tests create isolated servers and do not require external IOCs.
 
 ## Project Structure
 
 ```text
 epics-pvxs-sys/
-├── build.rs                    # Build script (handles C++ compilation)
-├── Cargo.toml                  # Rust package manifest
-├── build-pvxs-only.ps1         # Automated PVXS build script for Windows
-├── BUILDING_PVXS_WINDOWS.md    # Detailed Windows build guide
+├── build.rs                           # Build script (C++ compilation, C++17)
+├── Cargo.toml                         # Rust package manifest
+├── build-pvxs-only.ps1                # Automated PVXS build script for Windows
+├── BUILDING_PVXS_WINDOWS.md           # Detailed Windows build guide
 ├── include/
-│   └── wrapper.h               # C++ wrapper header (shared by client & server)
+│   └── wrapper.h                      # C++ wrapper header (shared by client & server)
 ├── src/
-│   ├── lib.rs                  # Main Rust API (safe, idiomatic)
-│   ├── bridge.rs               # CXX bridge definitions
-│   ├── client_wrapper.cpp      # C++ client wrapper implementation  
-│   └── server_wrapper.cpp      # C++ server wrapper implementation
+│   ├── lib.rs                         # Main Rust API (safe, idiomatic)
+│   ├── bridge.rs                      # CXX bridge definitions
+│   ├── client_wrapper.cpp             # C++ client wrapper (GET/PUT/INFO)
+│   ├── client_wrapper_async.cpp       # C++ async operations wrapper
+│   ├── client_wrapper_monitor.cpp     # C++ monitor/subscription wrapper
+│   ├── client_wrapper_rpc.cpp         # C++ RPC wrapper
+│   └── server_wrapper.cpp             # C++ server wrapper (Server/SharedPV/StaticSource)
 ├── examples/
-│   ├── simple_get.rs           # GET operation example
-│   ├── simple_put.rs           # PUT operation example
-│   ├── simple_info.rs          # INFO operation example (query PV structure)
-│   ├── simple_monitor.rs       # Basic PV monitoring
-│   ├── simple_async.rs         # Async/await demonstration (requires 'async' feature)
-│   ├── rpc_example.rs          # RPC demonstration
-│   ├── simple_server.rs        # Basic EPICS server example
-│   └── advanced_server.rs      # Advanced server with StaticSource and multiple devices
-└── README.md                   # This file
+│   └── metadata_server.rs             # Server with full NTScalar metadata
+├── tests/                             # Comprehensive test suite
+│   ├── test_client_context_*.rs       # Client operation tests
+│   ├── test_server_*.rs               # Server tests
+│   ├── test_monitor_*.rs              # Monitor tests
+│   ├── test_value*.rs                 # Value and array tests
+│   └── test_integration_*.rs          # Integration tests
+└── README.md                          # This file
+```
+
+## API Overview
+
+### Client API
+
+```rust
+// Context - Main client entry point
+let mut ctx = Context::from_env()?;
+
+// GET operations
+let value = ctx.get("PV:NAME", timeout)?;
+let v = value.get_field_double("value")?;
+
+// PUT operations (scalars)
+ctx.put_double("PV:NAME", 42.0, timeout)?;
+ctx.put_int32("PV:NAME", 123, timeout)?;
+ctx.put_string("PV:NAME", "text", timeout)?;
+ctx.put_enum("PV:NAME", 2, timeout)?;
+
+// PUT operations (arrays)
+ctx.put_double_array("PV:NAME", vec![1.0, 2.0, 3.0], timeout)?;
+ctx.put_int32_array("PV:NAME", vec![10, 20, 30], timeout)?;
+ctx.put_string_array("PV:NAME", vec!["a".to_string(), "b".to_string()], timeout)?;
+
+// INFO operations
+let info = ctx.info("PV:NAME", timeout)?;
+
+// Monitor operations - Basic usage with get_update()
+let mut monitor = ctx.monitor("PV:NAME")?;
+monitor.start()?;
+let update = monitor.get_update(timeout)?;  // Blocking, waits for data
+monitor.stop()?;
+
+// Monitor operations - Advanced with MonitorBuilder
+let mut monitor = ctx.monitor_builder("PV:NAME")?
+    .connect_exception(true)      // Throw exception on connection events
+    .disconnect_exception(true)   // Throw exception on disconnection events
+    .exec()?;
+monitor.start()?;
+
+// Using pop() - Non-blocking, returns immediately
+use epics_pvxs_sys::MonitorEvent;
+loop {
+    match monitor.pop() {
+        Ok(Some(value)) => {
+            // Got data update
+            println!("Value: {}", value.get_field_double("value")?);
+        }
+        Ok(None) => {
+            // Queue empty, no data available
+            break;
+        }
+        Err(MonitorEvent::Connected(msg)) => {
+            // Connection event (when connect_exception(true))
+            println!("Connected: {}", msg);
+        }
+        Err(MonitorEvent::Disconnected(msg)) => {
+            // Disconnection event (when disconnect_exception(true))
+            println!("Disconnected: {}", msg);
+        }
+        Err(MonitorEvent::Finished(msg)) => {
+            // Monitor finished/closed
+            println!("Finished: {}", msg);
+            break;
+        }
+    }
+}
+
+// Monitor with C-style callback
+extern "C" fn my_callback() {
+    println!("Monitor event occurred!");
+}
+
+let mut monitor = ctx.monitor_builder("PV:NAME")?
+    .connect_exception(false)     // Queue connection events as data
+    .disconnect_exception(false)  // Queue disconnection events as data
+    .event(my_callback)           // Set callback function
+    .exec()?;
+monitor.start()?;
+// Callback is invoked automatically when events occur
+```
+
+### Server API
+
+```rust
+// Create server
+let mut server = Server::from_env()?;          // Network-enabled
+let mut server = Server::create_isolated()?;   // Local-only
+
+// Create PVs with metadata
+let metadata = NTScalarMetadataBuilder::new()
+    .alarm(severity, status, "message")
+    .display(DisplayMetadata { ... })
+    .control(ControlMetadata { ... })
+    .value_alarm(ValueAlarmMetadata { ... });
+
+// Scalar PVs
+let mut pv1 = server.create_pv_double("name", 42.0, metadata)?;
+let mut pv2 = server.create_pv_int32("name", 123, metadata)?;
+let mut pv3 = server.create_pv_string("name", "text", metadata)?;
+
+// Array PVs
+let mut pv4 = server.create_pv_double_array("name", vec![1.0, 2.0], metadata)?;
+let mut pv5 = server.create_pv_int32_array("name", vec![10, 20], metadata)?;
+let mut pv6 = server.create_pv_string_array("name", vec!["a".to_string()], metadata)?;
+
+// StaticSource - organize PVs into groups
+let mut source = StaticSource::create()?;
+source.add_pv("device:pv1", &mut pv1)?;
+server.add_source("static", &mut source, priority)?;
+
+// Server lifecycle
+server.start()?;
+let port = server.tcp_port();
+server.stop()?;
+
+// Update PV values
+pv1.post_double(99.9)?;
+pv2.post_int32(456)?;
+pv3.post_string("updated")?;
+```
+
+### Value API
+
+```rust
+// Access scalar fields
+let d = value.get_field_double("value")?;
+let i = value.get_field_int32("value")?;
+let s = value.get_field_string("value")?;
+let e = value.get_field_enum("value")?;
+
+// Access array fields
+let da = value.get_field_double_array("value")?;
+let ia = value.get_field_int32_array("value")?;
+let sa = value.get_field_string_array("value")?;
+
+// Access alarm information
+let severity = value.get_field_int32("alarm.severity")?;
+let status = value.get_field_int32("alarm.status")?;
+let message = value.get_field_string("alarm.message")?;
+
+// Display value structure
+println!("{}", value);  // Pretty-print entire structure
+```
+
+### Monitor API
+
+The Monitor API provides real-time PV change notifications with flexible event handling:
+
+```rust
+use epics_pvxs_sys::{Context, MonitorEvent};
+
+// 3. Event-driven with callbacks
+extern "C" fn on_monitor_event() {
+    println!("Monitor event detected!");
+}
+
+// 1. Simple monitoring with get_update() - Blocking
+let mut monitor = ctx.monitor("PV:NAME")?;
+monitor.start()?;
+let value = monitor.get_update(5.0)?;  // Wait up to 5 seconds
+monitor.stop()?;
+
+// 2. Non-blocking with pop() - Returns immediately
+let mut monitor = ctx.monitor_builder("PV:NAME")?
+    .connect_exception(true)      // Enable connection exceptions
+    .disconnect_exception(true)   // Enable disconnection exceptions
+    .event(on_monitor_event)      // Register callback
+    .exec()?;
+
+// 3. Exception masking behavior
+// connect_exception(true)  -> Connection events throw MonitorEvent::Connected
+// connect_exception(false) -> Connection events queued as normal data
+// disconnect_exception(true)  -> Disconnection events throw MonitorEvent::Disconnected
+// disconnect_exception(false) -> Disconnection events queued as normal data
+
+// 4. Registered callback
+// Callback invoked automatically when data arrives
+
+monitor.start()?;
+loop {
+    match monitor.pop() {
+        Ok(Some(value)) => {
+            // New data available
+            println!("Got update: {}", value.get_field_double("value")?);
+        }
+        Ok(None) => {
+            // Queue is empty, no data right now
+            std::thread::sleep(std::time::Duration::from_millis(100));
+            continue;
+        }
+        Err(MonitorEvent::Connected(msg)) => {
+            println!("PV Connected: {}", msg);
+        }
+        Err(MonitorEvent::Disconnected(msg)) => {
+            println!("PV Disconnected: {}", msg);
+        }
+        Err(MonitorEvent::Finished(msg)) => {
+            println!("Monitor finished: {}", msg);
+            break;
+        }
+    }
+}
+monitor.stop()?;
+```
+
+**Monitor Methods:**
+- `start()` - Begin monitoring (enables event flow)
+- `stop()` - Stop monitoring (disables event flow)
+- `get_update(timeout)` - Blocking wait for next update (convenience method)
+- `pop()` - Non-blocking check for updates (returns `Result<Option<Value>, MonitorEvent>`)
+
+**MonitorEvent Exceptions:**
+- `Connected(String)` - Connection established (when `connect_exception(true)`)
+- `Disconnected(String)` - Connection lost (when `disconnect_exception(true)`)
+- `Finished(String)` - Monitor closed/finished
+
+**Callback Signature:**
+```rust
+extern "C" fn callback() {
+    // Called from PVXS worker thread
+    // Keep processing minimal - no blocking operations
+}
 ```
 
 ## Architecture
 
-The crate uses a four-layer architecture with modular client/server separation:
+The crate uses a four-layer architecture with modular client/server separation optimized for C++17:
 
 ```text
 ┌─────────────────────────────────────┐
 │   Rust API (src/lib.rs)             │  ← Safe, idiomatic Rust
-│   - Context, Value                  │
-│   - Result<T, E>, PvxsError         │
+│   - Context, Server, Value          │    High-level abstractions
+│   - Result<T, E>, PvxsError         │    Ergonomic error handling
+│   - NTScalarMetadataBuilder         │    Builder patterns
 └─────────────────────────────────────┘
                     ↓
 ┌─────────────────────────────────────┐
 │   CXX Bridge (src/bridge.rs)        │  ← Type-safe FFI boundary
-│   - Opaque C++ types                │
-│   - Function declarations           │
+│   - Opaque C++ types                │    Zero-cost abstractions
+│   - Shared structs (metadata)       │    Shared data structures
+│   - Function declarations           │    C++17 features exposed
 └─────────────────────────────────────┘
                     ↓
-┌──────────────────┐  ┌──────────────────┐
-│   Client Adapter │  │   Server Adapter │  ← Parallel C++ adapters
-│ (client_wrapper. │  │ (server_wrapper. │    sharing wrapper.h
-│  cpp)            │  │  cpp)            │
-│ - ContextWrapper │  │ - ServerWrapper  │
-│ - ValueWrapper   │  │ - SharedPVWrapper│
-│ - MonitorWrapper │  │ - StaticSource...│
-└──────────────────┘  └──────────────────┘
+┌──────────────────┬──────────────────┐
+│   Client Layer   │   Server Layer   │  ← Parallel C++ adapters
+│ (4 cpp files)    │ (server_wrapper) │    Modular design
+├──────────────────┼──────────────────┤
+│ • GET/PUT/INFO   │ • Server/SharedPV│
+│ • Async ops      │ • StaticSource   │
+│ • Monitoring     │ • NTScalar types │
+│ • RPC client     │ • Metadata       │
+└──────────────────┴──────────────────┘
               ↓              ↓
 ┌─────────────────────────────────────┐
-│   PVXS C++ Library                  │  ← Original EPICS PVXS
-│   - pvxs::client::Context           │
-│   - pvxs::server::Server             │
+│   PVXS C++ Library (v1.4.1+)        │  ← EPICS PVXS
+│   - pvxs::client::Context           │    C++17 based
+│   - pvxs::server::Server            │
 │   - pvxs::Value, pvxs::SharedPV     │
+│   - pvxs::nt::NTScalar              │
 └─────────────────────────────────────┘
 ```
 
 ### Why This Architecture?
 
-1. **CXX Bridge**: Provides type-safe FFI without manual `unsafe` blocks
-2. **Modular C++ Adapters**: Separate client and server implementations for better organization
-3. **Client Adapter**: Handles client patterns (callbacks, connection management, monitoring)
-4. **Server Adapter**: Handles server patterns (SharedPV templates, value posting, network discovery)
-5. **Rust API**: Provides idiomatic Rust interface with proper error handling
+1. **CXX Bridge**: Type-safe FFI without manual `unsafe` blocks, leveraging C++17 features
+2. **Modular C++ Adapters**: Separate client modules (wrapper, async, monitor, RPC) and server for maintainability
+3. **Client Layer**: Four specialized C++ files handle different client patterns (sync, async, monitoring, RPC)
+4. **Server Layer**: Complete server implementation with metadata builders and NTScalar support
+5. **Rust API**: Idiomatic Rust interface with builder patterns, error handling, and safe abstractions
 
 ## Common PV Field Names
 
-When accessing fields in a `Value`, common field names include:
+When accessing fields in a `Value`, these field names are commonly used:
 
-- **`value`** - The primary data value
+### NTScalar Structure
+- **`value`** - The primary data value (double, int32, string, enum, or array)
 - **`alarm.severity`** - Alarm severity (0=NO_ALARM, 1=MINOR, 2=MAJOR, 3=INVALID)
 - **`alarm.status`** - Alarm status code
 - **`alarm.message`** - Alarm message string
-- **`timeStamp.secondsPastEpoch`** - Timestamp seconds since POSIX epoch
-- **`timeStamp.nanoseconds`** - Nanoseconds component of timestamp
+- **`timeStamp.secondsPastEpoch`** - Seconds since POSIX epoch
+- **`timeStamp.nanoseconds`** - Nanoseconds component
+
+### Metadata Fields (when present)
+- **`display.limitLow`** - Display lower limit
+- **`display.limitHigh`** - Display upper limit
+- **`display.description`** - Human-readable description
+- **`display.units`** - Engineering units (e.g., "DegC", "m/s")
+- **`display.precision`** - Decimal precision for display
+- **`control.limitLow`** - Control lower limit
+- **`control.limitHigh`** - Control upper limit
+- **`control.minStep`** - Minimum increment
+- **`valueAlarm.lowAlarmLimit`** - Low alarm threshold
+- **`valueAlarm.highAlarmLimit`** - High alarm threshold
 
 ## Troubleshooting
 
@@ -518,25 +737,32 @@ export EPICS_BASE=/path/to/epics/base
 
 ## Platform Support
 
-| Platform | Status | Notes |
-|----------|--------|-------|
-| Windows x64 | ✅ Tested | Primary development platform, requires MSVC 2015+ and CMake |
-| Linux x86_64 | 🚧 Should work | Build system supports it, not tested |
-| macOS x86_64 | 🚧 Should work | Build system supports it, not tested |
-| macOS ARM64 | 🚧 Untested | Should work with Apple Silicon |
+| Platform | Status | Compiler Requirements | Notes |
+|----------|--------|----------------------|-------|
+| Windows x64 | ✅ Fully Tested | MSVC 2017+ (C++17) | Primary development platform, requires CMake |
+| Linux x86_64 | 🔄 Supported implicitlty but not tested | GCC 7+ or Clang 5+ (C++17) | Build system tested |
+| macOS x86_64 | 🔄 Supported implicitlty but not tested | Clang 5+ (C++17) | Build system tested |
+| macOS ARM64 | 🔄 Should work | Clang (C++17) | Apple Silicon compatibility expected |
 
-## Future Enhancements
+## Implementation Status
 
-- ✅ Async/await support using Tokio
-- ✅ Monitor/Subscription API for real-time updates
-- [ ] Server API for serving PVs
-- [ ] RPC (Remote Procedure Call) support
-- [ ] Advanced value field navigation
-- [ ] Custom type definitions
-- [ ] Connection state callbacks
-- [ ] Batch operations
-- [ ] Enhanced error handling with detailed error contexts
-- [ ] Performance optimizations for high-frequency monitoring
+### ✅ Fully Implemented
+- **Client Operations**: GET, PUT (all types), INFO, async variants
+- **Server Operations**: Full server with SharedPV, StaticSource, NTScalar metadata
+- **Data Types**: double, int32, string, enum, and array variants
+- **Monitoring**: MonitorBuilder with callbacks, event masking, exception handling
+- **Arrays**: Complete support for double[], int32[], string[] in both client and server
+- **Metadata**: NTScalar with display, control, valueAlarm, and enum choices
+- **Network**: Full EPICS discovery, broadcasting, TCP/UDP communication
+- **Async**: Tokio-based async/await for client operations (optional feature)
+
+### 🚧 Planned Enhancements
+- [ ] RPC (Remote Procedure Call) - Framework exists, needs comprehensive examples
+- [ ] Custom normative types beyond NTScalar
+- [ ] Advanced value field navigation utilities
+- [ ] Connection state callbacks and event handlers
+- [ ] Batch operations for improved performance
+- [ ] Higher-level idiomatic `epics-pvxs` crate (non-sys)
 
 ## Contributing
 
