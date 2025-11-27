@@ -775,7 +775,7 @@ Contributions are welcome! Please:
 
 ## License
 
-This project is licensed under MIT License ([LICENSE-MIT](LICENSE-MIT))
+This project is licensed under MIT License ([LICENSE](LICENSE))
 
 ## References
 
@@ -791,3 +791,4 @@ This project builds upon:
 - **PVXS** - The EPICS PVXS library by Michael Davidsaver and contributors
 - **EPICS Base** - The Experimental Physics and Industrial Control System
 - **CXX** - Safe C++/Rust interop by David Tolnay
+
