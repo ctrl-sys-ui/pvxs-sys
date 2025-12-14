@@ -2,10 +2,10 @@
 name = "pvxs-sys"
 version = "0.1.0"
 edition = "2021"
-authors = ["Your Name <your.email@example.com>"]
+authors = ["Tine Zata <https://github.com/TineZata>"]
 description = "Low-level FFI bindings for EPICS PVXS library"
 license = "MPL-2.0"
-repository = "https://github.com/yourusername/pvxs-sys"
+repository = "https://github.com/ctrl-sys-ui/pvxs-sys"
 keywords = ["epics", "pvxs", "control-system", "ffi", "sys"]
 categories = ["external-ffi-bindings", "science"]
 readme = "README.md"

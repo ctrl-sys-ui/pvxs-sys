@@ -80,7 +80,7 @@ Set the following environment variables:
   - Also accepts `PVXS_DIR` or `PVXS_BASE` as alternatives
 - **`EPICS_PVXS_LIBEVENT`** - Path to libevent installation (optional)
   - Defaults to bundled libevent within PVXS: `{PVXS}/bundle/usr/{ARCH}`
-  - Required DLLs: `event.dll`, `event_core.dll`, `event_extra.dll`
+  - Required DLL: `event_core.dll`
 
 Example setup:
 
@@ -121,16 +121,13 @@ pvxs-sys = { version = "0.1", features = ["async"] }
 
 ### Runtime Requirements (Windows)
 
-For Windows users, the EPICS and PVXS DLLs must be in your system PATH for the examples to run:
+For Windows users, the following DLLs are automatically copied by the build script to `target/debug` and `target/release`:
 
-1. **EPICS Base DLLs**: `{EPICS_BASE}\bin\{EPICS_HOST_ARCH}`
-2. **PVXS DLLs**: `{EPICS_PVXS}\bin\{EPICS_HOST_ARCH}`  
-3. **libevent DLLs**: `{EPICS_PVXS}\bundle\usr\{EPICS_HOST_ARCH}\lib`
+1. **`pvxs.dll`** from `{EPICS_PVXS}\bin\{EPICS_HOST_ARCH}`
+2. **`Com.dll`** from `{EPICS_BASE}\bin\{EPICS_HOST_ARCH}`
+3. **`event_core.dll`** from `{EPICS_PVXS}\bundle\usr\{EPICS_HOST_ARCH}\lib`
 
-Example PowerShell commands to add to PATH for current session:
-```powershell
-$env:PATH = "C:\epics\base\bin\windows-x64;C:\epics\pvxs\bin\windows-x64;C:\epics\pvxs\bundle\usr\windows-x64\lib;" + $env:PATH
-```
+No manual PATH configuration is needed for running examples or tests.
 
 ## Quick Start
 
