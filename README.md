@@ -31,10 +31,7 @@ This crate provides safe Rust bindings around the PVXS C++ library using the `cx
 
 ## Crate Structure
 
-This is a `-sys` crate following Rust conventions:
-
-- **`pvxs-sys`** (this crate) - Low-level FFI bindings
-- **`epics-pvxs`** (planned) - High-level, idiomatic Rust API
+This is a `-sys` crate that provides low-level FFI bindings to the PVXS C++ library using `cxx`, wrapped with a safe and ergonomic Rust API suitable for direct use.
 
 ## Architecture
 
