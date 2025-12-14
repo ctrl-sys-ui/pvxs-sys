@@ -1,5 +1,5 @@
 mod test_pvxs_remote_double_get_put {
-    use epics_pvxs_sys::{Server, Context, PvxsError, NTScalarMetadataBuilder};
+    use pvxs_sys::{Server, Context, PvxsError, NTScalarMetadataBuilder};
 
     #[test]
     fn test_pv_remote_double_get_put() {
@@ -18,7 +18,7 @@ mod test_pvxs_remote_double_get_put {
         let mut ctx = Context::from_env().expect("Failed to create client context from env");
 
         // Do a get to verify initial value
-        let first_get: Result<epics_pvxs_sys::Value, PvxsError> = ctx.get(name, timeout);
+        let first_get: Result<pvxs_sys::Value, PvxsError> = ctx.get(name, timeout);
         match first_get {
             Ok(value) => {
                 assert!((value.get_field_double("value").unwrap() - initial_value).abs() < 1e-6);
@@ -30,7 +30,7 @@ mod test_pvxs_remote_double_get_put {
         srv.stop().expect("Failed to stop server");
 
         // Try to do a get which should fail due to server being down
-        let failed_get: Result<epics_pvxs_sys::Value, PvxsError> = ctx.get(name, timeout);
+        let failed_get: Result<pvxs_sys::Value, PvxsError> = ctx.get(name, timeout);
         match failed_get {
             Ok(_) => assert!(false, "Expected error when getting from stopped server, but got Ok"),
             Err(e) => {
@@ -50,7 +50,7 @@ mod test_pvxs_remote_double_get_put {
         }
 
         // Do a get again to verify the new value
-        let second_get: Result<epics_pvxs_sys::Value, PvxsError> = ctx.get(name, timeout);
+        let second_get: Result<pvxs_sys::Value, PvxsError> = ctx.get(name, timeout);
         match second_get {
             Ok(value) => {
                 assert!((value.get_field_double("value").unwrap() - new_value).abs() < 1e-6);

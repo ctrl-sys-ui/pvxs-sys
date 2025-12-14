@@ -1,6 +1,6 @@
 mod test_pvxs_local_double_array_fetch_post {
 
-    use epics_pvxs_sys::{Server, NTScalarMetadataBuilder};
+    use pvxs_sys::{Server, NTScalarMetadataBuilder};
 
     #[test]
     fn test_pv_local_double_array_fetch_post() {

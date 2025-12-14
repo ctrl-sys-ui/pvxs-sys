@@ -1,4 +1,4 @@
-use epics_pvxs_sys::{Server, Context, PvxsError, NTScalarMetadataBuilder};
+use pvxs_sys::{Server, Context, PvxsError, NTScalarMetadataBuilder};
 
 #[test]
 fn test_pv_remote_int32_array_get_put() {
@@ -25,7 +25,7 @@ fn test_pv_remote_int32_array_get_put() {
     match ctx.put_int32_array(name, initial_array.clone(), timeout) {
         Ok(_) => {            
             // Do a get to verify the array values
-            let get_result: Result<epics_pvxs_sys::Value, PvxsError> = ctx.get(name, timeout);
+            let get_result: Result<pvxs_sys::Value, PvxsError> = ctx.get(name, timeout);
             match get_result {
                 Ok(value) => {
                     match value.get_field_int32_array("value") {

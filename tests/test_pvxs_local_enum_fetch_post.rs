@@ -1,6 +1,6 @@
 mod test_pv_local_double_array_fetch_post {
     mod test_pv_local_double_array_fetch_post {
-        use epics_pvxs_sys::{Server, SharedPV, NTEnumMetadataBuilder};
+        use pvxs_sys::{Server, SharedPV, NTEnumMetadataBuilder};
 
         #[test]
         fn test_pv_local_enum_fetch_post() {

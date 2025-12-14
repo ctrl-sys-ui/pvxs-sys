@@ -1,4 +1,4 @@
-use epics_pvxs_sys::{Server, StaticSource, DisplayMetadata, ControlMetadata, 
+use pvxs_sys::{Server, StaticSource, DisplayMetadata, ControlMetadata, 
                       ValueAlarmMetadata, NTScalarMetadataBuilder};
 use std::thread;
 use std::time::Duration;

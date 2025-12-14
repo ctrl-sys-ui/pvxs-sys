@@ -1,4 +1,4 @@
-# epics-pvxs-sys
+# pvxs-sys
 
 Complete low-level FFI bindings for the [EPICS PVXS](https://github.com/epics-base/pvxs) (PVAccess) library.
 
@@ -33,7 +33,7 @@ This crate provides safe Rust bindings around the PVXS C++ library using the `cx
 
 This is a `-sys` crate following Rust conventions:
 
-- **`epics-pvxs-sys`** (this crate) - Low-level FFI bindings
+- **`pvxs-sys`** (this crate) - Low-level FFI bindings
 - **`epics-pvxs`** (planned) - High-level, idiomatic Rust API
 
 ## Architecture
@@ -68,37 +68,6 @@ Before using this crate, you need:
 2. **PVXS Library** (>= 1.4.1 recommended) - [Download here](https://github.com/epics-base/pvxs)
 3. **C++17 Compiler** - GCC >= 7, Clang >= 5, or MSVC >= 2017
 4. **CMake** (>= 3.10) - Required for building libevent dependency - [Download here](https://cmake.org/download/)
-
-### Building PVXS from Source
-
-If you don't have PVXS installed, see our detailed guides:
-
-- **Windows**: [BUILDING_PVXS_WINDOWS.md](BUILDING_PVXS_WINDOWS.md) - Step-by-step guide
-  - Or use the automated script: `.\build-pvxs-only.ps1`
-  - **Note**: Requires CMake for building libevent dependency
-  - **Tip**: For environments with group policy restrictions, use: `.\build-pvxs-only.ps1 -TempDir "C:\Projects\Temp"`
-- **Linux/macOS**: See [GETTING_STARTED.md](GETTING_STARTED.md)
-
-#### Automated Windows Build Script
-
-The `build-pvxs-only.ps1` script supports several options for different environments:
-
-```powershell
-# Basic usage (uses system defaults)
-.\build-pvxs-only.ps1
-
-# With custom temp directory (helpful for group policy restrictions)
-.\build-pvxs-only.ps1 -TempDir "C:\Projects\Temp"
-
-# With custom architecture
-.\build-pvxs-only.ps1 -HostArch "windows-x64"
-
-# With custom PVXS version and install location
-.\build-pvxs-only.ps1 -PvxsVersion "1.4.1" -InstallDir "C:\Custom\Path"
-
-# All options combined
-.\build-pvxs-only.ps1 -PvxsVersion "1.4.1" -InstallDir "C:\epics\pvxs" -TempDir "C:\Projects\Temp" -HostArch "windows-x64"
-```
 
 ### Environment Variables
 
@@ -137,10 +106,10 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-epics-pvxs-sys = "0.1"
+pvxs-sys = "0.1"
 
 # For async support
-epics-pvxs-sys = { version = "0.1", features = ["async"] }
+pvxs-sys = { version = "0.1", features = ["async"] }
 ```
 
 ### Optional Features
@@ -168,7 +137,7 @@ $env:PATH = "C:\epics\base\bin\windows-x64;C:\epics\pvxs\bin\windows-x64;C:\epic
 ### Reading a PV Value (GET)
 
 ```rust
-use epics_pvxs_sys::{Context, PvxsError};
+use pvxs_sys::{Context, PvxsError};
 
 fn main() -> Result<(), PvxsError> {
     // Create context from environment variables
@@ -188,7 +157,7 @@ fn main() -> Result<(), PvxsError> {
 ### Writing PV Values (PUT)
 
 ```rust
-use epics_pvxs_sys::{Context, PvxsError};
+use pvxs_sys::{Context, PvxsError};
 
 fn main() -> Result<(), PvxsError> {
     let mut ctx = Context::from_env()?;
@@ -210,7 +179,7 @@ fn main() -> Result<(), PvxsError> {
 ### Monitoring PV Changes
 
 ```rust
-use epics_pvxs_sys::{Context, PvxsError};
+use pvxs_sys::{Context, PvxsError};
 
 fn main() -> Result<(), PvxsError> {
     let mut ctx = Context::from_env()?;
@@ -238,7 +207,7 @@ fn main() -> Result<(), PvxsError> {
 ### Creating an EPICS Server with Metadata
 
 ```rust
-use epics_pvxs_sys::{Server, NTScalarMetadataBuilder, DisplayMetadata, PvxsError};
+use pvxs_sys::{Server, NTScalarMetadataBuilder, DisplayMetadata, PvxsError};
 use std::thread;
 use std::time::Duration;
 
@@ -383,7 +352,7 @@ cargo test test_arrays         # Array operations
 ## Project Structure
 
 ```text
-epics-pvxs-sys/
+pvxs-sys/
 ├── build.rs                           # Build script (C++ compilation, C++17)
 ├── Cargo.toml                         # Rust package manifest
 ├── build-pvxs-only.ps1                # Automated PVXS build script for Windows
@@ -449,7 +418,7 @@ let mut monitor = ctx.monitor_builder("PV:NAME")?
 monitor.start()?;
 
 // Using pop() - Non-blocking, returns immediately
-use epics_pvxs_sys::MonitorEvent;
+use pvxs_sys::MonitorEvent;
 loop {
     match monitor.pop() {
         Ok(Some(value)) => {
@@ -558,7 +527,7 @@ println!("{}", value);  // Pretty-print entire structure
 The Monitor API provides real-time PV change notifications with flexible event handling:
 
 ```rust
-use epics_pvxs_sys::{Context, MonitorEvent};
+use pvxs_sys::{Context, MonitorEvent};
 
 // 3. Event-driven with callbacks
 extern "C" fn on_monitor_event() {

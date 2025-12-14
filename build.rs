@@ -132,7 +132,7 @@ fn main() {
         build.flag_if_supported("-pthread");
     }
     
-    build.compile("epics_pvxs_sys");
+    build.compile("pvxs_sys");
     
     // Link to PVXS and EPICS libraries
     println!("cargo:rustc-link-search=native={}", pvxs_lib.display());

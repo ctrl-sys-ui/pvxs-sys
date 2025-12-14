@@ -1,11 +1,11 @@
 [package]
-name = "epics-pvxs-sys"
+name = "pvxs-sys"
 version = "0.1.0"
 edition = "2021"
 authors = ["Your Name <your.email@example.com>"]
 description = "Low-level FFI bindings for EPICS PVXS library"
-license = "MIT OR Apache-2.0"
-repository = "https://github.com/yourusername/epics-pvxs-sys"
+license = "MPL-2.0"
+repository = "https://github.com/yourusername/pvxs-sys"
 keywords = ["epics", "pvxs", "control-system", "ffi", "sys"]
 categories = ["external-ffi-bindings", "science"]
 readme = "README.md"
@@ -30,7 +30,7 @@ cxx-build = "1.0.189"
 serial_test = "3.0"
 
 [lib]
-name = "epics_pvxs_sys"
+name = "pvxs_sys"
 path = "src/lib.rs"
 
 [package.metadata.docs.rs]

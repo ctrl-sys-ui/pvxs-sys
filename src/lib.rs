@@ -119,7 +119,7 @@ impl Context {
     /// # Example
     /// 
     /// ```no_run
-    /// use epics_pvxs_sys::Context;
+    /// use pvxs_sys::Context;
     /// 
     /// let ctx = Context::from_env().expect("Failed to create context");
     /// ```
@@ -147,7 +147,7 @@ impl Context {
     /// # Example
     /// 
     /// ```no_run
-    /// # use epics_pvxs_sys::Context;
+    /// # use pvxs_sys::Context;
     /// # let mut ctx = Context::from_env().unwrap();
     /// let value = ctx.get("my:pv:name", 5.0).expect("GET failed");
     /// println!("Value: {}", value);
@@ -177,7 +177,7 @@ impl Context {
     /// # Example
     /// 
     /// ```no_run
-    /// # use epics_pvxs_sys::Context;
+    /// # use pvxs_sys::Context;
     /// # let mut ctx = Context::from_env().unwrap();
     /// ctx.put_double("my:pv:double", 42.0, 5.0).expect("PUT failed");
     /// ```
@@ -204,7 +204,7 @@ impl Context {
     /// # Example
     /// 
     /// ```no_run
-    /// # use epics_pvxs_sys::Context;
+    /// # use pvxs_sys::Context;
     /// # let mut ctx = Context::from_env().unwrap();
     /// ctx.put_int32("my:pv:int", 42, 5.0).expect("PUT failed");
     /// ```
@@ -233,7 +233,7 @@ impl Context {
     /// # Example
     /// 
     /// ```no_run
-    /// # use epics_pvxs_sys::Context;
+    /// # use pvxs_sys::Context;
     /// # let mut ctx = Context::from_env().unwrap();
     /// ctx.put_string("my:pv:string", "Hello, EPICS!", 5.0).expect("PUT failed");
     /// ```
@@ -262,7 +262,7 @@ impl Context {
     /// # Example
     /// 
     /// ```no_run
-    /// # use epics_pvxs_sys::Context;
+    /// # use pvxs_sys::Context;
     /// # let mut ctx = Context::from_env().unwrap();
     /// ctx.put_enum("my:pv:enum", 2, 5.0).expect("PUT failed");
     /// ```
@@ -291,7 +291,7 @@ impl Context {
     /// # Example
     /// 
     /// ```no_run
-    /// # use epics_pvxs_sys::Context;
+    /// # use pvxs_sys::Context;
     /// # let mut ctx = Context::from_env().unwrap();
     /// ctx.put_double_array("my:pv:array", vec![1.0, 2.0, 3.0], 5.0).expect("PUT failed");
     /// ```
@@ -320,7 +320,7 @@ impl Context {
     /// # Example
     /// 
     /// ```no_run
-    /// # use epics_pvxs_sys::Context;
+    /// # use pvxs_sys::Context;
     /// # let mut ctx = Context::from_env().unwrap();
     /// ctx.put_int32_array("my:pv:array", vec![10, 20, 30], 5.0).expect("PUT failed");
     /// ```
@@ -349,7 +349,7 @@ impl Context {
     /// # Example
     /// 
     /// ```no_run
-    /// # use epics_pvxs_sys::Context;
+    /// # use pvxs_sys::Context;
     /// # let mut ctx = Context::from_env().unwrap();
     /// ctx.put_string_array("my:pv:array", vec!["one".to_string(), "two".to_string()], 5.0).expect("PUT failed");
     /// ```
@@ -373,7 +373,7 @@ impl Context {
     /// # Example
     /// 
     /// ```no_run
-    /// # use epics_pvxs_sys::Context;
+    /// # use pvxs_sys::Context;
     /// # let mut ctx = Context::from_env().unwrap();
     /// let info = ctx.info("my:pv:name", 5.0).expect("INFO failed");
     /// println!("PV structure: {}", info);
@@ -395,7 +395,7 @@ impl Context {
     /// # Example
     /// 
     /// ```no_run
-    /// # use epics_pvxs_sys::Context;
+    /// # use pvxs_sys::Context;
     /// # let mut ctx = Context::from_env().unwrap();
     /// let mut rpc = ctx.rpc("my:service").expect("RPC creation failed");
     /// rpc.arg_string("command", "start");
@@ -423,7 +423,7 @@ impl Context {
     /// # Example
     /// 
     /// ```no_run
-    /// # use epics_pvxs_sys::Context;
+    /// # use pvxs_sys::Context;
     /// # let mut ctx = Context::from_env().unwrap();
     /// let mut monitor = ctx.monitor("TEST:PV_Double").expect("Monitor creation failed");
     /// 
@@ -457,7 +457,7 @@ impl Context {
     /// # Example
     /// 
     /// ```no_run
-    /// use epics_pvxs_sys::Context;
+    /// use pvxs_sys::Context;
     /// 
     /// let mut ctx = Context::from_env().expect("Context creation failed");
     /// let monitor = ctx.monitor_builder("TEST:PV_Double")?
@@ -465,7 +465,7 @@ impl Context {
     ///     .disconnect_exception(true)   // Throw disconnection exceptions
     ///     .exec()
     ///     .expect("Monitor creation failed");
-    /// # Ok::<(), epics_pvxs_sys::PvxsError>(())
+    /// # Ok::<(), pvxs_sys::PvxsError>(())
     /// ```
     pub fn monitor_builder(&mut self, pv_name: &str) -> Result<MonitorBuilder> {
         let inner = bridge::context_monitor_builder_create(self.inner.pin_mut(), pv_name.to_string())?;
@@ -492,8 +492,8 @@ impl Context {
     /// # Example
     /// 
     /// ```no_run
-    /// # use epics_pvxs_sys::Context;
-    /// # async fn example() -> Result<(), epics_pvxs_sys::PvxsError> {
+    /// # use pvxs_sys::Context;
+    /// # async fn example() -> Result<(), pvxs_sys::PvxsError> {
     /// let mut ctx = Context::from_env()?;
     /// let value = ctx.get_async("my:pv:name", 5.0).await?;
     /// let val = value.get_field_double("value")?;
@@ -517,8 +517,8 @@ impl Context {
     /// # Example
     /// 
     /// ```no_run
-    /// # use epics_pvxs_sys::Context;
-    /// # async fn example() -> Result<(), epics_pvxs_sys::PvxsError> {
+    /// # use pvxs_sys::Context;
+    /// # async fn example() -> Result<(), pvxs_sys::PvxsError> {
     /// let mut ctx = Context::from_env()?;
     /// ctx.put_double_async("my:pv:name", 42.0, 5.0).await?;
     /// # Ok(())
@@ -540,8 +540,8 @@ impl Context {
     /// # Example
     /// 
     /// ```no_run
-    /// # use epics_pvxs_sys::Context;
-    /// # async fn example() -> Result<(), epics_pvxs_sys::PvxsError> {
+    /// # use pvxs_sys::Context;
+    /// # async fn example() -> Result<(), pvxs_sys::PvxsError> {
     /// let mut ctx = Context::from_env()?;
     /// let info = ctx.info_async("my:pv:name", 5.0).await?;
     /// println!("PV structure: {}", info);
@@ -585,7 +585,7 @@ impl Context {
 /// # Example
 /// 
 /// ```no_run
-/// # use epics_pvxs_sys::{Context, Value};
+/// # use pvxs_sys::{Context, Value};
 /// # let mut ctx = Context::from_env().unwrap();
 /// let value: Value = ctx.get("my:pv:name", 5.0).unwrap();
 /// 
@@ -662,7 +662,7 @@ impl Value {
     /// # Example
     /// 
     /// ```no_run
-    /// # use epics_pvxs_sys::Context;
+    /// # use pvxs_sys::Context;
     /// # let mut ctx = Context::from_env().unwrap();
     /// let value = ctx.get("waveform:double:pv", 5.0).unwrap();
     /// let array = value.get_field_double_array("value").unwrap();
@@ -692,7 +692,7 @@ impl Value {
     /// # Example
     /// 
     /// ```no_run
-    /// # use epics_pvxs_sys::Context;
+    /// # use pvxs_sys::Context;
     /// # let mut ctx = Context::from_env().unwrap();
     /// let value = ctx.get("array:int32:pv", 5.0).unwrap();
     /// let array = value.get_field_int32_array("value").unwrap();
@@ -722,7 +722,7 @@ impl Value {
     /// # Example
     /// 
     /// ```no_run
-    /// # use epics_pvxs_sys::Context;
+    /// # use pvxs_sys::Context;
     /// # let mut ctx = Context::from_env().unwrap();
     /// // Get enum choices for an NTEnum PV
     /// let value = ctx.get("enum:pv", 5.0).unwrap();
@@ -759,7 +759,7 @@ impl fmt::Debug for Value {
 /// # Example
 /// 
 /// ```no_run
-/// # use epics_pvxs_sys::Context;
+/// # use pvxs_sys::Context;
 /// # let mut ctx = Context::from_env().unwrap();
 /// let mut rpc = ctx.rpc("my:service").expect("RPC creation failed");
 /// 
@@ -782,7 +782,7 @@ impl fmt::Debug for Value {
 /// # Example
 /// 
 /// ```no_run
-/// use epics_pvxs_sys::Context;
+/// use pvxs_sys::Context;
 /// 
 /// let mut ctx = Context::from_env()?;
 /// let mut monitor = ctx.monitor("MY:PV")?;
@@ -796,7 +796,7 @@ impl fmt::Debug for Value {
 ///     }
 ///     std::thread::sleep(std::time::Duration::from_millis(100));
 /// }
-/// # Ok::<(), epics_pvxs_sys::PvxsError>(())
+/// # Ok::<(), pvxs_sys::PvxsError>(())
 /// ```
 pub struct Monitor {
     inner: UniquePtr<bridge::MonitorWrapper>,
@@ -810,7 +810,7 @@ impl Monitor {
     /// # Example
     /// 
     /// ```no_run
-    /// # use epics_pvxs_sys::Context;
+    /// # use pvxs_sys::Context;
     /// # let mut ctx = Context::from_env().unwrap();
     /// # let mut monitor = ctx.monitor("MY:PV").unwrap();
     /// monitor.start();
@@ -827,12 +827,12 @@ impl Monitor {
     /// # Example
     /// 
     /// ```no_run
-    /// # use epics_pvxs_sys::Context;
+    /// # use pvxs_sys::Context;
     /// # let mut ctx = Context::from_env().unwrap();
     /// # let mut monitor = ctx.monitor("MY:PV").unwrap();
     /// # monitor.start();
     /// monitor.stop()?;
-    /// # Ok::<(), epics_pvxs_sys::PvxsError>(())
+    /// # Ok::<(), pvxs_sys::PvxsError>(())
     /// ```
     pub fn stop(&mut self) -> Result<()> {
         bridge::monitor_stop(self.inner.pin_mut())?;
@@ -848,7 +848,7 @@ impl Monitor {
     /// # Example
     /// 
     /// ```no_run
-    /// # use epics_pvxs_sys::Context;
+    /// # use pvxs_sys::Context;
     /// # let mut ctx = Context::from_env().unwrap();
     /// # let mut monitor = ctx.monitor("MY:PV").unwrap();
     /// monitor.start();
@@ -867,7 +867,7 @@ impl Monitor {
     /// # Example
     /// 
     /// ```no_run
-    /// # use epics_pvxs_sys::Context;
+    /// # use pvxs_sys::Context;
     /// # let mut ctx = Context::from_env().unwrap();
     /// # let mut monitor = ctx.monitor("MY:PV").unwrap();
     /// # monitor.start();
@@ -875,7 +875,7 @@ impl Monitor {
     ///     let value = monitor.try_get_update()?;
     ///     println!("Update available: {:?}", value);
     /// }
-    /// # Ok::<(), epics_pvxs_sys::PvxsError>(())
+    /// # Ok::<(), pvxs_sys::PvxsError>(())
     /// ```
     pub fn has_update(&self) -> bool {
         bridge::monitor_has_update(&self.inner)
@@ -896,7 +896,7 @@ impl Monitor {
     /// # Example
     /// 
     /// ```no_run
-    /// # use epics_pvxs_sys::Context;
+    /// # use pvxs_sys::Context;
     /// # let mut ctx = Context::from_env().unwrap();
     /// # let mut monitor = ctx.monitor("MY:PV").unwrap();
     /// # monitor.start();
@@ -904,7 +904,7 @@ impl Monitor {
     ///     Ok(value) => println!("Update received: {}", value),
     ///     Err(e) => println!("No update within 5 seconds: {}", e),
     /// }
-    /// # Ok::<(), epics_pvxs_sys::PvxsError>(())
+    /// # Ok::<(), pvxs_sys::PvxsError>(())
     /// ```
     pub fn get_update(&mut self, timeout: f64) -> Result<Value> {
         let value_wrapper = bridge::monitor_get_update(self.inner.pin_mut(), timeout)?;
@@ -923,7 +923,7 @@ impl Monitor {
     /// # Example
     /// 
     /// ```no_run
-    /// # use epics_pvxs_sys::Context;
+    /// # use pvxs_sys::Context;
     /// # let mut ctx = Context::from_env().unwrap();
     /// # let mut monitor = ctx.monitor("MY:PV").unwrap();
     /// # monitor.start();
@@ -932,7 +932,7 @@ impl Monitor {
     /// } else {
     ///     println!("No update available");
     /// }
-    /// # Ok::<(), epics_pvxs_sys::PvxsError>(())
+    /// # Ok::<(), pvxs_sys::PvxsError>(())
     /// ```
     pub fn try_get_update(&mut self) -> Result<Option<Value>> {
         match bridge::monitor_try_get_update(self.inner.pin_mut()) {
@@ -967,7 +967,7 @@ impl Monitor {
     /// # Example
     /// 
     /// ```no_run
-    /// # use epics_pvxs_sys::{Context, MonitorEvent};
+    /// # use pvxs_sys::{Context, MonitorEvent};
     /// # let mut ctx = Context::from_env().unwrap();
     /// # let mut monitor = ctx.monitor("MY:PV").unwrap();
     /// # monitor.start();
@@ -1025,7 +1025,7 @@ impl Monitor {
     /// # Example
     /// 
     /// ```no_run
-    /// # use epics_pvxs_sys::Context;
+    /// # use pvxs_sys::Context;
     /// # let mut ctx = Context::from_env().unwrap();
     /// # let mut monitor = ctx.monitor("MY:PV").unwrap();
     /// # monitor.start();
@@ -1048,7 +1048,7 @@ impl Monitor {
     /// # Example
     /// 
     /// ```no_run
-    /// # use epics_pvxs_sys::Context;
+    /// # use pvxs_sys::Context;
     /// # let mut ctx = Context::from_env().unwrap();
     /// # let monitor = ctx.monitor("MY:PV").unwrap();
     /// println!("Monitoring PV: {}", monitor.name());
@@ -1066,14 +1066,14 @@ impl Monitor {
 /// # Example
 /// 
 /// ```no_run
-/// use epics_pvxs_sys::Context;
+/// use pvxs_sys::Context;
 /// 
 /// let mut ctx = Context::from_env()?;
 /// let monitor = ctx.monitor_builder("MY:PV")?
 ///     .connect_exception(true)
 ///     .disconnect_exception(true)
 ///     .exec()?;
-/// # Ok::<(), epics_pvxs_sys::PvxsError>(())
+/// # Ok::<(), pvxs_sys::PvxsError>(())
 /// ```
 pub struct MonitorBuilder {
     inner: UniquePtr<bridge::MonitorBuilderWrapper>,
@@ -1091,12 +1091,12 @@ impl MonitorBuilder {
     /// # Example
     /// 
     /// ```no_run
-    /// # use epics_pvxs_sys::Context;
+    /// # use pvxs_sys::Context;
     /// # let mut ctx = Context::from_env().unwrap();
     /// let monitor = ctx.monitor_builder("MY:PV")?
     ///     .connect_exception(true) // Throw connection exceptions
     ///     .exec()?;
-    /// # Ok::<(), epics_pvxs_sys::PvxsError>(())
+    /// # Ok::<(), pvxs_sys::PvxsError>(())
     /// ```
     pub fn connect_exception(mut self, enable: bool) -> Self {
         // PVXS maskConnected(false) = don't mask = throw events, maskConnected(true) = mask = suppress events
@@ -1116,12 +1116,12 @@ impl MonitorBuilder {
     /// # Example
     /// 
     /// ```no_run
-    /// # use epics_pvxs_sys::Context;
+    /// # use pvxs_sys::Context;
     /// # let mut ctx = Context::from_env().unwrap();
     /// let monitor = ctx.monitor_builder("MY:PV")?
     ///     .disconnect_exception(true) // Throw disconnection exceptions
     ///     .exec()?;
-    /// # Ok::<(), epics_pvxs_sys::PvxsError>(())
+    /// # Ok::<(), pvxs_sys::PvxsError>(())
     /// ```
     pub fn disconnect_exception(mut self, enable: bool) -> Self {
         // PVXS maskDisconnected(false) = don't mask = throw events, maskDisconnected(true) = mask = suppress events
@@ -1142,7 +1142,7 @@ impl MonitorBuilder {
     /// # Example
     /// 
     /// ```no_run
-    /// # use epics_pvxs_sys::Context;
+    /// # use pvxs_sys::Context;
     /// # let mut ctx = Context::from_env().unwrap();
     /// 
     /// extern "C" fn my_callback() {
@@ -1152,7 +1152,7 @@ impl MonitorBuilder {
     /// let monitor = ctx.monitor_builder("MY:PV")?
     ///     .event(my_callback)
     ///     .exec()?;
-    /// # Ok::<(), epics_pvxs_sys::PvxsError>(())
+    /// # Ok::<(), pvxs_sys::PvxsError>(())
     /// ```
     pub fn event(mut self, callback: extern "C" fn()) -> Self {
         // Convert function pointer to usize for C++
@@ -1174,12 +1174,12 @@ impl MonitorBuilder {
     /// # Example
     /// 
     /// ```no_run
-    /// # use epics_pvxs_sys::Context;
+    /// # use pvxs_sys::Context;
     /// # let mut ctx = Context::from_env().unwrap();
     /// let monitor = ctx.monitor_builder("MY:PV")?
     ///     .connect_exception(true)
     ///     .exec()?;
-    /// # Ok::<(), epics_pvxs_sys::PvxsError>(())
+    /// # Ok::<(), pvxs_sys::PvxsError>(())
     /// ```
     pub fn exec(mut self) -> Result<Monitor> {
         let inner = bridge::monitor_builder_exec(self.inner.pin_mut())?;
@@ -1198,11 +1198,11 @@ impl MonitorBuilder {
     /// # Example
     /// 
     /// ```no_run
-    /// # use epics_pvxs_sys::Context;
+    /// # use pvxs_sys::Context;
     /// # let mut ctx = Context::from_env().unwrap();
     /// let monitor = ctx.monitor_builder("MY:PV")?
     ///     .exec_with_callback(123)?;
-    /// # Ok::<(), epics_pvxs_sys::PvxsError>(())
+    /// # Ok::<(), pvxs_sys::PvxsError>(())
     /// ```
     pub fn exec_with_callback(mut self, callback_id: u64) -> Result<Monitor> {
         let inner = bridge::monitor_builder_exec_with_callback(self.inner.pin_mut(), callback_id)?;
@@ -1225,7 +1225,7 @@ impl Rpc {
     /// # Example
     /// 
     /// ```no_run
-    /// # use epics_pvxs_sys::Context;
+    /// # use pvxs_sys::Context;
     /// # let mut ctx = Context::from_env().unwrap();
     /// # let mut rpc = ctx.rpc("my:service").unwrap();
     /// rpc.arg_string("filename", "/path/to/file.txt");
@@ -1282,7 +1282,7 @@ impl Rpc {
     /// # Example
     /// 
     /// ```no_run
-    /// # use epics_pvxs_sys::Context;
+    /// # use pvxs_sys::Context;
     /// # let mut ctx = Context::from_env().unwrap();
     /// let mut rpc = ctx.rpc("calculator:add").unwrap();
     /// rpc.arg_double("a", 10.0);
@@ -1308,8 +1308,8 @@ impl Rpc {
     /// # Example
     /// 
     /// ```no_run
-    /// # use epics_pvxs_sys::Context;
-    /// # async fn example() -> Result<(), epics_pvxs_sys::PvxsError> {
+    /// # use pvxs_sys::Context;
+    /// # async fn example() -> Result<(), pvxs_sys::PvxsError> {
     /// let mut ctx = Context::from_env()?;
     /// let mut rpc = ctx.rpc("my:service")?;
     /// rpc.arg_string("command", "process");
@@ -1343,7 +1343,7 @@ impl Rpc {
 /// # Example
 /// 
 /// ```no_run
-/// use epics_pvxs_sys::{Server, NTScalarMetadataBuilder};
+/// use pvxs_sys::{Server, NTScalarMetadataBuilder};
 /// 
 /// let mut server = Server::from_env()?; // Create server from environment
 /// //let mut server = Server::create_isolated()?; // Create an isolated server
@@ -1355,7 +1355,7 @@ impl Rpc {
 /// println!("Server running on port {}", server.tcp_port());
 /// 
 /// server.stop()?;
-/// # Ok::<(), epics_pvxs_sys::PvxsError>(())
+/// # Ok::<(), pvxs_sys::PvxsError>(())
 /// ```
 pub struct Server {
     inner: UniquePtr<ServerWrapper>,
@@ -1382,13 +1382,13 @@ impl Server {
     /// # Example
     /// 
     /// ```no_run
-    /// use epics_pvxs_sys::Server;
+    /// use pvxs_sys::Server;
     /// 
     /// let mut server = Server::create_isolated()?;
     /// server.start()?;
     /// println!("Isolated server started on TCP port {}", server.tcp_port());
     /// server.stop()?;
-    /// # Ok::<(), epics_pvxs_sys::PvxsError>(())
+    /// # Ok::<(), pvxs_sys::PvxsError>(())
     /// ```
     pub fn create_isolated() -> Result<Self> {
         let inner = bridge::server_create_isolated()?;
@@ -1487,10 +1487,10 @@ impl Server {
     /// # Example
     /// 
     /// ```no_run
-    /// # use epics_pvxs_sys::{Server, NTScalarMetadataBuilder};
+    /// # use pvxs_sys::{Server, NTScalarMetadataBuilder};
     /// # let mut server = Server::create_isolated().unwrap();
     /// let pv = server.create_pv_double("test:double", 42.5, NTScalarMetadataBuilder::new())?;
-    /// # Ok::<(), epics_pvxs_sys::PvxsError>(())
+    /// # Ok::<(), pvxs_sys::PvxsError>(())
     /// ```
     pub fn create_pv_double(&mut self, name: &str, initial_value: f64, metadata: NTScalarMetadataBuilder) -> Result<SharedPV> {
         let mut pv = SharedPV::create_mailbox()?;
@@ -1634,7 +1634,7 @@ impl Server {
 /// # Example
 /// 
 /// ```ignore
-/// use epics_pvxs_sys::SharedPV;
+/// use pvxs_sys::SharedPV;
 /// 
 /// let mut pv = SharedPV::create_mailbox()?;
 /// // Note: open_double is internal API, use Server::create_pv_* methods instead
@@ -1645,7 +1645,7 @@ impl Server {
 /// // Get current value
 /// let value = pv.fetch()?;
 /// println!("Current value: {}", value);
-/// # Ok::<(), epics_pvxs_sys::PvxsError>(())
+/// # Ok::<(), pvxs_sys::PvxsError>(())
 /// ```
 pub struct SharedPV {
     inner: UniquePtr<SharedPVWrapper>,
@@ -1678,7 +1678,7 @@ impl SharedPV {
     /// # Example
     /// 
     /// ```ignore
-    /// # use epics_pvxs_sys::{SharedPV, NTScalarMetadataBuilder, DisplayMetadata};
+    /// # use pvxs_sys::{SharedPV, NTScalarMetadataBuilder, DisplayMetadata};
     /// // Note: open_double is internal API
     /// // Use Server::create_pv_double instead for public API
     /// let mut pv = SharedPV::create_mailbox()?;
@@ -1695,7 +1695,7 @@ impl SharedPV {
     ///     .with_form(true);
     /// 
     /// pv.open_double(25.5, metadata)?;
-    /// # Ok::<(), epics_pvxs_sys::PvxsError>(())
+    /// # Ok::<(), pvxs_sys::PvxsError>(())
     /// ```
     pub(crate) fn open_double(&mut self, initial_value: f64, metadata: NTScalarMetadataBuilder) -> Result<()> {
         let meta = metadata.build()?;
@@ -1898,7 +1898,7 @@ impl SharedPV {
 /// # Example
 /// 
 /// ```ignore
-/// use epics_pvxs_sys::{StaticSource, SharedPV};
+/// use pvxs_sys::{StaticSource, SharedPV};
 /// 
 /// // Note: This example uses internal APIs
 /// // Use Server::create_pv_* methods for public API
@@ -1911,7 +1911,7 @@ impl SharedPV {
 /// 
 /// // Add source to server with priority 0
 /// // server.add_source("sensors", &mut source, 0)?;
-/// # Ok::<(), epics_pvxs_sys::PvxsError>(())
+/// # Ok::<(), pvxs_sys::PvxsError>(())
 /// ```
 pub struct StaticSource {
     inner: UniquePtr<StaticSourceWrapper>,

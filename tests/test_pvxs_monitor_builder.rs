@@ -1,5 +1,5 @@
 mod test_pvxs_monitor_builder {
-    use epics_pvxs_sys::{Context, Monitor, PvxsError, Server, NTScalarMetadataBuilder};
+    use pvxs_sys::{Context, Monitor, PvxsError, Server, NTScalarMetadataBuilder};
     use std::thread;
     use std::time::Duration;
 
@@ -397,7 +397,7 @@ mod test_pvxs_monitor_builder {
     /// Test callbacks with continuously incrementing server-side value
     #[test]
     fn test_monitor_builder_with_server_side_counter() -> Result<(), PvxsError> {
-        use epics_pvxs_sys::MonitorEvent;
+        use pvxs_sys::MonitorEvent;
         // Create server using from_env instead of create_isolated
         let mut server = Server::from_env()?;
         

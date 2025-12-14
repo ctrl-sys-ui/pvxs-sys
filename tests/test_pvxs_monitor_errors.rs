@@ -1,6 +1,6 @@
 mod test_pvxs_monitor_errors {
 
-    use epics_pvxs_sys::{Context, Server, NTScalarMetadataBuilder, MonitorEvent, PvxsError};
+    use pvxs_sys::{Context, Server, NTScalarMetadataBuilder, MonitorEvent, PvxsError};
     use std::thread;
     use std::time::Duration;
 

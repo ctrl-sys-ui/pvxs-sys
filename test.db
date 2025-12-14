@@ -1,4 +1,4 @@
-# test.db - Comprehensive EPICS IOC Database for Testing epics-pvxs-sys
+# test.db - Comprehensive EPICS IOC Database for Testing pvxs-sys
 # Created: 2025-10-16
 # Purpose: Provides a variety of PV types for testing Rust PVXS bindings
 #

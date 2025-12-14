@@ -1,5 +1,5 @@
 mod test_pvxs_local_int32_array_fetch_post {
-    use epics_pvxs_sys::{Server, NTScalarMetadataBuilder};
+    use pvxs_sys::{Server, NTScalarMetadataBuilder};
 
     #[test]
     fn test_pv_local_int32_array_fetch_post() {

@@ -1,5 +1,5 @@
 mod test_pvxs_monitor_callbacks {
-    use epics_pvxs_sys::{Context, Server, NTScalarMetadataBuilder, AtomicUsize, Ordering, MonitorEvent};
+    use pvxs_sys::{Context, Server, NTScalarMetadataBuilder, AtomicUsize, Ordering, MonitorEvent};
     use std::thread;
     use std::time::Duration;
 
