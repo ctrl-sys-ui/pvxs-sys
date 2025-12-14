@@ -2,6 +2,12 @@ use std::env;
 use std::path::PathBuf;
 
 fn main() {
+    // Skip C++ compilation when building docs on docs.rs
+    if cfg!(doc) || env::var("DOCS_RS").is_ok() {
+        println!("cargo:warning=Skipping C++ compilation for documentation build");
+        return;
+    }
+    
     // Get EPICS_BASE from environment
     let epics_base = env::var("EPICS_BASE")
         .expect("EPICS_BASE environment variable not set. Please set it to your EPICS base installation path.");

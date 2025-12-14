@@ -9,6 +9,8 @@ repository = "https://github.com/ctrl-sys-ui/pvxs-sys"
 keywords = ["epics", "pvxs", "control-system", "ffi", "sys"]
 categories = ["external-ffi-bindings", "science"]
 readme = "README.md"
+documentation = "https://docs.rs/pvxs-sys"
+homepage = "https://github.com/ctrl-sys-ui/pvxs-sys"
 
 # This is a *-sys crate providing low-level FFI bindings
 links = "pvxs"
@@ -34,5 +36,8 @@ name = "pvxs_sys"
 path = "src/lib.rs"
 
 [package.metadata.docs.rs]
-# Environment variables needed for docs.rs builds
+# Docs.rs doesn't have EPICS/PVXS installed, so skip actual compilation
+# Documentation will be generated from Rust source only
 rustdoc-args = ["--cfg", "docsrs"]
+no-default-features = true
+features = []
