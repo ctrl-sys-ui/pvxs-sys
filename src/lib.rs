@@ -23,7 +23,10 @@
 pub mod bridge;
 
 use cxx::UniquePtr;
+use crossbeam_channel as channel;
+use std::collections::HashMap;
 use std::fmt;
+use std::thread;
 
 pub use bridge::{ContextWrapper, ValueWrapper, RpcWrapper, MonitorWrapper, MonitorBuilderWrapper, ServerWrapper, SharedPVWrapper, StaticSourceWrapper};
 
@@ -1626,6 +1629,678 @@ impl Server {
     }
 }
 
+// ============================================================================
+// Server PV Manager (single-threaded PV ownership)
+// ============================================================================
+
+const ALARM_NO_ALARM: i32 = 0;
+const ALARM_MINOR: i32 = 1;
+const ALARM_MAJOR: i32 = 2;
+const ALARM_INVALID: i32 = 3;
+
+const ALARM_STATUS_NO_ALARM: i32 = 0;
+const ALARM_STATUS_HIHI: i32 = 3;
+const ALARM_STATUS_HIGH: i32 = 4;
+const ALARM_STATUS_LOLO: i32 = 5;
+const ALARM_STATUS_LOW: i32 = 6;
+const ALARM_STATUS_HWLIMIT: i32 = 11;
+
+#[derive(Clone, Debug, Default)]
+struct AlarmConfig {
+    control: Option<ControlMetadata>,
+    value_alarm: Option<ValueAlarmMetadata>,
+}
+
+#[derive(Clone, Debug)]
+struct AlarmResult {
+    allow: bool,
+    severity: i32,
+    status: i32,
+    message: String,
+}
+
+fn compute_alarm_for_scalar(value: f64, config: &AlarmConfig) -> AlarmResult {
+    // Control limits: if present, reject updates outside limits
+    if let Some(control) = &config.control {
+        if value < control.limit_low || value > control.limit_high {
+            return AlarmResult {
+                allow: false,
+                severity: ALARM_INVALID,
+                status: ALARM_STATUS_HWLIMIT,
+                message: "OUT_OF_CONTROL_LIMITS".to_string(),
+            };
+        }
+    }
+
+    if let Some(value_alarm) = &config.value_alarm {
+        if value_alarm.active {
+            if value <= value_alarm.low_alarm_limit {
+                return AlarmResult {
+                    allow: true,
+                    severity: value_alarm.low_alarm_severity,
+                    status: ALARM_STATUS_LOLO,
+                    message: "LOW_ALARM".to_string(),
+                };
+            }
+            if value <= value_alarm.low_warning_limit {
+                return AlarmResult {
+                    allow: true,
+                    severity: value_alarm.low_warning_severity,
+                    status: ALARM_STATUS_LOW,
+                    message: "LOW_WARNING".to_string(),
+                };
+            }
+            if value >= value_alarm.high_alarm_limit {
+                return AlarmResult {
+                    allow: true,
+                    severity: value_alarm.high_alarm_severity,
+                    status: ALARM_STATUS_HIHI,
+                    message: "HIGH_ALARM".to_string(),
+                };
+            }
+            if value >= value_alarm.high_warning_limit {
+                return AlarmResult {
+                    allow: true,
+                    severity: value_alarm.high_warning_severity,
+                    status: ALARM_STATUS_HIGH,
+                    message: "HIGH_WARNING".to_string(),
+                };
+            }
+        }
+    }
+
+    AlarmResult {
+        allow: true,
+        severity: ALARM_NO_ALARM,
+        status: ALARM_STATUS_NO_ALARM,
+        message: "OK".to_string(),
+    }
+}
+
+enum ManagerCommand {
+    CreateDouble {
+        name: String,
+        initial: f64,
+        metadata: NTScalarMetadataBuilder,
+        reply: channel::Sender<Result<()>>,
+    },
+    CreateDoubleArray {
+        name: String,
+        initial: Vec<f64>,
+        metadata: NTScalarMetadataBuilder,
+        reply: channel::Sender<Result<()>>,
+    },
+    CreateInt32 {
+        name: String,
+        initial: i32,
+        metadata: NTScalarMetadataBuilder,
+        reply: channel::Sender<Result<()>>,
+    },
+    CreateInt32Array {
+        name: String,
+        initial: Vec<i32>,
+        metadata: NTScalarMetadataBuilder,
+        reply: channel::Sender<Result<()>>,
+    },
+    CreateString {
+        name: String,
+        initial: String,
+        metadata: NTScalarMetadataBuilder,
+        reply: channel::Sender<Result<()>>,
+    },
+    CreateStringArray {
+        name: String,
+        initial: Vec<String>,
+        metadata: NTScalarMetadataBuilder,
+        reply: channel::Sender<Result<()>>,
+    },
+    PostDouble {
+        name: String,
+        value: f64,
+        reply: channel::Sender<Result<()>>,
+    },
+    PostDoubleArray {
+        name: String,
+        value: Vec<f64>,
+        reply: channel::Sender<Result<()>>,
+    },
+    PostInt32 {
+        name: String,
+        value: i32,
+        reply: channel::Sender<Result<()>>,
+    },
+    PostInt32Array {
+        name: String,
+        value: Vec<i32>,
+        reply: channel::Sender<Result<()>>,
+    },
+    PostString {
+        name: String,
+        value: String,
+        reply: channel::Sender<Result<()>>,
+    },
+    PostStringArray {
+        name: String,
+        value: Vec<String>,
+        reply: channel::Sender<Result<()>>,
+    },
+    Remove {
+        name: String,
+        reply: channel::Sender<Result<()>>,
+    },
+    Stop {
+        reply: channel::Sender<Result<()>>,
+    },
+}
+
+enum ManagedPv {
+    Double {
+        pv: SharedPV,
+        alarm: AlarmConfig,
+        last: f64,
+    },
+    DoubleArray(SharedPV),
+    Int32 {
+        pv: SharedPV,
+        alarm: AlarmConfig,
+        last: i32,
+    },
+    Int32Array(SharedPV),
+    String(SharedPV),
+    StringArray(SharedPV),
+}
+
+#[derive(Clone)]
+pub struct ServerPvManagerHandle {
+    tx: channel::Sender<ManagerCommand>,
+    tcp_port: u16,
+    udp_port: u16,
+}
+
+impl ServerPvManagerHandle {
+    pub fn tcp_port(&self) -> u16 {
+        self.tcp_port
+    }
+
+    pub fn udp_port(&self) -> u16 {
+        self.udp_port
+    }
+
+    pub fn create_pv_double(&self, name: &str, initial: f64, metadata: NTScalarMetadataBuilder) -> Result<()> {
+        let (reply_tx, reply_rx) = channel::bounded(1);
+        self.tx
+            .send(ManagerCommand::CreateDouble {
+                name: name.to_string(),
+                initial,
+                metadata,
+                reply: reply_tx,
+            })
+            .map_err(|_| PvxsError::new("ServerPvManager worker stopped"))?;
+        reply_rx.recv().map_err(|_| PvxsError::new("ServerPvManager worker stopped"))?
+    }
+
+    pub fn create_pv_double_array(&self, name: &str, initial: Vec<f64>, metadata: NTScalarMetadataBuilder) -> Result<()> {
+        let (reply_tx, reply_rx) = channel::bounded(1);
+        self.tx
+            .send(ManagerCommand::CreateDoubleArray {
+                name: name.to_string(),
+                initial,
+                metadata,
+                reply: reply_tx,
+            })
+            .map_err(|_| PvxsError::new("ServerPvManager worker stopped"))?;
+        reply_rx.recv().map_err(|_| PvxsError::new("ServerPvManager worker stopped"))?
+    }
+
+    pub fn create_pv_int32(&self, name: &str, initial: i32, metadata: NTScalarMetadataBuilder) -> Result<()> {
+        let (reply_tx, reply_rx) = channel::bounded(1);
+        self.tx
+            .send(ManagerCommand::CreateInt32 {
+                name: name.to_string(),
+                initial,
+                metadata,
+                reply: reply_tx,
+            })
+            .map_err(|_| PvxsError::new("ServerPvManager worker stopped"))?;
+        reply_rx.recv().map_err(|_| PvxsError::new("ServerPvManager worker stopped"))?
+    }
+
+    pub fn create_pv_int32_array(&self, name: &str, initial: Vec<i32>, metadata: NTScalarMetadataBuilder) -> Result<()> {
+        let (reply_tx, reply_rx) = channel::bounded(1);
+        self.tx
+            .send(ManagerCommand::CreateInt32Array {
+                name: name.to_string(),
+                initial,
+                metadata,
+                reply: reply_tx,
+            })
+            .map_err(|_| PvxsError::new("ServerPvManager worker stopped"))?;
+        reply_rx.recv().map_err(|_| PvxsError::new("ServerPvManager worker stopped"))?
+    }
+
+    pub fn create_pv_string(&self, name: &str, initial: &str, metadata: NTScalarMetadataBuilder) -> Result<()> {
+        let (reply_tx, reply_rx) = channel::bounded(1);
+        self.tx
+            .send(ManagerCommand::CreateString {
+                name: name.to_string(),
+                initial: initial.to_string(),
+                metadata,
+                reply: reply_tx,
+            })
+            .map_err(|_| PvxsError::new("ServerPvManager worker stopped"))?;
+        reply_rx.recv().map_err(|_| PvxsError::new("ServerPvManager worker stopped"))?
+    }
+
+    pub fn create_pv_string_array(&self, name: &str, initial: Vec<String>, metadata: NTScalarMetadataBuilder) -> Result<()> {
+        let (reply_tx, reply_rx) = channel::bounded(1);
+        self.tx
+            .send(ManagerCommand::CreateStringArray {
+                name: name.to_string(),
+                initial,
+                metadata,
+                reply: reply_tx,
+            })
+            .map_err(|_| PvxsError::new("ServerPvManager worker stopped"))?;
+        reply_rx.recv().map_err(|_| PvxsError::new("ServerPvManager worker stopped"))?
+    }
+
+    pub fn post_double(&self, name: &str, value: f64) -> Result<()> {
+        let (reply_tx, reply_rx) = channel::bounded(1);
+        self.tx
+            .send(ManagerCommand::PostDouble {
+                name: name.to_string(),
+                value,
+                reply: reply_tx,
+            })
+            .map_err(|_| PvxsError::new("ServerPvManager worker stopped"))?;
+        reply_rx.recv().map_err(|_| PvxsError::new("ServerPvManager worker stopped"))?
+    }
+
+    pub fn post_double_array(&self, name: &str, value: Vec<f64>) -> Result<()> {
+        let (reply_tx, reply_rx) = channel::bounded(1);
+        self.tx
+            .send(ManagerCommand::PostDoubleArray {
+                name: name.to_string(),
+                value,
+                reply: reply_tx,
+            })
+            .map_err(|_| PvxsError::new("ServerPvManager worker stopped"))?;
+        reply_rx.recv().map_err(|_| PvxsError::new("ServerPvManager worker stopped"))?
+    }
+
+    pub fn post_int32(&self, name: &str, value: i32) -> Result<()> {
+        let (reply_tx, reply_rx) = channel::bounded(1);
+        self.tx
+            .send(ManagerCommand::PostInt32 {
+                name: name.to_string(),
+                value,
+                reply: reply_tx,
+            })
+            .map_err(|_| PvxsError::new("ServerPvManager worker stopped"))?;
+        reply_rx.recv().map_err(|_| PvxsError::new("ServerPvManager worker stopped"))?
+    }
+
+    pub fn post_int32_array(&self, name: &str, value: Vec<i32>) -> Result<()> {
+        let (reply_tx, reply_rx) = channel::bounded(1);
+        self.tx
+            .send(ManagerCommand::PostInt32Array {
+                name: name.to_string(),
+                value,
+                reply: reply_tx,
+            })
+            .map_err(|_| PvxsError::new("ServerPvManager worker stopped"))?;
+        reply_rx.recv().map_err(|_| PvxsError::new("ServerPvManager worker stopped"))?
+    }
+
+    pub fn post_string(&self, name: &str, value: &str) -> Result<()> {
+        let (reply_tx, reply_rx) = channel::bounded(1);
+        self.tx
+            .send(ManagerCommand::PostString {
+                name: name.to_string(),
+                value: value.to_string(),
+                reply: reply_tx,
+            })
+            .map_err(|_| PvxsError::new("ServerPvManager worker stopped"))?;
+        reply_rx.recv().map_err(|_| PvxsError::new("ServerPvManager worker stopped"))?
+    }
+
+    pub fn post_string_array(&self, name: &str, value: Vec<String>) -> Result<()> {
+        let (reply_tx, reply_rx) = channel::bounded(1);
+        self.tx
+            .send(ManagerCommand::PostStringArray {
+                name: name.to_string(),
+                value,
+                reply: reply_tx,
+            })
+            .map_err(|_| PvxsError::new("ServerPvManager worker stopped"))?;
+        reply_rx.recv().map_err(|_| PvxsError::new("ServerPvManager worker stopped"))?
+    }
+
+    pub fn remove_pv(&self, name: &str) -> Result<()> {
+        let (reply_tx, reply_rx) = channel::bounded(1);
+        self.tx
+            .send(ManagerCommand::Remove {
+                name: name.to_string(),
+                reply: reply_tx,
+            })
+            .map_err(|_| PvxsError::new("ServerPvManager worker stopped"))?;
+        reply_rx.recv().map_err(|_| PvxsError::new("ServerPvManager worker stopped"))?
+    }
+}
+
+pub struct ServerPvManager {
+    handle: ServerPvManagerHandle,
+    join: Option<thread::JoinHandle<()>>,
+}
+
+impl ServerPvManager {
+    pub fn start_from_env() -> Result<Self> {
+        Self::start_inner(false)
+    }
+
+    pub fn start_isolated() -> Result<Self> {
+        Self::start_inner(true)
+    }
+
+    pub fn handle(&self) -> ServerPvManagerHandle {
+        self.handle.clone()
+    }
+
+    pub fn tcp_port(&self) -> u16 {
+        self.handle.tcp_port()
+    }
+
+    pub fn udp_port(&self) -> u16 {
+        self.handle.udp_port()
+    }
+
+    pub fn create_pv_double(&self, name: &str, initial: f64, metadata: NTScalarMetadataBuilder) -> Result<()> {
+        self.handle.create_pv_double(name, initial, metadata)
+    }
+
+    pub fn create_pv_double_array(&self, name: &str, initial: Vec<f64>, metadata: NTScalarMetadataBuilder) -> Result<()> {
+        self.handle.create_pv_double_array(name, initial, metadata)
+    }
+
+    pub fn create_pv_int32(&self, name: &str, initial: i32, metadata: NTScalarMetadataBuilder) -> Result<()> {
+        self.handle.create_pv_int32(name, initial, metadata)
+    }
+
+    pub fn create_pv_int32_array(&self, name: &str, initial: Vec<i32>, metadata: NTScalarMetadataBuilder) -> Result<()> {
+        self.handle.create_pv_int32_array(name, initial, metadata)
+    }
+
+    pub fn create_pv_string(&self, name: &str, initial: &str, metadata: NTScalarMetadataBuilder) -> Result<()> {
+        self.handle.create_pv_string(name, initial, metadata)
+    }
+
+    pub fn create_pv_string_array(&self, name: &str, initial: Vec<String>, metadata: NTScalarMetadataBuilder) -> Result<()> {
+        self.handle.create_pv_string_array(name, initial, metadata)
+    }
+
+    pub fn post_double(&self, name: &str, value: f64) -> Result<()> {
+        self.handle.post_double(name, value)
+    }
+
+    pub fn post_double_array(&self, name: &str, value: Vec<f64>) -> Result<()> {
+        self.handle.post_double_array(name, value)
+    }
+
+    pub fn post_int32(&self, name: &str, value: i32) -> Result<()> {
+        self.handle.post_int32(name, value)
+    }
+
+    pub fn post_int32_array(&self, name: &str, value: Vec<i32>) -> Result<()> {
+        self.handle.post_int32_array(name, value)
+    }
+
+    pub fn post_string(&self, name: &str, value: &str) -> Result<()> {
+        self.handle.post_string(name, value)
+    }
+
+    pub fn post_string_array(&self, name: &str, value: Vec<String>) -> Result<()> {
+        self.handle.post_string_array(name, value)
+    }
+
+    pub fn remove_pv(&self, name: &str) -> Result<()> {
+        self.handle.remove_pv(name)
+    }
+
+    pub fn stop(mut self) -> Result<()> {
+        let (reply_tx, reply_rx) = channel::bounded(1);
+        self.handle
+            .tx
+            .send(ManagerCommand::Stop { reply: reply_tx })
+            .map_err(|_| PvxsError::new("ServerPvManager worker stopped"))?;
+        let result = reply_rx.recv().map_err(|_| PvxsError::new("ServerPvManager worker stopped"))?;
+        if let Some(join) = self.join.take() {
+            let _ = join.join();
+        }
+        result
+    }
+
+    fn start_inner(isolated: bool) -> Result<Self> {
+        let (tx, rx) = channel::unbounded::<ManagerCommand>();
+        let (ready_tx, ready_rx) = channel::bounded::<Result<(u16, u16)>>(1);
+
+        let join = thread::spawn(move || {
+            let mut server = if isolated {
+                match Server::create_isolated() {
+                    Ok(s) => s,
+                    Err(e) => {
+                        let _ = ready_tx.send(Err(e));
+                        return;
+                    }
+                }
+            } else {
+                match Server::from_env() {
+                    Ok(s) => s,
+                    Err(e) => {
+                        let _ = ready_tx.send(Err(e));
+                        return;
+                    }
+                }
+            };
+
+            if let Err(e) = server.start() {
+                let _ = ready_tx.send(Err(e));
+                return;
+            }
+
+            let _ = ready_tx.send(Ok((server.tcp_port(), server.udp_port())));
+
+            let mut pvs: HashMap<String, ManagedPv> = HashMap::new();
+
+            while let Ok(cmd) = rx.recv() {
+                match cmd {
+                    ManagerCommand::CreateDouble { name, initial, metadata, reply } => {
+                        let result = if pvs.contains_key(&name) {
+                            Err(PvxsError::new("PV already exists"))
+                        } else {
+                            let alarm = AlarmConfig {
+                                control: metadata.control.clone(),
+                                value_alarm: metadata.value_alarm.clone(),
+                            };
+                            match server.create_pv_double(&name, initial, metadata) {
+                                Ok(pv) => {
+                                    pvs.insert(name, ManagedPv::Double { pv, alarm, last: initial });
+                                    Ok(())
+                                }
+                                Err(e) => Err(e),
+                            }
+                        };
+                        let _ = reply.send(result);
+                    }
+                    ManagerCommand::CreateDoubleArray { name, initial, metadata, reply } => {
+                        let result = if pvs.contains_key(&name) {
+                            Err(PvxsError::new("PV already exists"))
+                        } else {
+                            match server.create_pv_double_array(&name, initial, metadata) {
+                                Ok(pv) => {
+                                    pvs.insert(name, ManagedPv::DoubleArray(pv));
+                                    Ok(())
+                                }
+                                Err(e) => Err(e),
+                            }
+                        };
+                        let _ = reply.send(result);
+                    }
+                    ManagerCommand::CreateInt32 { name, initial, metadata, reply } => {
+                        let result = if pvs.contains_key(&name) {
+                            Err(PvxsError::new("PV already exists"))
+                        } else {
+                            let alarm = AlarmConfig {
+                                control: metadata.control.clone(),
+                                value_alarm: metadata.value_alarm.clone(),
+                            };
+                            match server.create_pv_int32(&name, initial, metadata) {
+                                Ok(pv) => {
+                                    pvs.insert(name, ManagedPv::Int32 { pv, alarm, last: initial });
+                                    Ok(())
+                                }
+                                Err(e) => Err(e),
+                            }
+                        };
+                        let _ = reply.send(result);
+                    }
+                    ManagerCommand::CreateInt32Array { name, initial, metadata, reply } => {
+                        let result = if pvs.contains_key(&name) {
+                            Err(PvxsError::new("PV already exists"))
+                        } else {
+                            match server.create_pv_int32_array(&name, initial, metadata) {
+                                Ok(pv) => {
+                                    pvs.insert(name, ManagedPv::Int32Array(pv));
+                                    Ok(())
+                                }
+                                Err(e) => Err(e),
+                            }
+                        };
+                        let _ = reply.send(result);
+                    }
+                    ManagerCommand::CreateString { name, initial, metadata, reply } => {
+                        let result = if pvs.contains_key(&name) {
+                            Err(PvxsError::new("PV already exists"))
+                        } else {
+                            match server.create_pv_string(&name, &initial, metadata) {
+                                Ok(pv) => {
+                                    pvs.insert(name, ManagedPv::String(pv));
+                                    Ok(())
+                                }
+                                Err(e) => Err(e),
+                            }
+                        };
+                        let _ = reply.send(result);
+                    }
+                    ManagerCommand::CreateStringArray { name, initial, metadata, reply } => {
+                        let result = if pvs.contains_key(&name) {
+                            Err(PvxsError::new("PV already exists"))
+                        } else {
+                            match server.create_pv_string_array(&name, initial, metadata) {
+                                Ok(pv) => {
+                                    pvs.insert(name, ManagedPv::StringArray(pv));
+                                    Ok(())
+                                }
+                                Err(e) => Err(e),
+                            }
+                        };
+                        let _ = reply.send(result);
+                    }
+                    ManagerCommand::PostDouble { name, value, reply } => {
+                        let result = match pvs.get_mut(&name) {
+                            Some(ManagedPv::Double { pv, alarm, last }) => {
+                                let alarm_result = compute_alarm_for_scalar(value, alarm);
+                                let post_value = if alarm_result.allow { value } else { *last };
+                                let result = pv.post_double_with_alarm(
+                                    post_value,
+                                    alarm_result.severity,
+                                    alarm_result.status,
+                                    alarm_result.message,
+                                );
+                                if result.is_ok() && alarm_result.allow {
+                                    *last = post_value;
+                                }
+                                result
+                            }
+                            _ => Err(PvxsError::new("PV not found or type mismatch")),
+                        };
+                        let _ = reply.send(result);
+                    }
+                    ManagerCommand::PostDoubleArray { name, value, reply } => {
+                        let result = match pvs.get_mut(&name) {
+                            Some(ManagedPv::DoubleArray(pv)) => pv.post_double_array(&value),
+                            _ => Err(PvxsError::new("PV not found or type mismatch")),
+                        };
+                        let _ = reply.send(result);
+                    }
+                    ManagerCommand::PostInt32 { name, value, reply } => {
+                        let result = match pvs.get_mut(&name) {
+                            Some(ManagedPv::Int32 { pv, alarm, last }) => {
+                                let alarm_result = compute_alarm_for_scalar(value as f64, alarm);
+                                let post_value = if alarm_result.allow { value } else { *last };
+                                let result = pv.post_int32_with_alarm(
+                                    post_value,
+                                    alarm_result.severity,
+                                    alarm_result.status,
+                                    alarm_result.message,
+                                );
+                                if result.is_ok() && alarm_result.allow {
+                                    *last = post_value;
+                                }
+                                result
+                            }
+                            _ => Err(PvxsError::new("PV not found or type mismatch")),
+                        };
+                        let _ = reply.send(result);
+                    }
+                    ManagerCommand::PostInt32Array { name, value, reply } => {
+                        let result = match pvs.get_mut(&name) {
+                            Some(ManagedPv::Int32Array(pv)) => pv.post_int32_array(&value),
+                            _ => Err(PvxsError::new("PV not found or type mismatch")),
+                        };
+                        let _ = reply.send(result);
+                    }
+                    ManagerCommand::PostString { name, value, reply } => {
+                        let result = match pvs.get_mut(&name) {
+                            Some(ManagedPv::String(pv)) => pv.post_string(&value),
+                            _ => Err(PvxsError::new("PV not found or type mismatch")),
+                        };
+                        let _ = reply.send(result);
+                    }
+                    ManagerCommand::PostStringArray { name, value, reply } => {
+                        let result = match pvs.get_mut(&name) {
+                            Some(ManagedPv::StringArray(pv)) => pv.post_string_array(&value),
+                            _ => Err(PvxsError::new("PV not found or type mismatch")),
+                        };
+                        let _ = reply.send(result);
+                    }
+                    ManagerCommand::Remove { name, reply } => {
+                        let result = if pvs.remove(&name).is_some() {
+                            server.remove_pv(&name)
+                        } else {
+                            Err(PvxsError::new("PV not found"))
+                        };
+                        let _ = reply.send(result);
+                    }
+                    ManagerCommand::Stop { reply } => {
+                        let result = server.stop();
+                        let _ = reply.send(result);
+                        break;
+                    }
+                }
+            }
+        });
+
+        let (tcp_port, udp_port) = ready_rx
+            .recv()
+            .map_err(|_| PvxsError::new("ServerPvManager failed to start"))??;
+
+        Ok(Self {
+            handle: ServerPvManagerHandle { tx, tcp_port, udp_port },
+            join: Some(join),
+        })
+    }
+}
+
 /// A shared process variable that can be hosted by a server
 /// 
 /// SharedPVs represent individual process variables with typed values
@@ -1813,6 +2488,16 @@ impl SharedPV {
         bridge::shared_pv_post_int32(self.inner.pin_mut(), value)?;
         Ok(())
     }
+
+    pub(crate) fn post_double_with_alarm(&mut self, value: f64, severity: i32, status: i32, message: String) -> Result<()> {
+        bridge::shared_pv_post_double_with_alarm(self.inner.pin_mut(), value, severity, status, message)?;
+        Ok(())
+    }
+
+    pub(crate) fn post_int32_with_alarm(&mut self, value: i32, severity: i32, status: i32, message: String) -> Result<()> {
+        bridge::shared_pv_post_int32_with_alarm(self.inner.pin_mut(), value, severity, status, message)?;
+        Ok(())
+    }
     
     /// Post a new string value to the PV
     /// 
@@ -1890,7 +2575,7 @@ impl SharedPV {
     }
 }
 
-/// A static source for organizing collections of PVs
+/// A static source for organising collections of PVs
 /// 
 /// StaticSource allows grouping related PVs together with common
 /// configuration and management.

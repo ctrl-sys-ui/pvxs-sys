@@ -602,7 +602,9 @@ namespace pvxs_wrapper
     bool shared_pv_is_open(const SharedPVWrapper &pv);
     void shared_pv_close(SharedPVWrapper &pv);
     void shared_pv_post_double(SharedPVWrapper &pv, double value);
+    void shared_pv_post_double_with_alarm(SharedPVWrapper &pv, double value, int32_t severity, int32_t status, rust::String message);
     void shared_pv_post_int32(SharedPVWrapper &pv, int32_t value);
+    void shared_pv_post_int32_with_alarm(SharedPVWrapper &pv, int32_t value, int32_t severity, int32_t status, rust::String message);
     void shared_pv_post_string(SharedPVWrapper &pv, rust::String value);
     void shared_pv_post_enum(SharedPVWrapper &pv, int16_t value);
     void shared_pv_post_double_array(SharedPVWrapper &pv, rust::Vec<double> value);

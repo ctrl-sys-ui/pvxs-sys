@@ -1,10 +1,6 @@
 // server_wrapper.cpp - C++ server wrapper layer for PVXS
 
 #include "wrapper.h"
-#include <sstream>
-#include <chrono>
-#include <thread>
-#include <pvxs/log.h>
 
 namespace pvxs_wrapper {
 
@@ -824,6 +820,21 @@ void shared_pv_post_double(SharedPVWrapper& pv, double value) {
     }
 }
 
+void shared_pv_post_double_with_alarm(SharedPVWrapper& pv, double value, int32_t severity, int32_t status, rust::String message) {
+    try {
+        auto update = pv.get_template().cloneEmpty();
+        update["value"] = value;
+        update["alarm.severity"] = severity;
+        update["alarm.status"] = status;
+        update["alarm.message"] = std::string(message);
+
+        ValueWrapper wrapper(std::move(update));
+        pv.post_value(wrapper);
+    } catch (const std::exception& e) {
+        throw PvxsError(std::string("Error posting double value with alarm to SharedPV: ") + e.what());
+    }
+}
+
 void shared_pv_post_int32(SharedPVWrapper& pv, int32_t value) {
     try {
         // Use cloneEmpty() to get correct structure, then set the value
@@ -834,6 +845,21 @@ void shared_pv_post_int32(SharedPVWrapper& pv, int32_t value) {
         pv.post_value(wrapper);
     } catch (const std::exception& e) {
         throw PvxsError(std::string("Error posting int32 value to SharedPV: ") + e.what());
+    }
+}
+
+void shared_pv_post_int32_with_alarm(SharedPVWrapper& pv, int32_t value, int32_t severity, int32_t status, rust::String message) {
+    try {
+        auto update = pv.get_template().cloneEmpty();
+        update["value"] = value;
+        update["alarm.severity"] = severity;
+        update["alarm.status"] = status;
+        update["alarm.message"] = std::string(message);
+
+        ValueWrapper wrapper(std::move(update));
+        pv.post_value(wrapper);
+    } catch (const std::exception& e) {
+        throw PvxsError(std::string("Error posting int32 value with alarm to SharedPV: ") + e.what());
     }
 }
 

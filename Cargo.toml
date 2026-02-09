@@ -20,6 +20,7 @@ cxx = "1.0.120"
 tokio = { version = "1.0", features = ["full"], optional = true }
 futures = { version = "0.3", optional = true }
 chrono = { version = "0.4", features = ["serde"] }
+crossbeam-channel = "0.5"
 
 [features]
 default = ["async"]
