@@ -6,9 +6,9 @@ use std::time::Duration;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Starting EPICS PVA server with rich NTScalar metadata...");
     
-    // Create server with isolated configuration
+    // Create server with remote configuration
     let mut server = Server::from_env()?;
-    println!("Server created in isolated mode");
+    println!("Server created in remote mode");
     
     // Create a static source
     let mut source = StaticSource::create()?;

@@ -1633,17 +1633,39 @@ impl Server {
 // Server PV Manager (single-threaded PV ownership)
 // ============================================================================
 
-const ALARM_NO_ALARM: i32 = 0;
-const ALARM_MINOR: i32 = 1;
-const ALARM_MAJOR: i32 = 2;
-const ALARM_INVALID: i32 = 3;
+enum AlarmSeverity {
+    NoAlarm = 0,
+    Minor = 1,
+    Major = 2,
+    Invalid = 3,
+    NSEV = 4,
+ } 
 
-const ALARM_STATUS_NO_ALARM: i32 = 0;
-const ALARM_STATUS_HIHI: i32 = 3;
-const ALARM_STATUS_HIGH: i32 = 4;
-const ALARM_STATUS_LOLO: i32 = 5;
-const ALARM_STATUS_LOW: i32 = 6;
-const ALARM_STATUS_HWLIMIT: i32 = 11;
+enum AlarmStatus  {
+    NoAlarm = 0 ,
+    Read = 1,            /* Read alarm (read error) */
+    Write = 2,           /* Write alarm (write error) */
+    HiHi = 3,            /* High high limit alarm */
+    High = 4,            /* High limit alarm */
+    LoLo = 5,            /* Low low limit alarm */
+    Low = 6,             /* Low limit alarm */
+    State = 7,           /* State alarm (e.g. off/on) */
+    Cos = 8,             /* Change of state alarm */
+    Comm = 9,            /* Communication alarm */
+    Timeout = 10,         /* Timeout alarm */
+    HwLimit = 11,         /* Hardware limit alarm */
+    Calc = 12,            /* Calculation expression error */
+    Scan = 13,            /* Scan alarm, e.g. record not processed (10 times) or not in desired scan list */
+    Link = 14,            /* Link alarm */
+    Soft = 15,            /* Soft alarm, e.g. in sub record if subroutine gives error */
+    BadSub = 16,          /* Bad subroutine alarm, e.g. in sub record subroutine not defined */
+    UDF = 17,             /* Undefined value alarm, e.g. record never processed */
+    Disable = 18,         /* Record disabled using DISV/DISA fields */
+    Simm = 19,            /* Record is in simulation mode */
+    ReadAccess = 20,      /* Read access permission problem */
+    WriteAccess = 21,     /* Write access permission problem */
+    NSTATUS = 22,         /* Number of alarm conditions */
+}
 
 #[derive(Clone, Debug, Default)]
 struct AlarmConfig {
@@ -1665,8 +1687,8 @@ fn compute_alarm_for_scalar(value: f64, config: &AlarmConfig) -> AlarmResult {
         if value < control.limit_low || value > control.limit_high {
             return AlarmResult {
                 allow: false,
-                severity: ALARM_INVALID,
-                status: ALARM_STATUS_HWLIMIT,
+                severity: AlarmSeverity::Invalid as i32,
+                status: AlarmStatus::HwLimit as i32,
                 message: "OUT_OF_CONTROL_LIMITS".to_string(),
             };
         }
@@ -1678,7 +1700,7 @@ fn compute_alarm_for_scalar(value: f64, config: &AlarmConfig) -> AlarmResult {
                 return AlarmResult {
                     allow: true,
                     severity: value_alarm.low_alarm_severity,
-                    status: ALARM_STATUS_LOLO,
+                    status: AlarmStatus::LoLo as i32,
                     message: "LOW_ALARM".to_string(),
                 };
             }
@@ -1686,7 +1708,7 @@ fn compute_alarm_for_scalar(value: f64, config: &AlarmConfig) -> AlarmResult {
                 return AlarmResult {
                     allow: true,
                     severity: value_alarm.low_warning_severity,
-                    status: ALARM_STATUS_LOW,
+                    status: AlarmStatus::Low as i32,
                     message: "LOW_WARNING".to_string(),
                 };
             }
@@ -1694,7 +1716,7 @@ fn compute_alarm_for_scalar(value: f64, config: &AlarmConfig) -> AlarmResult {
                 return AlarmResult {
                     allow: true,
                     severity: value_alarm.high_alarm_severity,
-                    status: ALARM_STATUS_HIHI,
+                    status: AlarmStatus::HiHi as i32,
                     message: "HIGH_ALARM".to_string(),
                 };
             }
@@ -1702,7 +1724,7 @@ fn compute_alarm_for_scalar(value: f64, config: &AlarmConfig) -> AlarmResult {
                 return AlarmResult {
                     allow: true,
                     severity: value_alarm.high_warning_severity,
-                    status: ALARM_STATUS_HIGH,
+                    status: AlarmStatus::High as i32,
                     message: "HIGH_WARNING".to_string(),
                 };
             }
@@ -1711,8 +1733,8 @@ fn compute_alarm_for_scalar(value: f64, config: &AlarmConfig) -> AlarmResult {
 
     AlarmResult {
         allow: true,
-        severity: ALARM_NO_ALARM,
-        status: ALARM_STATUS_NO_ALARM,
+        severity: AlarmSeverity::NoAlarm as i32,
+        status: AlarmStatus::NoAlarm as i32,
         message: "OK".to_string(),
     }
 }
