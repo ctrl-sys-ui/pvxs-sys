@@ -1,19 +1,19 @@
 #[cfg(test)]
 mod test_server_alarm_manager_lifecycle {
-    use pvxs_sys::{ServerPvManager, Context, NTScalarMetadataBuilder, ControlMetadata, ValueAlarmMetadata};
+    use pvxs_sys::{Server, Context, NTScalarMetadataBuilder, ControlMetadata, AlarmMetadata};
     use std::thread;
     use std::time::Duration;
 
     #[test]
     fn test_create_multiple_pvs_with_alarms() {
-        let manager = ServerPvManager::start_from_env()
-            .expect("Failed to create ServerPvManager");
+        let manager = Server::start_from_env()
+            .expect("Failed to create Server");
 
         // Create multiple PVs with alarm metadata
         for i in 0..5 {
             let pv_name = format!("test:lifecycle:pv{}", i);
             let metadata = NTScalarMetadataBuilder::new()
-                .value_alarm(ValueAlarmMetadata {
+                .alarm(AlarmMetadata {
                     active: true,
                     low_alarm_limit: (i * 10) as f64,
                     low_warning_limit: (i * 10 + 10) as f64,
@@ -48,12 +48,12 @@ mod test_server_alarm_manager_lifecycle {
 
     #[test]
     fn test_remove_pv_with_alarms() {
-        let manager = ServerPvManager::start_from_env()
-            .expect("Failed to create ServerPvManager");
+        let manager = Server::start_from_env()
+            .expect("Failed to create Server");
 
         let pv_name = "test:lifecycle:remove";
         let metadata = NTScalarMetadataBuilder::new()
-            .value_alarm(ValueAlarmMetadata {
+            .alarm(AlarmMetadata {
                 active: true,
                 low_alarm_limit: 10.0,
                 low_warning_limit: 20.0,
@@ -93,12 +93,12 @@ mod test_server_alarm_manager_lifecycle {
 
     #[test]
     fn test_duplicate_pv_creation() {
-        let manager = ServerPvManager::start_from_env()
-            .expect("Failed to create ServerPvManager");
+        let manager = Server::start_from_env()
+            .expect("Failed to create Server");
 
         let pv_name = "test:lifecycle:duplicate";
         let metadata = NTScalarMetadataBuilder::new()
-            .value_alarm(ValueAlarmMetadata {
+            .alarm(AlarmMetadata {
                 active: true,
                 low_alarm_limit: 10.0,
                 low_warning_limit: 20.0,
@@ -125,8 +125,8 @@ mod test_server_alarm_manager_lifecycle {
 
     #[test]
     fn test_post_to_nonexistent_pv() {
-        let manager = ServerPvManager::start_from_env()
-            .expect("Failed to create ServerPvManager");
+        let manager = Server::start_from_env()
+            .expect("Failed to create Server");
 
         let result = manager.post_double("test:lifecycle:nonexistent", 42.0);
         assert!(result.is_err(), "Should not be able to post to non-existent PV");
@@ -137,8 +137,8 @@ mod test_server_alarm_manager_lifecycle {
 
     #[test]
     fn test_alarm_persistence_across_posts() {
-        let manager = ServerPvManager::start_from_env()
-            .expect("Failed to create ServerPvManager");
+        let manager = Server::start_from_env()
+            .expect("Failed to create Server");
 
         let pv_name = "test:lifecycle:persistence";
         let metadata = NTScalarMetadataBuilder::new()
@@ -180,8 +180,8 @@ mod test_server_alarm_manager_lifecycle {
 
     #[test]
     fn test_manager_handle_after_stop() {
-        let manager = ServerPvManager::start_from_env()
-            .expect("Failed to create ServerPvManager");
+        let manager = Server::start_from_env()
+            .expect("Failed to create Server");
 
         let handle = manager.handle();
         let pv_name = "test:lifecycle:handle";
@@ -199,11 +199,11 @@ mod test_server_alarm_manager_lifecycle {
 
     #[test]
     fn test_mixed_pv_types_with_alarms() {
-        let manager = ServerPvManager::start_from_env()
-            .expect("Failed to create ServerPvManager");
+        let manager = Server::start_from_env()
+            .expect("Failed to create Server");
 
         let metadata_double = NTScalarMetadataBuilder::new()
-            .value_alarm(ValueAlarmMetadata {
+            .alarm(AlarmMetadata {
                 active: true,
                 low_alarm_limit: 10.0,
                 low_warning_limit: 20.0,
@@ -248,3 +248,4 @@ mod test_server_alarm_manager_lifecycle {
         manager.stop().expect("Failed to stop manager");
     }
 }
+

@@ -468,6 +468,18 @@ void shared_pv_open_double(SharedPVWrapper& pv, double initial_value, const NTSc
         
         ValueWrapper wrapper(std::move(initial));
         pv.open(wrapper);
+        
+        // Add a simple PUT handler that accepts external writes
+        // Rust code can use fetch() to detect changes and apply validation/alarms
+        auto onPut = [](pvxs::server::SharedPV& spv, std::unique_ptr<pvxs::server::ExecOp>&& op, pvxs::Value&& value) {
+            try {
+                spv.post(std::move(value));
+                op->reply();
+            } catch (const std::exception& e) {
+                op->error(std::string("Error applying PUT: ") + e.what());
+            }
+        };
+        pv.get().onPut(onPut);
     } catch (const std::exception& e) {
         throw PvxsError(std::string("Error opening SharedPV with NTScalar metadata: ") + e.what());
     }
@@ -536,6 +548,17 @@ void shared_pv_open_double_array(SharedPVWrapper& pv, rust::Vec<double> initial_
 
         ValueWrapper wrapper(std::move(initial));
         pv.open(wrapper);
+        
+        // Add a simple PUT handler that accepts external writes
+        auto onPut = [](pvxs::server::SharedPV& spv, std::unique_ptr<pvxs::server::ExecOp>&& op, pvxs::Value&& value) {
+            try {
+                spv.post(std::move(value));
+                op->reply();
+            } catch (const std::exception& e) {
+                op->error(std::string("Error applying PUT: ") + e.what());
+            }
+        };
+        pv.get().onPut(onPut);
     } catch (const std::exception& e) {
         throw PvxsError(std::string("Error opening SharedPV with double array metadata: ") + e.what());
     }
@@ -595,6 +618,18 @@ void shared_pv_open_int32(SharedPVWrapper& pv, int32_t initial_value, const NTSc
         
         ValueWrapper wrapper(std::move(initial));
         pv.open(wrapper);
+        
+        // Add a simple PUT handler that accepts external writes
+        // Rust code can use fetch() to detect changes and apply validation/alarms
+        auto onPut = [](pvxs::server::SharedPV& spv, std::unique_ptr<pvxs::server::ExecOp>&& op, pvxs::Value&& value) {
+            try {
+                spv.post(std::move(value));
+                op->reply();
+            } catch (const std::exception& e) {
+                op->error(std::string("Error applying PUT: ") + e.what());
+            }
+        };
+        pv.get().onPut(onPut);
     } catch (const std::exception& e) {
         throw PvxsError(std::string("Error opening SharedPV with int32 value: ") + e.what());
     }
@@ -663,6 +698,17 @@ void shared_pv_open_int32_array(SharedPVWrapper& pv, rust::Vec<int32_t> initial_
 
         ValueWrapper wrapper(std::move(initial));
         pv.open(wrapper);
+        
+        // Add a simple PUT handler that accepts external writes
+        auto onPut = [](pvxs::server::SharedPV& spv, std::unique_ptr<pvxs::server::ExecOp>&& op, pvxs::Value&& value) {
+            try {
+                spv.post(std::move(value));
+                op->reply();
+            } catch (const std::exception& e) {
+                op->error(std::string("Error applying PUT: ") + e.what());
+            }
+        };
+        pv.get().onPut(onPut);
     } catch (const std::exception& e) {
         throw PvxsError(std::string("Error opening SharedPV with int32 array metadata: ") + e.what());
     }
@@ -699,6 +745,17 @@ void shared_pv_open_string(SharedPVWrapper& pv, rust::String initial_value, cons
         
         ValueWrapper wrapper(std::move(initial));
         pv.open(wrapper);
+        
+        // Add a simple PUT handler that accepts external writes
+        auto onPut = [](pvxs::server::SharedPV& spv, std::unique_ptr<pvxs::server::ExecOp>&& op, pvxs::Value&& value) {
+            try {
+                spv.post(std::move(value));
+                op->reply();
+            } catch (const std::exception& e) {
+                op->error(std::string("Error applying PUT: ") + e.what());
+            }
+        };
+        pv.get().onPut(onPut);
     } catch (const std::exception& e) {
         throw PvxsError(std::string("Error opening SharedPV with string value and metadata: ") + e.what());
     }
@@ -740,6 +797,17 @@ void shared_pv_open_string_array(SharedPVWrapper& pv, rust::Vec<rust::String> in
         
         ValueWrapper wrapper(std::move(initial));
         pv.open(wrapper);
+        
+        // Add a simple PUT handler that accepts external writes
+        auto onPut = [](pvxs::server::SharedPV& spv, std::unique_ptr<pvxs::server::ExecOp>&& op, pvxs::Value&& value) {
+            try {
+                spv.post(std::move(value));
+                op->reply();
+            } catch (const std::exception& e) {
+                op->error(std::string("Error applying PUT: ") + e.what());
+            }
+        };
+        pv.get().onPut(onPut);
     } catch (const std::exception& e) {
         throw PvxsError(std::string("Error opening SharedPV with string array metadata: ") + e.what());
     }
@@ -903,6 +971,36 @@ void shared_pv_post_enum(SharedPVWrapper& pv, int16_t value) {
     }
 }
 
+void shared_pv_post_enum_with_alarm(SharedPVWrapper& pv, int16_t value, int32_t severity, int32_t status, rust::String message) {
+    try {
+        // Get the current template to validate against choices
+        auto current = pv.get_template();
+        
+        // Validate the enum index is within valid range
+        if (value < 0) {
+            throw PvxsError("Enum index cannot be negative");
+        }
+        
+        // Get the choices array to validate the index
+        auto choices = current["value.choices"].as<pvxs::shared_array<const std::string>>();
+        if (static_cast<size_t>(value) >= choices.size()) {
+            throw PvxsError("Enum index " + std::to_string(value) + " is out of range (max: " + std::to_string(choices.size() - 1) + ")");
+        }
+        
+        // Use cloneEmpty() to get correct structure, then set the enum index and alarm
+        auto update = current.cloneEmpty();
+        update["value.index"] = value;
+        update["alarm.severity"] = severity;
+        update["alarm.status"] = status;
+        update["alarm.message"] = std::string(message);
+        
+        ValueWrapper wrapper(std::move(update));
+        pv.post_value(wrapper);
+    } catch (const std::exception& e) {
+        throw PvxsError(std::string("Error posting enum value with alarm to SharedPV: ") + e.what());
+    }
+}
+
 void shared_pv_post_double_array(SharedPVWrapper& pv, rust::Vec<double> value) {
     try {
         auto update = pv.get_template().cloneEmpty();
@@ -969,6 +1067,44 @@ void static_source_remove_pv(StaticSourceWrapper& source, rust::String name) {
 
 void static_source_close_all(StaticSourceWrapper& source) {
     source.close_all();
+}
+
+// ============================================================================
+// Logging control
+// ============================================================================
+
+void pvxs_logger_config_env() {
+    try {
+        pvxs::logger_config_env();
+    } catch (const std::exception& e) {
+        throw PvxsError(std::string("Error configuring logger from env: ") + e.what());
+    }
+}
+
+void pvxs_logger_level_set(rust::String name, rust::String level) {
+    try {
+        std::string name_str(name);
+        std::string level_str(level);
+        
+        pvxs::Level lvl;
+        if (level_str == "CRIT" || level_str == "Crit") {
+            lvl = pvxs::Level::Crit;
+        } else if (level_str == "ERR" || level_str == "Err") {
+            lvl = pvxs::Level::Err;
+        } else if (level_str == "WARN" || level_str == "Warn") {
+            lvl = pvxs::Level::Warn;
+        } else if (level_str == "INFO" || level_str == "Info") {
+            lvl = pvxs::Level::Info;
+        } else if (level_str == "DEBUG" || level_str == "Debug") {
+            lvl = pvxs::Level::Debug;
+        } else {
+            throw PvxsError("Invalid log level: " + level_str + ". Must be one of: CRIT, ERR, WARN, INFO, DEBUG");
+        }
+        
+        pvxs::logger_level_set(name_str.c_str(), lvl);
+    } catch (const std::exception& e) {
+        throw PvxsError(std::string("Error setting logger level: ") + e.what());
+    }
 }
 
 } // namespace pvxs_wrapper

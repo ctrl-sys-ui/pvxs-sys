@@ -1,14 +1,14 @@
 #[cfg(test)]
 mod test_server_alarm_manager_control_limits {
-    use pvxs_sys::{ServerPvManager, Context, NTScalarMetadataBuilder, ControlMetadata};
+    use pvxs_sys::{Server, Context, NTScalarMetadataBuilder, ControlMetadata};
     use std::thread;
     use std::time::Duration;
 
     #[test]
     fn test_control_limits_reject_out_of_bounds() {
-        // Create a ServerPvManager with control limits
-        let manager = ServerPvManager::start_from_env()
-            .expect("Failed to create ServerPvManager");
+        // Create a Server with control limits
+        let manager = Server::start_from_env()
+            .expect("Failed to create Server");
 
         let pv_name = "test:control:reject";
         let metadata = NTScalarMetadataBuilder::new()
@@ -73,8 +73,8 @@ mod test_server_alarm_manager_control_limits {
 
     #[test]
     fn test_control_limits_boundary_values() {
-        let manager = ServerPvManager::start_from_env()
-            .expect("Failed to create ServerPvManager");
+        let manager = Server::start_from_env()
+            .expect("Failed to create Server");
 
         let pv_name = "test:control:boundary";
         let metadata = NTScalarMetadataBuilder::new()
@@ -115,8 +115,8 @@ mod test_server_alarm_manager_control_limits {
 
     #[test]
     fn test_control_limits_int32() {
-        let manager = ServerPvManager::start_from_env()
-            .expect("Failed to create ServerPvManager");
+        let manager = Server::start_from_env()
+            .expect("Failed to create Server");
 
         let pv_name = "test:control:int32";
         let metadata = NTScalarMetadataBuilder::new()
@@ -158,3 +158,4 @@ mod test_server_alarm_manager_control_limits {
         manager.stop().expect("Failed to stop manager");
     }
 }
+

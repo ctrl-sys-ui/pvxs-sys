@@ -53,6 +53,10 @@ mod ffi {
 
         fn create_enum_metadata(alarm: &NTScalarAlarm, time_stamp: &NTScalarTime) -> UniquePtr<NTEnumMetadata>;
         
+        // Logging control functions
+        fn pvxs_logger_config_env() -> Result<()>;
+        fn pvxs_logger_level_set(name: String, level: String) -> Result<()>;
+        
         // Note: RpcSourceWrapper - to be implemented later
         
         // Context creation and operations
@@ -186,6 +190,7 @@ mod ffi {
         fn shared_pv_post_int32_with_alarm(pv: Pin<&mut SharedPVWrapper>, value: i32, severity: i32, status: i32, message: String) -> Result<()>;
         fn shared_pv_post_string(pv: Pin<&mut SharedPVWrapper>, value: String) -> Result<()>;
         fn shared_pv_post_enum(pv: Pin<&mut SharedPVWrapper>, value: i16) -> Result<()>;
+        fn shared_pv_post_enum_with_alarm(pv: Pin<&mut SharedPVWrapper>, value: i16, severity: i32, status: i32, message: String) -> Result<()>;
         fn shared_pv_post_double_array(pv: Pin<&mut SharedPVWrapper>, value: Vec<f64>) -> Result<()>;
         fn shared_pv_post_int32_array(pv: Pin<&mut SharedPVWrapper>, value: Vec<i32>) -> Result<()>;
         fn shared_pv_post_string_array(pv: Pin<&mut SharedPVWrapper>, value: Vec<String>) -> Result<()>;

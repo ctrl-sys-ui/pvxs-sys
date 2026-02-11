@@ -201,35 +201,31 @@ fn main() -> Result<(), PvxsError> {
 ### Creating an EPICS Server with Metadata
 
 ```rust
-use pvxs_sys::{Server, NTScalarMetadataBuilder, DisplayMetadata, PvxsError};
+use pvxs_sys::{Server, NTScalarMetadataBuilder, ControlMetadata, PvxsError};
 use std::thread;
 use std::time::Duration;
 
 fn main() -> Result<(), PvxsError> {
-    // Create server from environment (enables network discovery)
-    let mut server = Server::from_env()?;
+    // Create and start server with network discovery
+    let server = Server::start_from_env()?;
+    println!("Server started on TCP port: {}", server.tcp_port());
     
-    // Create PV with rich metadata
+    // Create PV with control limits (enables automatic validation)
     let metadata = NTScalarMetadataBuilder::new()
-        .alarm(0, 0, "OK")
-        .display(DisplayMetadata {
-            limit_low: 0,
-            limit_high: 100,
-            description: "Temperature sensor".to_string(),
-            units: "DegC".to_string(),
-            precision: 2,
+        .control(ControlMetadata {
+            limit_low: 0.0,
+            limit_high: 100.0,
+            min_step: 0.1,
         });
     
-    let mut temp_pv = server.create_pv_double("temp:sensor1", 23.5, metadata)?;
-    
-    // Start server
-    server.start()?;
-    println!("Server running - PV available at: temp:sensor1");
+    server.create_pv_double("temp:sensor1", 23.5, metadata)?;
+    println!("PV created: temp:sensor1");
     
     // Update values periodically
     for i in 0..100 {
         let new_temp = 23.5 + (i as f64 * 0.1);
-        temp_pv.post_double(new_temp)?;
+        server.post_double("temp:sensor1", new_temp)?;
+        println!("Temperature updated to: {:.1}°C", new_temp);
         thread::sleep(Duration::from_secs(1));
     }
     
@@ -456,41 +452,50 @@ monitor.start()?;
 ### Server API
 
 ```rust
-// Create server
-let mut server = Server::from_env()?;          // Network-enabled
-let mut server = Server::create_isolated()?;   // Local-only
+// Create and start server (automatically started)
+let server = Server::start_from_env()?;      // Network-enabled
+let server = Server::start_isolated()?;      // Local-only (for testing)
+
+// Server provides automatic alarm management and validation
+println!("Server started on TCP port: {}", server.tcp_port());
+println!("Server started on UDP port: {}", server.udp_port());
 
 // Create PVs with metadata
 let metadata = NTScalarMetadataBuilder::new()
-    .alarm(severity, status, "message")
-    .display(DisplayMetadata { ... })
-    .control(ControlMetadata { ... })
-    .value_alarm(ValueAlarmMetadata { ... });
+    .control(ControlMetadata {
+        limit_low: 0.0,
+        limit_high: 100.0,
+        min_step: 0.1,
+    });
 
-// Scalar PVs
-let mut pv1 = server.create_pv_double("name", 42.0, metadata)?;
-let mut pv2 = server.create_pv_int32("name", 123, metadata)?;
-let mut pv3 = server.create_pv_string("name", "text", metadata)?;
+// Create PVs - automatically managed with alarm handling
+server.create_pv_double("temperature", 25.0, metadata)?;
+server.create_pv_int32("count", 0, NTScalarMetadataBuilder::new())?;
+server.create_pv_string("status", "OK", NTScalarMetadataBuilder::new())?;
+server.create_pv_enum("mode", vec!["Off", "On", "Auto"], 1, 
+                      NTEnumMetadataBuilder::new())?;
 
-// Array PVs
-let mut pv4 = server.create_pv_double_array("name", vec![1.0, 2.0], metadata)?;
-let mut pv5 = server.create_pv_int32_array("name", vec![10, 20], metadata)?;
-let mut pv6 = server.create_pv_string_array("name", vec!["a".to_string()], metadata)?;
+// Create array PVs
+server.create_pv_double_array("waveform", vec![1.0, 2.0, 3.0], 
+                              NTScalarMetadataBuilder::new())?;
+server.create_pv_int32_array("samples", vec![10, 20, 30],
+                             NTScalarMetadataBuilder::new())?;
 
-// StaticSource - organize PVs into groups
-let mut source = StaticSource::create()?;
-source.add_pv("device:pv1", &mut pv1)?;
-server.add_source("static", &mut source, priority)?;
+// Update PV values - automatic alarm computation and validation
+server.post_double("temperature", 30.5)?;
+server.post_int32("count", 42)?;
+server.post_string("status", "RUNNING")?;
+server.post_enum("mode", 2)?;
+server.post_double_array("waveform", vec![4.0, 5.0, 6.0])?;
 
-// Server lifecycle
-server.start()?;
-let port = server.tcp_port();
+// Server stops automatically when dropped, or manually:
 server.stop()?;
 
-// Update PV values
-pv1.post_double(99.9)?;
-pv2.post_int32(456)?;
-pv3.post_string("updated")?;
+// Get a cloneable handle for multi-threaded access
+let handle = server.handle();
+std::thread::spawn(move || {
+    handle.post_double("temperature", 35.0).expect("Failed to update");
+});
 ```
 
 ### Value API

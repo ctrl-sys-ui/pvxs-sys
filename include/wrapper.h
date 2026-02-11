@@ -7,11 +7,13 @@
 #include <string>
 #include <stdexcept>
 #include <optional>
+#include <chrono>
 #include "rust/cxx.h" // For rust::String and rust::Str types
 #include <pvxs/client.h>
 #include <pvxs/server.h>
 #include <pvxs/sharedpv.h>
 #include <pvxs/nt.h>
+#include <pvxs/log.h>
 
 namespace pvxs_wrapper
 {
@@ -606,8 +608,7 @@ namespace pvxs_wrapper
     void shared_pv_post_int32(SharedPVWrapper &pv, int32_t value);
     void shared_pv_post_int32_with_alarm(SharedPVWrapper &pv, int32_t value, int32_t severity, int32_t status, rust::String message);
     void shared_pv_post_string(SharedPVWrapper &pv, rust::String value);
-    void shared_pv_post_enum(SharedPVWrapper &pv, int16_t value);
-    void shared_pv_post_double_array(SharedPVWrapper &pv, rust::Vec<double> value);
+    void shared_pv_post_enum(SharedPVWrapper &pv, int16_t value);    void shared_pv_post_enum_with_alarm(SharedPVWrapper &pv, int16_t value, int32_t severity, int32_t status, rust::String message);    void shared_pv_post_double_array(SharedPVWrapper &pv, rust::Vec<double> value);
     void shared_pv_post_int32_array(SharedPVWrapper &pv, rust::Vec<int32_t> value);
     void shared_pv_post_string_array(SharedPVWrapper &pv, rust::Vec<rust::String> value);
     std::unique_ptr<ValueWrapper> shared_pv_fetch(const SharedPVWrapper &pv);
@@ -617,6 +618,17 @@ namespace pvxs_wrapper
     void static_source_add_pv(StaticSourceWrapper &source, rust::String name, SharedPVWrapper &pv);
     void static_source_remove_pv(StaticSourceWrapper &source, rust::String name);
     void static_source_close_all(StaticSourceWrapper &source);
+
+    // ============================================================================
+    // Logging control
+    
+    /// Configure PVXS logging from environment variable PVXS_LOG
+    void pvxs_logger_config_env();
+    
+    /// Set logging level for a specific logger
+    /// @param name Logger name (supports wildcards like "pvxs.*")
+    /// @param level One of: "CRIT", "ERR", "WARN", "INFO", "DEBUG"
+    void pvxs_logger_level_set(rust::String name, rust::String level);
 
     // ============================================================================
     // Note: RPC Source implementation - to be added later when needed

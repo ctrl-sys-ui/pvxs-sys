@@ -1,17 +1,17 @@
 #[cfg(test)]
 mod test_server_alarm_manager_value_alarms {
-    use pvxs_sys::{ServerPvManager, Context, NTScalarMetadataBuilder, ValueAlarmMetadata};
+    use pvxs_sys::{Server, Context, NTScalarMetadataBuilder, AlarmMetadata};
     use std::thread;
     use std::time::Duration;
 
     #[test]
     fn test_high_alarm_limit() {
-        let manager = ServerPvManager::start_from_env()
-            .expect("Failed to create ServerPvManager");
+        let manager = Server::start_from_env()
+            .expect("Failed to create Server");
 
         let pv_name = "test:alarm:high";
         let metadata = NTScalarMetadataBuilder::new()
-            .value_alarm(ValueAlarmMetadata {
+            .alarm(AlarmMetadata {
                 active: true,
                 low_alarm_limit: 10.0,
                 low_warning_limit: 20.0,
@@ -52,12 +52,12 @@ mod test_server_alarm_manager_value_alarms {
 
     #[test]
     fn test_high_warning_limit() {
-        let manager = ServerPvManager::start_from_env()
-            .expect("Failed to create ServerPvManager");
+        let manager = Server::start_from_env()
+            .expect("Failed to create Server");
 
         let pv_name = "test:alarm:high_warn";
         let metadata = NTScalarMetadataBuilder::new()
-            .value_alarm(ValueAlarmMetadata {
+            .alarm(AlarmMetadata {
                 active: true,
                 low_alarm_limit: 10.0,
                 low_warning_limit: 20.0,
@@ -95,12 +95,12 @@ mod test_server_alarm_manager_value_alarms {
 
     #[test]
     fn test_low_alarm_limit() {
-        let manager = ServerPvManager::start_from_env()
-            .expect("Failed to create ServerPvManager");
+        let manager = Server::start_from_env()
+            .expect("Failed to create Server");
 
         let pv_name = "test:alarm:low";
         let metadata = NTScalarMetadataBuilder::new()
-            .value_alarm(ValueAlarmMetadata {
+            .alarm(AlarmMetadata {
                 active: true,
                 low_alarm_limit: 10.0,
                 low_warning_limit: 20.0,
@@ -138,12 +138,12 @@ mod test_server_alarm_manager_value_alarms {
 
     #[test]
     fn test_low_warning_limit() {
-        let manager = ServerPvManager::start_from_env()
-            .expect("Failed to create ServerPvManager");
+        let manager = Server::start_from_env()
+            .expect("Failed to create Server");
 
         let pv_name = "test:alarm:low_warn";
         let metadata = NTScalarMetadataBuilder::new()
-            .value_alarm(ValueAlarmMetadata {
+            .alarm(AlarmMetadata {
                 active: true,
                 low_alarm_limit: 10.0,
                 low_warning_limit: 20.0,
@@ -181,12 +181,12 @@ mod test_server_alarm_manager_value_alarms {
 
     #[test]
     fn test_no_alarm_within_normal_range() {
-        let manager = ServerPvManager::start_from_env()
-            .expect("Failed to create ServerPvManager");
+        let manager = Server::start_from_env()
+            .expect("Failed to create Server");
 
         let pv_name = "test:alarm:normal";
         let metadata = NTScalarMetadataBuilder::new()
-            .value_alarm(ValueAlarmMetadata {
+            .alarm(AlarmMetadata {
                 active: true,
                 low_alarm_limit: 10.0,
                 low_warning_limit: 20.0,
@@ -224,12 +224,12 @@ mod test_server_alarm_manager_value_alarms {
 
     #[test]
     fn test_inactive_value_alarm() {
-        let manager = ServerPvManager::start_from_env()
-            .expect("Failed to create ServerPvManager");
+        let manager = Server::start_from_env()
+            .expect("Failed to create Server");
 
         let pv_name = "test:alarm:inactive";
         let metadata = NTScalarMetadataBuilder::new()
-            .value_alarm(ValueAlarmMetadata {
+            .alarm(AlarmMetadata {
                 active: false, // Alarms disabled
                 low_alarm_limit: 10.0,
                 low_warning_limit: 20.0,
@@ -266,12 +266,12 @@ mod test_server_alarm_manager_value_alarms {
 
     #[test]
     fn test_alarm_severity_levels_int32() {
-        let manager = ServerPvManager::start_from_env()
-            .expect("Failed to create ServerPvManager");
+        let manager = Server::start_from_env()
+            .expect("Failed to create Server");
 
         let pv_name = "test:alarm:int32:severity";
         let metadata = NTScalarMetadataBuilder::new()
-            .value_alarm(ValueAlarmMetadata {
+            .alarm(AlarmMetadata {
                 active: true,
                 low_alarm_limit: 5.0,
                 low_warning_limit: 10.0,
@@ -305,3 +305,4 @@ mod test_server_alarm_manager_value_alarms {
         manager.stop().expect("Failed to stop manager");
     }
 }
+
