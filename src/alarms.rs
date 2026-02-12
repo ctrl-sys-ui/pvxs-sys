@@ -30,6 +30,7 @@ impl From<i32> for AlarmSeverity {
  #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum AlarmStatus  {
     NoAlarm = 0 ,
+    DeviceStatus = 1,
     DriverStatus = 2,
     RecordStatus = 3,
     DbStatus = 4,
@@ -48,6 +49,7 @@ impl From<i32> for AlarmStatus {
     fn from(value: i32) -> Self {
         match value {
             0 => AlarmStatus::NoAlarm,
+            1 => AlarmStatus::DeviceStatus,
             2 => AlarmStatus::DriverStatus,
             3 => AlarmStatus::RecordStatus,
             4 => AlarmStatus::DbStatus,
@@ -98,7 +100,7 @@ pub fn compute_alarm_for_scalar(value: f64, config: &AlarmConfig) -> AlarmResult
                 return AlarmResult {
                     allow: true,
                     severity: value_alarm.low_alarm_severity,
-                    status: AlarmStatus::DriverStatus,
+                    status: AlarmStatus::DeviceStatus,
                     message: "LOW_ALARM".to_string(),
                 };
             }
@@ -106,7 +108,7 @@ pub fn compute_alarm_for_scalar(value: f64, config: &AlarmConfig) -> AlarmResult
                 return AlarmResult {
                     allow: true,
                     severity: value_alarm.low_warning_severity,
-                    status: AlarmStatus::DriverStatus,
+                    status: AlarmStatus::DeviceStatus,
                     message: "LOW_WARNING".to_string(),
                 };
             }
@@ -114,7 +116,7 @@ pub fn compute_alarm_for_scalar(value: f64, config: &AlarmConfig) -> AlarmResult
                 return AlarmResult {
                     allow: true,
                     severity: value_alarm.high_alarm_severity,
-                    status: AlarmStatus::DriverStatus,
+                    status: AlarmStatus::DeviceStatus,
                     message: "HIGH_ALARM".to_string(),
                 };
             }
@@ -122,7 +124,7 @@ pub fn compute_alarm_for_scalar(value: f64, config: &AlarmConfig) -> AlarmResult
                 return AlarmResult {
                     allow: true,
                     severity: value_alarm.high_warning_severity,
-                    status: AlarmStatus::DriverStatus,
+                    status: AlarmStatus::DeviceStatus,
                     message: "HIGH_WARNING".to_string(),
                 };
             }

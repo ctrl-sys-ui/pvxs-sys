@@ -286,6 +286,9 @@ pub struct FetchedDouble {
     pub alarm_severity: AlarmSeverity,
     pub alarm_status: AlarmStatus,
     pub alarm_message: String,
+    pub display_metadata: Option<DisplayMetadata>, 
+    pub control_metadata: Option<ControlMetadata>,
+    pub alarm_metadata: Option<AlarmMetadata>,
 }
 
 /// Fetched int32 value with alarm information
@@ -295,6 +298,9 @@ pub struct FetchedInt32 {
     pub alarm_severity: AlarmSeverity,
     pub alarm_status: AlarmStatus,
     pub alarm_message: String,
+    pub display_metadata:Option<DisplayMetadata>, 
+    pub control_metadata: Option<ControlMetadata>,
+    pub alarm_metadata: Option<AlarmMetadata>,
 }
 
 /// Fetched string value with alarm information
@@ -310,6 +316,7 @@ pub struct FetchedString {
 #[derive(Debug, Clone)]
 pub struct FetchedEnum {
     pub value: i16,
+    pub value_options: Vec<String>,
     pub alarm_severity: AlarmSeverity,
     pub alarm_status: AlarmStatus,
     pub alarm_message: String,
@@ -1103,11 +1110,50 @@ impl Server {
                         let result = match pvs.get(&name) {
                             Some(ManagedPv::Double { pv, .. }) | Some(ManagedPv::DoubleArray(pv)) => {
                                 pv.fetch().and_then(|v| {
+                                    // Extract display metadata if present
+                                    let display_metadata = (|| -> Option<DisplayMetadata> {
+                                        Some(DisplayMetadata {
+                                            limit_low: v.get_field_int32("display.limitLow").ok()? as i64,
+                                            limit_high: v.get_field_int32("display.limitHigh").ok()? as i64,
+                                            description: v.get_field_string("display.description").ok()?,
+                                            units: v.get_field_string("display.units").ok()?,
+                                            precision: v.get_field_int32("display.precision").ok()?,
+                                        })
+                                    })();
+
+                                    // Extract control metadata if present
+                                    let control_metadata = (|| -> Option<ControlMetadata> {
+                                        Some(ControlMetadata {
+                                            limit_low: v.get_field_double("control.limitLow").ok()?,
+                                            limit_high: v.get_field_double("control.limitHigh").ok()?,
+                                            min_step: v.get_field_double("control.minStep").ok()?,
+                                        })
+                                    })();
+
+                                    // Extract alarm metadata if present
+                                    let alarm_metadata = (|| -> Option<AlarmMetadata> {
+                                        Some(AlarmMetadata {
+                                            active: v.get_field_int32("valueAlarm.active").ok()? != 0,
+                                            low_alarm_limit: v.get_field_double("valueAlarm.lowAlarmLimit").ok()?,
+                                            low_warning_limit: v.get_field_double("valueAlarm.lowWarningLimit").ok()?,
+                                            high_warning_limit: v.get_field_double("valueAlarm.highWarningLimit").ok()?,
+                                            high_alarm_limit: v.get_field_double("valueAlarm.highAlarmLimit").ok()?,
+                                            low_alarm_severity: AlarmSeverity::from(v.get_field_int32("valueAlarm.lowAlarmSeverity").ok()?),
+                                            low_warning_severity: AlarmSeverity::from(v.get_field_int32("valueAlarm.lowWarningSeverity").ok()?),
+                                            high_warning_severity: AlarmSeverity::from(v.get_field_int32("valueAlarm.highWarningSeverity").ok()?),
+                                            high_alarm_severity: AlarmSeverity::from(v.get_field_int32("valueAlarm.highAlarmSeverity").ok()?),
+                                            hysteresis: v.get_field_int32("valueAlarm.hysteresis").ok()? as u8,
+                                        })
+                                    })();
+
                                     Ok(FetchedDouble {
                                         value: v.get_field_double("value")?,
                                         alarm_severity: AlarmSeverity::from(v.get_field_int32("alarm.severity").unwrap_or(0)),
                                         alarm_status: AlarmStatus::from(v.get_field_int32("alarm.status").unwrap_or(0)),
                                         alarm_message: v.get_field_string("alarm.message").unwrap_or_default(),
+                                        display_metadata,
+                                        control_metadata,
+                                        alarm_metadata,
                                     })
                                 })
                             }
@@ -1119,11 +1165,50 @@ impl Server {
                         let result = match pvs.get(&name) {
                             Some(ManagedPv::Int32 { pv, .. }) | Some(ManagedPv::Int32Array(pv)) => {
                                 pv.fetch().and_then(|v| {
+                                    // Extract display metadata if present
+                                    let display_metadata = (|| -> Option<DisplayMetadata> {
+                                        Some(DisplayMetadata {
+                                            limit_low: v.get_field_int32("display.limitLow").ok()? as i64,
+                                            limit_high: v.get_field_int32("display.limitHigh").ok()? as i64,
+                                            description: v.get_field_string("display.description").ok()?,
+                                            units: v.get_field_string("display.units").ok()?,
+                                            precision: v.get_field_int32("display.precision").ok()?,
+                                        })
+                                    })();
+
+                                    // Extract control metadata if present
+                                    let control_metadata = (|| -> Option<ControlMetadata> {
+                                        Some(ControlMetadata {
+                                            limit_low: v.get_field_double("control.limitLow").ok()?,
+                                            limit_high: v.get_field_double("control.limitHigh").ok()?,
+                                            min_step: v.get_field_double("control.minStep").ok()?,
+                                        })
+                                    })();
+
+                                    // Extract alarm metadata if present
+                                    let alarm_metadata = (|| -> Option<AlarmMetadata> {
+                                        Some(AlarmMetadata {
+                                            active: v.get_field_int32("valueAlarm.active").ok()? != 0,
+                                            low_alarm_limit: v.get_field_double("valueAlarm.lowAlarmLimit").ok()?,
+                                            low_warning_limit: v.get_field_double("valueAlarm.lowWarningLimit").ok()?,
+                                            high_warning_limit: v.get_field_double("valueAlarm.highWarningLimit").ok()?,
+                                            high_alarm_limit: v.get_field_double("valueAlarm.highAlarmLimit").ok()?,
+                                            low_alarm_severity: AlarmSeverity::from(v.get_field_int32("valueAlarm.lowAlarmSeverity").ok()?),
+                                            low_warning_severity: AlarmSeverity::from(v.get_field_int32("valueAlarm.lowWarningSeverity").ok()?),
+                                            high_warning_severity: AlarmSeverity::from(v.get_field_int32("valueAlarm.highWarningSeverity").ok()?),
+                                            high_alarm_severity: AlarmSeverity::from(v.get_field_int32("valueAlarm.highAlarmSeverity").ok()?),
+                                            hysteresis: v.get_field_int32("valueAlarm.hysteresis").ok()? as u8,
+                                        })
+                                    })();
+
                                     Ok(FetchedInt32 {
                                         value: v.get_field_int32("value")?,
                                         alarm_severity: AlarmSeverity::from(v.get_field_int32("alarm.severity").unwrap_or(0)),
                                         alarm_status: AlarmStatus::from(v.get_field_int32("alarm.status").unwrap_or(0)),
                                         alarm_message: v.get_field_string("alarm.message").unwrap_or_default(),
+                                        display_metadata,
+                                        control_metadata,
+                                        alarm_metadata,
                                     })
                                 })
                             }
@@ -1153,6 +1238,7 @@ impl Server {
                                 pv.fetch().and_then(|v| {
                                     Ok(FetchedEnum {
                                         value: v.get_field_enum("value")?,
+                                        value_options: v.get_field_string_array("value.choices").unwrap_or_default(),
                                         alarm_severity: AlarmSeverity::from(v.get_field_int32("alarm.severity").unwrap_or(0)),
                                         alarm_status: AlarmStatus::from(v.get_field_int32("alarm.status").unwrap_or(0)),
                                         alarm_message: v.get_field_string("alarm.message").unwrap_or_default(),

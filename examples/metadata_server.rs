@@ -1,4 +1,4 @@
-use pvxs_sys::{AlarmSeverity, AlarmStatus, ControlMetadata, NTScalarMetadataBuilder, Server};
+use pvxs_sys::{AlarmSeverity, AlarmStatus, ControlMetadata, DisplayMetadata, NTScalarMetadataBuilder, Server};
 use std::thread;
 use std::time::Duration;
 
@@ -23,6 +23,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     // Create metadata with control limits and alarm thresholds
     let metadata = NTScalarMetadataBuilder::new()
+        .display( DisplayMetadata {
+            limit_low: -10,
+            limit_high : 110,
+            description: "Temperature Sensor".to_string(), 
+            units: "°C".to_string(), 
+            precision: 3,
+        })
         .control(ControlMetadata {
             limit_low: -10.0,
             limit_high: 110.0,
@@ -71,12 +78,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if temp.alarm_status >= AlarmStatus::RecordStatus && 
             temp.alarm_severity >= AlarmSeverity::Invalid && 
             temp.alarm_message.contains("OUT_OF_CONTROL_LIMITS") {
-            temp.value -= 1.0; // Drop back below high alarm limit to demonstrate hysteresis (105 - 1 hysteresis = 104)
+            temp.value -= 1.014; // Drop back below high alarm limit to demonstrate hysteresis (105 - 1 hysteresis = 104)
         }
         else {
-            temp.value += 1.0; // Continue increasing to demonstrate alarm progression
+            temp.value += 1.014; // Continue increasing to demonstrate alarm progression
         }
         server.post_double("temperature:sensor1", temp.value)?;
-        println!("Updated temperature to: {:.1}°C", temp.value);
+        let precision = temp.display_metadata.as_ref().map_or(2, |d| d.precision as usize);
+        let units = temp.display_metadata.as_ref().map_or("", |d| d.units.as_str());
+        println!("Updated temperature to: {:.precision$}{}", temp.value, units);
     }
 }
