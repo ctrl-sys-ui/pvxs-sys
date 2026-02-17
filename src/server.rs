@@ -312,11 +312,44 @@ pub struct FetchedString {
     pub alarm_message: String,
 }
 
+/// Fetched double array value with alarm information
+#[derive(Debug, Clone)]
+pub struct FetchedDoubleArray {
+    pub value: Vec<f64>,
+    pub alarm_severity: AlarmSeverity,
+    pub alarm_status: AlarmStatus,
+    pub alarm_message: String,
+    pub display_metadata: Option<DisplayMetadata>,
+    pub control_metadata: Option<ControlMetadata>,
+    pub alarm_metadata: Option<AlarmMetadata>,
+}
+
+/// Fetched int32 array value with alarm information
+#[derive(Debug, Clone)]
+pub struct FetchedInt32Array {
+    pub value: Vec<i32>,
+    pub alarm_severity: AlarmSeverity,
+    pub alarm_status: AlarmStatus,
+    pub alarm_message: String,
+    pub display_metadata: Option<DisplayMetadata>,
+    pub control_metadata: Option<ControlMetadata>,
+    pub alarm_metadata: Option<AlarmMetadata>,
+}
+
+/// Fetched string array value with alarm information
+#[derive(Debug, Clone)]
+pub struct FetchedStringArray {
+    pub value: Vec<String>,
+    pub alarm_severity: AlarmSeverity,
+    pub alarm_status: AlarmStatus,
+    pub alarm_message: String,
+}
+
 /// Fetched enum value with alarm information
 #[derive(Debug, Clone)]
 pub struct FetchedEnum {
     pub value: i16,
-    pub value_options: Vec<String>,
+    pub value_choices: Vec<String>,
     pub alarm_severity: AlarmSeverity,
     pub alarm_status: AlarmStatus,
     pub alarm_message: String,
@@ -416,6 +449,18 @@ enum ManagerCommand {
     FetchString {
         name: String,
         reply: channel::Sender<Result<FetchedString>>,
+    },
+    FetchDoubleArray {
+        name: String,
+        reply: channel::Sender<Result<FetchedDoubleArray>>,
+    },
+    FetchInt32Array {
+        name: String,
+        reply: channel::Sender<Result<FetchedInt32Array>>,
+    },
+    FetchStringArray {
+        name: String,
+        reply: channel::Sender<Result<FetchedStringArray>>,
     },
     FetchEnum {
         name: String,
@@ -684,6 +729,39 @@ impl ServerHandle {
         reply_rx.recv().map_err(|_| PvxsError::new("Server worker stopped"))?
     }
 
+    pub fn fetch_double_array(&self, name: &str) -> Result<FetchedDoubleArray> {
+        let (reply_tx, reply_rx) = channel::bounded(1);
+        self.tx
+            .send(ManagerCommand::FetchDoubleArray {
+                name: name.to_string(),
+                reply: reply_tx,
+            })
+            .map_err(|_| PvxsError::new("Server worker stopped"))?;
+        reply_rx.recv().map_err(|_| PvxsError::new("Server worker stopped"))?
+    }
+
+    pub fn fetch_int32_array(&self, name: &str) -> Result<FetchedInt32Array> {
+        let (reply_tx, reply_rx) = channel::bounded(1);
+        self.tx
+            .send(ManagerCommand::FetchInt32Array {
+                name: name.to_string(),
+                reply: reply_tx,
+            })
+            .map_err(|_| PvxsError::new("Server worker stopped"))?;
+        reply_rx.recv().map_err(|_| PvxsError::new("Server worker stopped"))?
+    }
+
+    pub fn fetch_string_array(&self, name: &str) -> Result<FetchedStringArray> {
+        let (reply_tx, reply_rx) = channel::bounded(1);
+        self.tx
+            .send(ManagerCommand::FetchStringArray {
+                name: name.to_string(),
+                reply: reply_tx,
+            })
+            .map_err(|_| PvxsError::new("Server worker stopped"))?;
+        reply_rx.recv().map_err(|_| PvxsError::new("Server worker stopped"))?
+    }
+
     pub fn fetch_enum(&self, name: &str) -> Result<FetchedEnum> {
         let (reply_tx, reply_rx) = channel::bounded(1);
         self.tx
@@ -845,6 +923,18 @@ impl Server {
 
     pub fn fetch_string(&self, name: &str) -> Result<FetchedString> {
         self.handle.fetch_string(name)
+    }
+
+    pub fn fetch_double_array(&self, name: &str) -> Result<FetchedDoubleArray> {
+        self.handle.fetch_double_array(name)
+    }
+
+    pub fn fetch_int32_array(&self, name: &str) -> Result<FetchedInt32Array> {
+        self.handle.fetch_int32_array(name)
+    }
+
+    pub fn fetch_string_array(&self, name: &str) -> Result<FetchedStringArray> {
+        self.handle.fetch_string_array(name)
     }
 
     pub fn fetch_enum(&self, name: &str) -> Result<FetchedEnum> {
@@ -1108,7 +1198,7 @@ impl Server {
                     }
                     ManagerCommand::FetchDouble { name, reply } => {
                         let result = match pvs.get(&name) {
-                            Some(ManagedPv::Double { pv, .. }) | Some(ManagedPv::DoubleArray(pv)) => {
+                            Some(ManagedPv::Double { pv, .. }) => {
                                 pv.fetch().and_then(|v| {
                                     // Extract display metadata if present
                                     let display_metadata = (|| -> Option<DisplayMetadata> {
@@ -1163,7 +1253,7 @@ impl Server {
                     }
                     ManagerCommand::FetchInt32 { name, reply } => {
                         let result = match pvs.get(&name) {
-                            Some(ManagedPv::Int32 { pv, .. }) | Some(ManagedPv::Int32Array(pv)) => {
+                            Some(ManagedPv::Int32 { pv, .. }) => {
                                 pv.fetch().and_then(|v| {
                                     // Extract display metadata if present
                                     let display_metadata = (|| -> Option<DisplayMetadata> {
@@ -1218,10 +1308,124 @@ impl Server {
                     }
                     ManagerCommand::FetchString { name, reply } => {
                         let result = match pvs.get(&name) {
-                            Some(ManagedPv::String(pv)) | Some(ManagedPv::StringArray(pv)) => {
+                            Some(ManagedPv::String(pv)) => {
                                 pv.fetch().and_then(|v| {
                                     Ok(FetchedString {
                                         value: v.get_field_string("value")?,
+                                        alarm_severity: AlarmSeverity::from(v.get_field_int32("alarm.severity").unwrap_or(0)),
+                                        alarm_status: AlarmStatus::from(v.get_field_int32("alarm.status").unwrap_or(0)),
+                                        alarm_message: v.get_field_string("alarm.message").unwrap_or_default(),
+                                    })
+                                })
+                            }
+                            _ => Err(PvxsError::new("PV not found or type mismatch")),
+                        };
+                        let _ = reply.send(result);
+                    }
+                    ManagerCommand::FetchDoubleArray { name, reply } => {
+                        let result = match pvs.get(&name) {
+                            Some(ManagedPv::DoubleArray(pv)) => {
+                                pv.fetch().and_then(|v| {
+                                    let display_metadata = (|| -> Option<DisplayMetadata> {
+                                        Some(DisplayMetadata {
+                                            limit_low: v.get_field_int32("display.limitLow").ok()? as i64,
+                                            limit_high: v.get_field_int32("display.limitHigh").ok()? as i64,
+                                            description: v.get_field_string("display.description").ok()?,
+                                            units: v.get_field_string("display.units").ok()?,
+                                            precision: v.get_field_int32("display.precision").ok()?,
+                                        })
+                                    })();
+                                    let control_metadata = (|| -> Option<ControlMetadata> {
+                                        Some(ControlMetadata {
+                                            limit_low: v.get_field_double("control.limitLow").ok()?,
+                                            limit_high: v.get_field_double("control.limitHigh").ok()?,
+                                            min_step: v.get_field_double("control.minStep").ok()?,
+                                        })
+                                    })();
+                                    let alarm_metadata = (|| -> Option<AlarmMetadata> {
+                                        Some(AlarmMetadata {
+                                            active: v.get_field_int32("valueAlarm.active").ok()? != 0,
+                                            low_alarm_limit: v.get_field_double("valueAlarm.lowAlarmLimit").ok()?,
+                                            low_warning_limit: v.get_field_double("valueAlarm.lowWarningLimit").ok()?,
+                                            high_warning_limit: v.get_field_double("valueAlarm.highWarningLimit").ok()?,
+                                            high_alarm_limit: v.get_field_double("valueAlarm.highAlarmLimit").ok()?,
+                                            low_alarm_severity: AlarmSeverity::from(v.get_field_int32("valueAlarm.lowAlarmSeverity").ok()?),
+                                            low_warning_severity: AlarmSeverity::from(v.get_field_int32("valueAlarm.lowWarningSeverity").ok()?),
+                                            high_warning_severity: AlarmSeverity::from(v.get_field_int32("valueAlarm.highWarningSeverity").ok()?),
+                                            high_alarm_severity: AlarmSeverity::from(v.get_field_int32("valueAlarm.highAlarmSeverity").ok()?),
+                                            hysteresis: v.get_field_int32("valueAlarm.hysteresis").ok()? as u8,
+                                        })
+                                    })();
+                                    Ok(FetchedDoubleArray {
+                                        value: v.get_field_double_array("value")?,
+                                        alarm_severity: AlarmSeverity::from(v.get_field_int32("alarm.severity").unwrap_or(0)),
+                                        alarm_status: AlarmStatus::from(v.get_field_int32("alarm.status").unwrap_or(0)),
+                                        alarm_message: v.get_field_string("alarm.message").unwrap_or_default(),
+                                        display_metadata,
+                                        control_metadata,
+                                        alarm_metadata,
+                                    })
+                                })
+                            }
+                            _ => Err(PvxsError::new("PV not found or type mismatch")),
+                        };
+                        let _ = reply.send(result);
+                    }
+                    ManagerCommand::FetchInt32Array { name, reply } => {
+                        let result = match pvs.get(&name) {
+                            Some(ManagedPv::Int32Array(pv)) => {
+                                pv.fetch().and_then(|v| {
+                                    let display_metadata = (|| -> Option<DisplayMetadata> {
+                                        Some(DisplayMetadata {
+                                            limit_low: v.get_field_int32("display.limitLow").ok()? as i64,
+                                            limit_high: v.get_field_int32("display.limitHigh").ok()? as i64,
+                                            description: v.get_field_string("display.description").ok()?,
+                                            units: v.get_field_string("display.units").ok()?,
+                                            precision: v.get_field_int32("display.precision").ok()?,
+                                        })
+                                    })();
+                                    let control_metadata = (|| -> Option<ControlMetadata> {
+                                        Some(ControlMetadata {
+                                            limit_low: v.get_field_double("control.limitLow").ok()?,
+                                            limit_high: v.get_field_double("control.limitHigh").ok()?,
+                                            min_step: v.get_field_double("control.minStep").ok()?,
+                                        })
+                                    })();
+                                    let alarm_metadata = (|| -> Option<AlarmMetadata> {
+                                        Some(AlarmMetadata {
+                                            active: v.get_field_int32("valueAlarm.active").ok()? != 0,
+                                            low_alarm_limit: v.get_field_double("valueAlarm.lowAlarmLimit").ok()?,
+                                            low_warning_limit: v.get_field_double("valueAlarm.lowWarningLimit").ok()?,
+                                            high_warning_limit: v.get_field_double("valueAlarm.highWarningLimit").ok()?,
+                                            high_alarm_limit: v.get_field_double("valueAlarm.highAlarmLimit").ok()?,
+                                            low_alarm_severity: AlarmSeverity::from(v.get_field_int32("valueAlarm.lowAlarmSeverity").ok()?),
+                                            low_warning_severity: AlarmSeverity::from(v.get_field_int32("valueAlarm.lowWarningSeverity").ok()?),
+                                            high_warning_severity: AlarmSeverity::from(v.get_field_int32("valueAlarm.highWarningSeverity").ok()?),
+                                            high_alarm_severity: AlarmSeverity::from(v.get_field_int32("valueAlarm.highAlarmSeverity").ok()?),
+                                            hysteresis: v.get_field_int32("valueAlarm.hysteresis").ok()? as u8,
+                                        })
+                                    })();
+                                    Ok(FetchedInt32Array {
+                                        value: v.get_field_int32_array("value")?,
+                                        alarm_severity: AlarmSeverity::from(v.get_field_int32("alarm.severity").unwrap_or(0)),
+                                        alarm_status: AlarmStatus::from(v.get_field_int32("alarm.status").unwrap_or(0)),
+                                        alarm_message: v.get_field_string("alarm.message").unwrap_or_default(),
+                                        display_metadata,
+                                        control_metadata,
+                                        alarm_metadata,
+                                    })
+                                })
+                            }
+                            _ => Err(PvxsError::new("PV not found or type mismatch")),
+                        };
+                        let _ = reply.send(result);
+                    }
+                    ManagerCommand::FetchStringArray { name, reply } => {
+                        let result = match pvs.get(&name) {
+                            Some(ManagedPv::StringArray(pv)) => {
+                                pv.fetch().and_then(|v| {
+                                    Ok(FetchedStringArray {
+                                        value: v.get_field_string_array("value")?,
                                         alarm_severity: AlarmSeverity::from(v.get_field_int32("alarm.severity").unwrap_or(0)),
                                         alarm_status: AlarmStatus::from(v.get_field_int32("alarm.status").unwrap_or(0)),
                                         alarm_message: v.get_field_string("alarm.message").unwrap_or_default(),
@@ -1237,8 +1441,8 @@ impl Server {
                             Some(ManagedPv::PvEnum(pv)) => {
                                 pv.fetch().and_then(|v| {
                                     Ok(FetchedEnum {
-                                        value: v.get_field_enum("value")?,
-                                        value_options: v.get_field_string_array("value.choices").unwrap_or_default(),
+                                        value: v.get_field_enum("value.index")?,
+                                        value_choices: v.get_field_string_array("value.choices").unwrap_or_default(),
                                         alarm_severity: AlarmSeverity::from(v.get_field_int32("alarm.severity").unwrap_or(0)),
                                         alarm_status: AlarmStatus::from(v.get_field_int32("alarm.status").unwrap_or(0)),
                                         alarm_message: v.get_field_string("alarm.message").unwrap_or_default(),

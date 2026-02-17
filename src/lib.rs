@@ -98,8 +98,11 @@ pub use server::{
     NTScalarMetadataBuilder,
     NTEnumMetadataBuilder,
     FetchedDouble,
+    FetchedDoubleArray,
     FetchedInt32,
+    FetchedInt32Array,
     FetchedString,
+    FetchedStringArray,
     FetchedEnum,
 };
 

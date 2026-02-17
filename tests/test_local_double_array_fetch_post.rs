@@ -6,107 +6,106 @@ mod test_pvxs_local_double_array_fetch_post {
     fn test_pv_local_double_array_fetch_post() {
         // This test creates a local pv (loc:double:array) on a server and
         // tests server-side fetch() and post_double() operations.
-        let initial_value = 3.14159;
+        let initial_array = vec![3.14159, 2.71828, 1.61803];
         let name = "loc:double:array";
-        let mut loc_srv = Server::create_isolated()
+        let loc_srv = Server::start_isolated()
             .expect("Failed to create isolated server");
 
-        // Create a double PV and capture it for server-side operations
-        let mut srv_pv = loc_srv.create_pv_double(name, initial_value, NTScalarMetadataBuilder::new())
+        // Create a double array PV and capture it for server-side operations
+        loc_srv.create_pv_double_array(
+            name, initial_array.clone(), NTScalarMetadataBuilder::new())
             .expect("Failed to create pv:double:array");
 
-        // Verify we can fetch the initial scalar value using server-side fetch
-        let value = srv_pv.fetch().expect("Failed to fetch initial value");
-        let scalar_val = value.get_field_double("value").unwrap();
-        assert_eq!(scalar_val, initial_value, "Initial scalar value mismatch, got {}, expected {}", scalar_val, initial_value);
+        // Verify we can fetch the initial array value using server-side fetch
+        match loc_srv.fetch_double_array(name) {
+            Ok(fetched) => {
+                assert_eq!(initial_array, fetched.value, "Initial array value mismatch, got {:?}, expected {:?}", fetched.value, initial_array);
+            },
+            Err(e) => panic!("Failed to fetch initial array value: {}", e),
+        }
 
         // Test posting different double values and reading back using server-side operations
         let test_values = vec![0.0, -1.5, 2.71828, 1e-10, 1e10];
-        
-        for test_val in test_values {
-            srv_pv.post_double(test_val).expect("Failed to post test value");
-            
-            let fetched = srv_pv.fetch().expect("Failed to fetch test value");
-            let retrieved_val = fetched.get_field_double("value").unwrap();
-            assert_eq!(retrieved_val, test_val, "Value mismatch: posted {}, got {}", test_val, retrieved_val);
+        loc_srv.post_double_array(name, test_values.clone())
+            .expect("Failed to post double array");
+
+        match loc_srv.fetch_double_array(name) {
+            Ok(fetched) => {
+                assert_eq!(test_values, fetched.value, "Posted array value mismatch, got {:?}, expected {:?}", fetched.value, test_values);
+            },
+            Err(e) => panic!("Failed to fetch posted array value: {}", e),
         }
     }
 
     #[test]
     fn test_pv_local_double_array_special_values() {
-        // Test local handling of special floating point values using server-side operations
-        let name = "loc:double:special";
-        let mut loc_srv = Server::create_isolated()
-            .expect("Failed to create isolated server");
-
-        let mut srv_pv = loc_srv.create_pv_double(name, 0.0, NTScalarMetadataBuilder::new())
-            .expect("Failed to create pv:double:special");
-
+        
         // Test special double values using server-side post/fetch
-        let special_values = vec![
-            ("Zero", 0.0),
-            ("Negative zero", -0.0),
-            ("PI", std::f64::consts::PI),
-            ("E", std::f64::consts::E),
-            ("Max", f64::MAX),
-            ("Min", f64::MIN),
-            ("Min positive", f64::MIN_POSITIVE),
-            ("Very small", 1e-308),
-            ("Very large", 1e308),
+        let mut special_values = vec![
+            0.0, // Zero
+            -0.0, // Negative zero
+            std::f64::consts::PI, // PI
+            std::f64::consts::E, // E
+            f64::MAX, // Max
+            f64::MIN, // Min
+            f64::MIN_POSITIVE, // Min positive
+            1e-308, // Very small
+            1e308, // Very large
         ];
 
-        for (name_val, value) in special_values {
-            srv_pv.post_double(value).expect(&format!("Failed to post {}", name_val));
-            let fetched = srv_pv.fetch().expect("Failed to fetch special value");
-            let retrieved = fetched.get_field_double("value").unwrap();
-            
-            if value.is_finite() {
-                assert_eq!(retrieved, value, "{}: expected {}, got {}", name_val, value, retrieved);
-            }
+        // Test local handling of special floating point values using server-side operations
+        let name = "loc:double:special";
+        let loc_srv = Server::start_isolated()
+            .expect("Failed to create isolated server");
+
+        loc_srv.create_pv_double_array(name, special_values.clone(), NTScalarMetadataBuilder::new())
+            .expect("Failed to create pv:double:special");
+        
+        match loc_srv.fetch_double_array(name) {
+            Ok(fetched) => {
+                assert_eq!(special_values, fetched.value, "Special values array mismatch, got {:?}, expected {:?}", fetched.value, special_values);
+            },
+            Err(e) => panic!("Failed to fetch special values array: {}", e),
         }
 
-        // Test infinity
-        srv_pv.post_double(f64::INFINITY).expect("Failed to post infinity");
-        let fetched = srv_pv.fetch().unwrap();
-        let retrieved = fetched.get_field_double("value").unwrap();
-        assert!(retrieved.is_infinite() && retrieved > 0.0, "Expected positive infinity, got {}", retrieved);
+        // Add  infinity to the array and test
+        special_values.push(f64::INFINITY);
+        loc_srv.post_double_array(name, special_values.clone())
+            .expect("Failed to post double array with infinity");
+        match loc_srv.fetch_double_array(name) {
+            Ok(fetched) => {
+                assert_eq!(special_values, fetched.value, "Special values array with infinity mismatch, got {:?}, expected {:?}", fetched.value, special_values);
+            },  
+            Err(e) => panic!("Failed to fetch special values array with infinity: {}", e),
+        }
 
-        // Test negative infinity
-        srv_pv.post_double(f64::NEG_INFINITY).expect("Failed to post negative infinity");
-        let fetched = srv_pv.fetch().unwrap();
-        let retrieved = fetched.get_field_double("value").unwrap();
-        assert!(retrieved.is_infinite() && retrieved < 0.0, "Expected negative infinity, got {}", retrieved);
+        // Add negative infinity to the array and test
+        special_values.push(f64::NEG_INFINITY);
+        loc_srv.post_double_array(name, special_values.clone())
+            .expect("Failed to post double array with negative infinity");
+        match loc_srv.fetch_double_array(name) {
+            Ok(fetched) => {
+                assert_eq!(special_values, fetched.value, "Special values array with negative infinity mismatch, got {:?}, expected {:?}", fetched.value, special_values);
+            },  
+            Err(e) => panic!("Failed to fetch special values array with negative infinity: {}", e),
+        }
 
-        // Test NaN
-        srv_pv.post_double(f64::NAN).expect("Failed to post NaN");
-        let fetched = srv_pv.fetch().unwrap();
-        let retrieved = fetched.get_field_double("value").unwrap();
-        assert!(retrieved.is_nan(), "Expected NaN, got {}", retrieved);
-    }
-
-    #[test]
-    fn test_pv_local_double_array_error_handling() -> Result<(), Box<dyn std::error::Error>> {
-        // Test server-side operations with proper error propagation
-        let name = "loc:double:errors";
-        let mut loc_srv = Server::create_isolated()?;
-        let mut srv_pv = loc_srv.create_pv_double(name, 1.23, NTScalarMetadataBuilder::new())?;
-
-        // Verify initial state using server-side fetch
-        let initial_fetch = srv_pv.fetch()?;
-        let initial_val = initial_fetch.get_field_double("value")?;
-        assert!((initial_val - 1.23).abs() < 1e-6);
-
-        // Test that valid operations work using server-side post
-        srv_pv.post_double(9.87)?;
-        let updated_fetch = srv_pv.fetch()?;
-        let updated_val = updated_fetch.get_field_double("value")?;
-        assert!((updated_val - 9.87).abs() < 1e-6);
-
-        // Test another valid operation
-        srv_pv.post_double(4.56)?;
-        let final_fetch = srv_pv.fetch()?;
-        let final_val = final_fetch.get_field_double("value")?;
-        assert_eq!(final_val, 4.56, "Expected 4.56, got {}", final_val);
-        Ok(())
+        // Add NaN to the array and test
+        special_values.push(f64::NAN);
+        loc_srv.post_double_array(name, special_values.clone())
+            .expect("Failed to post double array with NaN");
+        match loc_srv.fetch_double_array(name) {
+            Ok(fetched) => {
+                assert_eq!(special_values.len(), fetched.value.len(), "Special values array length mismatch");
+                for (i, (expected, actual)) in special_values.iter().zip(fetched.value.iter()).enumerate() {
+                    if expected.is_nan() {
+                        assert!(actual.is_nan(), "Element {} should be NaN, got {}", i, actual);
+                    } else {
+                        assert_eq!(expected, actual, "Element {} mismatch: expected {}, got {}", i, expected, actual);
+                    }
+                }
+            },  
+            Err(e) => panic!("Failed to fetch special values array with NaN: {}", e),
+        }
     }
 }
