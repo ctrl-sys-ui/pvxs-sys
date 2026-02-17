@@ -387,7 +387,7 @@ namespace pvxs_wrapper
 
     std::unique_ptr<NTScalarMetadata> create_metadata(const NTScalarAlarm &alarm, const NTScalarTime &time_stamp,
                                                       const NTScalarDisplay *display, const NTScalarControl *control,
-                                                      const NTScalarValueAlarm *value_alarm, bool has_form)
+                                                      const NTScalarValueAlarm *value_alarm)
     {
         auto metadata = std::make_unique<NTScalarMetadata>();
         metadata->alarm = alarm;
@@ -408,92 +408,84 @@ namespace pvxs_wrapper
             metadata->value_alarm = *value_alarm;
         }
 
-        metadata->has_form = has_form;
         return metadata;
     }
 
     // Helper functions for different combinations of optional fields
-    std::unique_ptr<NTScalarMetadata> create_metadata_no_optional(const NTScalarAlarm &alarm, const NTScalarTime &time_stamp, bool has_form)
+    std::unique_ptr<NTScalarMetadata> create_metadata_no_optional(const NTScalarAlarm &alarm, const NTScalarTime &time_stamp)
     {
         auto metadata = std::make_unique<NTScalarMetadata>();
         metadata->alarm = alarm;
         metadata->time_stamp = time_stamp;
-        metadata->has_form = has_form;
         return metadata;
     }
 
     std::unique_ptr<NTScalarMetadata> create_metadata_with_display(const NTScalarAlarm &alarm, const NTScalarTime &time_stamp,
-                                                                   const NTScalarDisplay &display, bool has_form)
+                                                                   const NTScalarDisplay &display)
     {
         auto metadata = std::make_unique<NTScalarMetadata>();
         metadata->alarm = alarm;
         metadata->time_stamp = time_stamp;
         metadata->display = display;
-        metadata->has_form = has_form;
         return metadata;
     }
 
     std::unique_ptr<NTScalarMetadata> create_metadata_with_control(const NTScalarAlarm &alarm, const NTScalarTime &time_stamp,
-                                                                   const NTScalarControl &control, bool has_form)
+                                                                   const NTScalarControl &control)
     {
         auto metadata = std::make_unique<NTScalarMetadata>();
         metadata->alarm = alarm;
         metadata->time_stamp = time_stamp;
         metadata->control = control;
-        metadata->has_form = has_form;
         return metadata;
     }
 
     std::unique_ptr<NTScalarMetadata> create_metadata_with_value_alarm(const NTScalarAlarm &alarm, const NTScalarTime &time_stamp,
-                                                                       const NTScalarValueAlarm &value_alarm, bool has_form)
+                                                                       const NTScalarValueAlarm &value_alarm)
     {
         auto metadata = std::make_unique<NTScalarMetadata>();
         metadata->alarm = alarm;
         metadata->time_stamp = time_stamp;
         metadata->value_alarm = value_alarm;
-        metadata->has_form = has_form;
         return metadata;
     }
 
     std::unique_ptr<NTScalarMetadata> create_metadata_with_display_control(const NTScalarAlarm &alarm, const NTScalarTime &time_stamp,
-                                                                           const NTScalarDisplay &display, const NTScalarControl &control, bool has_form)
+                                                                           const NTScalarDisplay &display, const NTScalarControl &control)
     {
         auto metadata = std::make_unique<NTScalarMetadata>();
         metadata->alarm = alarm;
         metadata->time_stamp = time_stamp;
         metadata->display = display;
         metadata->control = control;
-        metadata->has_form = has_form;
         return metadata;
     }
 
     std::unique_ptr<NTScalarMetadata> create_metadata_with_display_value_alarm(const NTScalarAlarm &alarm, const NTScalarTime &time_stamp,
-                                                                               const NTScalarDisplay &display, const NTScalarValueAlarm &value_alarm, bool has_form)
+                                                                               const NTScalarDisplay &display, const NTScalarValueAlarm &value_alarm)
     {
         auto metadata = std::make_unique<NTScalarMetadata>();
         metadata->alarm = alarm;
         metadata->time_stamp = time_stamp;
         metadata->display = display;
         metadata->value_alarm = value_alarm;
-        metadata->has_form = has_form;
         return metadata;
     }
 
     std::unique_ptr<NTScalarMetadata> create_metadata_with_control_value_alarm(const NTScalarAlarm &alarm, const NTScalarTime &time_stamp,
-                                                                               const NTScalarControl &control, const NTScalarValueAlarm &value_alarm, bool has_form)
+                                                                               const NTScalarControl &control, const NTScalarValueAlarm &value_alarm)
     {
         auto metadata = std::make_unique<NTScalarMetadata>();
         metadata->alarm = alarm;
         metadata->time_stamp = time_stamp;
         metadata->control = control;
         metadata->value_alarm = value_alarm;
-        metadata->has_form = has_form;
         return metadata;
     }
 
     std::unique_ptr<NTScalarMetadata> create_metadata_full(const NTScalarAlarm &alarm, const NTScalarTime &time_stamp,
                                                            const NTScalarDisplay &display, const NTScalarControl &control,
-                                                           const NTScalarValueAlarm &value_alarm, bool has_form)
+                                                           const NTScalarValueAlarm &value_alarm)
     {
         auto metadata = std::make_unique<NTScalarMetadata>();
         metadata->alarm = alarm;
@@ -501,7 +493,6 @@ namespace pvxs_wrapper
         metadata->display = display;
         metadata->control = control;
         metadata->value_alarm = value_alarm;
-        metadata->has_form = has_form;
         return metadata;
     }
 
@@ -527,7 +518,7 @@ namespace pvxs_wrapper
                 metadata.display.has_value(),
                 metadata.control.has_value(),
                 metadata.value_alarm.has_value(),
-                metadata.has_form}
+                metadata.display.has_value()}  // form=true when display is enabled (enables display.precision and display.form)
                                .create();
 
             initial["value"] = initial_value;
@@ -549,10 +540,7 @@ namespace pvxs_wrapper
                 initial["display.limitHigh"] = disp.limit_high;
                 initial["display.description"] = std::string(disp.description);
                 initial["display.units"] = std::string(disp.units);
-                if (metadata.has_form)
-                {
-                    initial["display.precision"] = disp.precision;
-                }
+                initial["display.precision"] = disp.precision;
             }
 
             // Optional: control fields
@@ -614,7 +602,7 @@ namespace pvxs_wrapper
                 metadata.display.has_value(),
                 metadata.control.has_value(),
                 metadata.value_alarm.has_value(),
-                metadata.has_form}
+                metadata.display.has_value()}  // form=true when display is enabled
                                .create();
 
             // Convert rust::Vec to pvxs::shared_array
@@ -642,10 +630,7 @@ namespace pvxs_wrapper
                 initial["display.limitHigh"] = disp.limit_high;
                 initial["display.description"] = std::string(disp.description);
                 initial["display.units"] = std::string(disp.units);
-                if (metadata.has_form)
-                {
-                    initial["display.precision"] = disp.precision;
-                }
+                initial["display.precision"] = disp.precision;
             }
 
             // Optional: control fields
@@ -707,7 +692,7 @@ namespace pvxs_wrapper
                 metadata.display.has_value(),
                 metadata.control.has_value(),
                 metadata.value_alarm.has_value(),
-                metadata.has_form}
+                metadata.display.has_value()}  // form=true when display is enabled
                                .create();
 
             initial["value"] = initial_value;
@@ -727,10 +712,7 @@ namespace pvxs_wrapper
                 initial["display.limitHigh"] = disp.limit_high;
                 initial["display.description"] = std::string(disp.description);
                 initial["display.units"] = std::string(disp.units);
-                if (metadata.has_form)
-                {
-                    initial["display.precision"] = disp.precision;
-                }
+                initial["display.precision"] = disp.precision;
             }
             // Optional: control fields
             if (metadata.control.has_value())
@@ -790,7 +772,7 @@ namespace pvxs_wrapper
                 metadata.display.has_value(),
                 metadata.control.has_value(),
                 metadata.value_alarm.has_value(),
-                metadata.has_form}
+                metadata.display.has_value()}  // form=true when display is enabled
                                .create();
 
             // Convert rust::Vec to pvxs::shared_array
@@ -818,10 +800,7 @@ namespace pvxs_wrapper
                 initial["display.limitHigh"] = disp.limit_high;
                 initial["display.description"] = std::string(disp.description);
                 initial["display.units"] = std::string(disp.units);
-                if (metadata.has_form)
-                {
-                    initial["display.precision"] = disp.precision;
-                }
+                initial["display.precision"] = disp.precision;
             }
 
             // Optional: control fields
@@ -882,8 +861,7 @@ namespace pvxs_wrapper
                 pvxs::TypeCode::String,
                 metadata.display.has_value(),
                 metadata.control.has_value(),
-                metadata.value_alarm.has_value(),
-                metadata.has_form}
+                metadata.value_alarm.has_value()}
                                .create();
 
             initial["value"] = std::string(initial_value);
@@ -938,8 +916,7 @@ namespace pvxs_wrapper
                 pvxs::TypeCode::StringA, // StringA for arrays
                 metadata.display.has_value(),
                 metadata.control.has_value(),
-                metadata.value_alarm.has_value(),
-                metadata.has_form}
+                metadata.value_alarm.has_value()}
                                .create();
 
             // Convert rust::Vec to pvxs::shared_array

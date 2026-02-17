@@ -564,7 +564,6 @@ namespace pvxs_wrapper
         std::optional<NTScalarDisplay> display;
         std::optional<NTScalarControl> control;
         std::optional<NTScalarValueAlarm> value_alarm;
-        bool has_form;
     };
 
     struct NTEnumMetadata {
@@ -583,14 +582,14 @@ namespace pvxs_wrapper
                                                             int32_t high_warning_severity, int32_t high_alarm_severity, uint8_t hysteresis);
     
     // Helper functions to build metadata with different combinations of optional fields
-    std::unique_ptr<NTScalarMetadata> create_metadata_no_optional(const NTScalarAlarm& alarm, const NTScalarTime& time_stamp, bool has_form);
-    std::unique_ptr<NTScalarMetadata> create_metadata_with_display(const NTScalarAlarm& alarm, const NTScalarTime& time_stamp, const NTScalarDisplay& display, bool has_form);
-    std::unique_ptr<NTScalarMetadata> create_metadata_with_control(const NTScalarAlarm& alarm, const NTScalarTime& time_stamp, const NTScalarControl& control, bool has_form);
-    std::unique_ptr<NTScalarMetadata> create_metadata_with_value_alarm(const NTScalarAlarm& alarm, const NTScalarTime& time_stamp, const NTScalarValueAlarm& value_alarm, bool has_form);
-    std::unique_ptr<NTScalarMetadata> create_metadata_with_display_control(const NTScalarAlarm& alarm, const NTScalarTime& time_stamp, const NTScalarDisplay& display, const NTScalarControl& control, bool has_form);
-    std::unique_ptr<NTScalarMetadata> create_metadata_with_display_value_alarm(const NTScalarAlarm& alarm, const NTScalarTime& time_stamp, const NTScalarDisplay& display, const NTScalarValueAlarm& value_alarm, bool has_form);
-    std::unique_ptr<NTScalarMetadata> create_metadata_with_control_value_alarm(const NTScalarAlarm& alarm, const NTScalarTime& time_stamp, const NTScalarControl& control, const NTScalarValueAlarm& value_alarm, bool has_form);
-    std::unique_ptr<NTScalarMetadata> create_metadata_full(const NTScalarAlarm& alarm, const NTScalarTime& time_stamp, const NTScalarDisplay& display, const NTScalarControl& control, const NTScalarValueAlarm& value_alarm, bool has_form);
+    std::unique_ptr<NTScalarMetadata> create_metadata_no_optional(const NTScalarAlarm& alarm, const NTScalarTime& time_stamp);
+    std::unique_ptr<NTScalarMetadata> create_metadata_with_display(const NTScalarAlarm& alarm, const NTScalarTime& time_stamp, const NTScalarDisplay& display);
+    std::unique_ptr<NTScalarMetadata> create_metadata_with_control(const NTScalarAlarm& alarm, const NTScalarTime& time_stamp, const NTScalarControl& control);
+    std::unique_ptr<NTScalarMetadata> create_metadata_with_value_alarm(const NTScalarAlarm& alarm, const NTScalarTime& time_stamp, const NTScalarValueAlarm& value_alarm);
+    std::unique_ptr<NTScalarMetadata> create_metadata_with_display_control(const NTScalarAlarm& alarm, const NTScalarTime& time_stamp, const NTScalarDisplay& display, const NTScalarControl& control);
+    std::unique_ptr<NTScalarMetadata> create_metadata_with_display_value_alarm(const NTScalarAlarm& alarm, const NTScalarTime& time_stamp, const NTScalarDisplay& display, const NTScalarValueAlarm& value_alarm);
+    std::unique_ptr<NTScalarMetadata> create_metadata_with_control_value_alarm(const NTScalarAlarm& alarm, const NTScalarTime& time_stamp, const NTScalarControl& control, const NTScalarValueAlarm& value_alarm);
+    std::unique_ptr<NTScalarMetadata> create_metadata_full(const NTScalarAlarm& alarm, const NTScalarTime& time_stamp, const NTScalarDisplay& display, const NTScalarControl& control, const NTScalarValueAlarm& value_alarm);
     
     std::unique_ptr<NTEnumMetadata> create_enum_metadata(const NTScalarAlarm& alarm, const NTScalarTime& time_stamp);
 

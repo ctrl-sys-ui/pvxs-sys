@@ -48,8 +48,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 high_alarm_severity: pvxs_sys::AlarmSeverity::Major,
                 hysteresis: 1,
             }
-        )
-        .with_form(true);
+        );
     
     // Create PV with automatic alarm computation based on initial value
     // Initial value 25.5 is in the low warning range (20 < 25.5 < 30)

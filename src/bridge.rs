@@ -42,14 +42,14 @@ mod ffi {
                              high_warning_severity: i32, high_alarm_severity: i32, hysteresis: u8) -> UniquePtr<NTScalarValueAlarm>;
         
         // Helper functions to build metadata with optional fields
-        fn create_metadata_no_optional(alarm: &NTScalarAlarm, time_stamp: &NTScalarTime, has_form: bool) -> UniquePtr<NTScalarMetadata>;
-        fn create_metadata_with_display(alarm: &NTScalarAlarm, time_stamp: &NTScalarTime, display: &NTScalarDisplay, has_form: bool) -> UniquePtr<NTScalarMetadata>;
-        fn create_metadata_with_control(alarm: &NTScalarAlarm, time_stamp: &NTScalarTime, control: &NTScalarControl, has_form: bool) -> UniquePtr<NTScalarMetadata>;
-        fn create_metadata_with_value_alarm(alarm: &NTScalarAlarm, time_stamp: &NTScalarTime, value_alarm: &NTScalarValueAlarm, has_form: bool) -> UniquePtr<NTScalarMetadata>;
-        fn create_metadata_with_display_control(alarm: &NTScalarAlarm, time_stamp: &NTScalarTime, display: &NTScalarDisplay, control: &NTScalarControl, has_form: bool) -> UniquePtr<NTScalarMetadata>;
-        fn create_metadata_with_display_value_alarm(alarm: &NTScalarAlarm, time_stamp: &NTScalarTime, display: &NTScalarDisplay, value_alarm: &NTScalarValueAlarm, has_form: bool) -> UniquePtr<NTScalarMetadata>;
-        fn create_metadata_with_control_value_alarm(alarm: &NTScalarAlarm, time_stamp: &NTScalarTime, control: &NTScalarControl, value_alarm: &NTScalarValueAlarm, has_form: bool) -> UniquePtr<NTScalarMetadata>;
-        fn create_metadata_full(alarm: &NTScalarAlarm, time_stamp: &NTScalarTime, display: &NTScalarDisplay, control: &NTScalarControl, value_alarm: &NTScalarValueAlarm, has_form: bool) -> UniquePtr<NTScalarMetadata>;
+        fn create_metadata_no_optional(alarm: &NTScalarAlarm, time_stamp: &NTScalarTime) -> UniquePtr<NTScalarMetadata>;
+        fn create_metadata_with_display(alarm: &NTScalarAlarm, time_stamp: &NTScalarTime, display: &NTScalarDisplay) -> UniquePtr<NTScalarMetadata>;
+        fn create_metadata_with_control(alarm: &NTScalarAlarm, time_stamp: &NTScalarTime, control: &NTScalarControl) -> UniquePtr<NTScalarMetadata>;
+        fn create_metadata_with_value_alarm(alarm: &NTScalarAlarm, time_stamp: &NTScalarTime, value_alarm: &NTScalarValueAlarm) -> UniquePtr<NTScalarMetadata>;
+        fn create_metadata_with_display_control(alarm: &NTScalarAlarm, time_stamp: &NTScalarTime, display: &NTScalarDisplay, control: &NTScalarControl) -> UniquePtr<NTScalarMetadata>;
+        fn create_metadata_with_display_value_alarm(alarm: &NTScalarAlarm, time_stamp: &NTScalarTime, display: &NTScalarDisplay, value_alarm: &NTScalarValueAlarm) -> UniquePtr<NTScalarMetadata>;
+        fn create_metadata_with_control_value_alarm(alarm: &NTScalarAlarm, time_stamp: &NTScalarTime, control: &NTScalarControl, value_alarm: &NTScalarValueAlarm) -> UniquePtr<NTScalarMetadata>;
+        fn create_metadata_full(alarm: &NTScalarAlarm, time_stamp: &NTScalarTime, display: &NTScalarDisplay, control: &NTScalarControl, value_alarm: &NTScalarValueAlarm) -> UniquePtr<NTScalarMetadata>;
 
         fn create_enum_metadata(alarm: &NTScalarAlarm, time_stamp: &NTScalarTime) -> UniquePtr<NTEnumMetadata>;
         
