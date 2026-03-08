@@ -47,7 +47,7 @@ mod test_server_alarm_manager_value_alarms {
         assert_eq!(severity, 2, "Expected Major severity (2), got {}", severity);
         assert_eq!(status, 3, "Expected HiHi status (3), got {}", status); // AlarmStatus::HiHi
 
-        manager.stop().expect("Failed to stop manager");
+        manager.stop_drop().expect("Failed to stop manager");
     }
 
     #[test]
@@ -90,7 +90,7 @@ mod test_server_alarm_manager_value_alarms {
         assert_eq!(severity, 1, "Expected Minor severity (1), got {}", severity);
         assert_eq!(status, 4, "Expected High status (4), got {}", status); // AlarmStatus::High
 
-        manager.stop().expect("Failed to stop manager");
+        manager.stop_drop().expect("Failed to stop manager");
     }
 
     #[test]
@@ -133,7 +133,7 @@ mod test_server_alarm_manager_value_alarms {
         assert_eq!(severity, 2, "Expected Major severity (2), got {}", severity);
         assert_eq!(status, 5, "Expected LoLo status (5), got {}", status); // AlarmStatus::LoLo
 
-        manager.stop().expect("Failed to stop manager");
+        manager.stop_drop().expect("Failed to stop manager");
     }
 
     #[test]
@@ -176,7 +176,7 @@ mod test_server_alarm_manager_value_alarms {
         assert_eq!(severity, 1, "Expected Minor severity (1), got {}", severity);
         assert_eq!(status, 6, "Expected Low status (6), got {}", status); // AlarmStatus::Low
 
-        manager.stop().expect("Failed to stop manager");
+        manager.stop_drop().expect("Failed to stop manager");
     }
 
     #[test]
@@ -219,7 +219,7 @@ mod test_server_alarm_manager_value_alarms {
         assert_eq!(severity, 0, "Expected NoAlarm severity (0), got {}", severity);
         assert_eq!(status, 0, "Expected NoAlarm status (0), got {}", status);
 
-        manager.stop().expect("Failed to stop manager");
+        manager.stop_drop().expect("Failed to stop manager");
     }
 
     #[test]
@@ -261,7 +261,7 @@ mod test_server_alarm_manager_value_alarms {
         // Should be no alarm because alarms are disabled
         assert_eq!(severity, 0, "Expected no alarm when inactive");
 
-        manager.stop().expect("Failed to stop manager");
+        manager.stop_drop().expect("Failed to stop manager");
     }
 
     #[test]
@@ -302,7 +302,7 @@ mod test_server_alarm_manager_value_alarms {
 
         assert_eq!(severity, 3, "Expected Invalid severity (3) for high alarm");
 
-        manager.stop().expect("Failed to stop manager");
+        manager.stop_drop().expect("Failed to stop manager");
     }
 }
 

@@ -68,7 +68,7 @@ mod test_server_alarm_manager_combined {
         assert_eq!(severity, 1, "Expected Minor severity for high warning");
         assert_eq!(status, 4, "Expected High status");
 
-        manager.stop().expect("Failed to stop manager");
+        manager.stop_drop().expect("Failed to stop manager");
     }
 
     #[test]
@@ -140,7 +140,7 @@ mod test_server_alarm_manager_combined {
         assert_eq!(value.get_field_int32("alarm.severity").unwrap(), AlarmSeverity::Major as i32, "Should be Major");
         assert_eq!(value.get_field_int32("alarm.status").unwrap(), AlarmStatus::LoLo as i32, "Should be LoLo");
 
-        manager.stop().expect("Failed to stop manager");
+        manager.stop_drop().expect("Failed to stop manager");
     }
 
     #[test]
@@ -205,7 +205,7 @@ mod test_server_alarm_manager_combined {
         assert_eq!(value2.get_field_int32("alarm.severity").unwrap(), AlarmSeverity::Invalid as i32);
         assert!((value2.get_field_double("value").unwrap() - 0.0).abs() < 1e-6);
 
-        manager.stop().expect("Failed to stop manager");
+        manager.stop_drop().expect("Failed to stop manager");
     }
 
     #[test]
@@ -254,7 +254,7 @@ mod test_server_alarm_manager_combined {
         let value = ctx.get(pv_name, 2.0).expect("Failed to get");
         assert_eq!(value.get_field_int32("alarm.status").unwrap(), AlarmStatus::Low as i32, "Between limits should trigger Low");
 
-        manager.stop().expect("Failed to stop manager");
+        manager.stop_drop().expect("Failed to stop manager");
     }
 }
 

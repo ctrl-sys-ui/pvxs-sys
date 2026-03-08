@@ -68,7 +68,7 @@ mod test_server_alarm_manager_control_limits {
         let severity = value.get_field_int32("alarm.severity").expect("Failed to get severity");
         assert_eq!(severity, 3, "Expected Invalid severity for out-of-bounds");
 
-        manager.stop().expect("Failed to stop manager");
+        manager.stop_drop().expect("Failed to stop manager");
     }
 
     #[test]
@@ -110,7 +110,7 @@ mod test_server_alarm_manager_control_limits {
         let retrieved = value.get_field_double("value").expect("Failed to get value");
         assert!((retrieved - 50.0).abs() < 1e-6, "Upper boundary should be accepted");
 
-        manager.stop().expect("Failed to stop manager");
+        manager.stop_drop().expect("Failed to stop manager");
     }
 
     #[test]
@@ -155,7 +155,7 @@ mod test_server_alarm_manager_control_limits {
         let severity = value.get_field_int32("alarm.severity").expect("Failed to get severity");
         assert_eq!(severity, 3, "Expected Invalid severity");
 
-        manager.stop().expect("Failed to stop manager");
+        manager.stop_drop().expect("Failed to stop manager");
     }
 }
 

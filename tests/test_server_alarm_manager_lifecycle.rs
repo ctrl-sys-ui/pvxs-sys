@@ -43,7 +43,7 @@ mod test_server_alarm_manager_lifecycle {
             assert!((value.get_field_double("value").unwrap() - 50.0).abs() < 1e-6);
         }
 
-        manager.stop().expect("Failed to stop manager");
+        manager.stop_drop().expect("Failed to stop manager");
     }
 
     #[test]
@@ -88,7 +88,7 @@ mod test_server_alarm_manager_lifecycle {
         let result = ctx.get(pv_name, 2.0);
         assert!(result.is_err(), "PV should not be accessible after removal");
 
-        manager.stop().expect("Failed to stop manager");
+        manager.stop_drop().expect("Failed to stop manager");
     }
 
     #[test]
@@ -120,7 +120,7 @@ mod test_server_alarm_manager_lifecycle {
         assert!(result.is_err(), "Should not be able to create duplicate PV");
         assert!(result.unwrap_err().to_string().contains("already exists"));
 
-        manager.stop().expect("Failed to stop manager");
+        manager.stop_drop().expect("Failed to stop manager");
     }
 
     #[test]
@@ -132,7 +132,7 @@ mod test_server_alarm_manager_lifecycle {
         assert!(result.is_err(), "Should not be able to post to non-existent PV");
         assert!(result.unwrap_err().to_string().contains("not found"));
 
-        manager.stop().expect("Failed to stop manager");
+        manager.stop_drop().expect("Failed to stop manager");
     }
 
     #[test]
@@ -175,7 +175,7 @@ mod test_server_alarm_manager_lifecycle {
         let value = ctx.get(pv_name, 2.0).expect("Failed to get");
         assert!((value.get_field_double("value").unwrap() - 25.0).abs() < 1e-6);
 
-        manager.stop().expect("Failed to stop manager");
+        manager.stop_drop().expect("Failed to stop manager");
     }
 
     #[test]
@@ -190,7 +190,7 @@ mod test_server_alarm_manager_lifecycle {
         handle.create_pv_double(pv_name, 42.0, metadata)
             .expect("Failed to create PV via handle");
 
-        manager.stop().expect("Failed to stop manager");
+        manager.stop_drop().expect("Failed to stop manager");
 
         // Try to use handle after manager stopped
         let result = handle.post_double(pv_name, 100.0);
@@ -245,7 +245,7 @@ mod test_server_alarm_manager_lifecycle {
         let val_string = ctx.get("test:lifecycle:mixed:string", 2.0).expect("Failed to get string");
         assert_eq!(val_string.get_field_string("value").unwrap(), "test");
 
-        manager.stop().expect("Failed to stop manager");
+        manager.stop_drop().expect("Failed to stop manager");
     }
 }
 

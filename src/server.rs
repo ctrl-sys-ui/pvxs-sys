@@ -98,6 +98,8 @@ impl ServerImpl {
         Ok(())
     }
     
+    // TODO: TZ: Review later if needed
+    /*
     /// Add a static source to the server
     /// 
     /// Static sources provide collections of PVs with a common configuration.
@@ -110,7 +112,7 @@ impl ServerImpl {
     pub fn add_source(&mut self, name: &str, source: &mut StaticSource, order: i32) -> Result<()> {
         bridge::server_add_source(self.inner.pin_mut(), name.to_string(), source.inner.pin_mut(), order)?;
         Ok(())
-    }
+    }*/
     
     /// Get the TCP port the server is listening on
     /// 
@@ -260,7 +262,10 @@ impl ServerImpl {
         self.add_pv(name, &mut pv)?;
         Ok(pv)
     }
-    
+
+
+    // TODO: TZ - template for readonly PVs if needed in the future
+    /*
     /// Create and add a new readonly SharedPV with a double value and metadata
     /// 
     /// Readonly PVs only allow reading by clients.
@@ -276,7 +281,7 @@ impl ServerImpl {
         pv.open_double(initial_value, metadata)?;
         self.add_pv(name, &mut pv)?;
         Ok(pv)
-    }
+    }*/
 }
 
 /// Fetched double value with alarm information
@@ -941,7 +946,12 @@ impl Server {
         self.handle.fetch_enum(name)
     }
 
-    pub fn stop(mut self) -> Result<()> {
+    /// Indirectly calls inner stop through the manager thread, ensuring proper shutdown and resource cleanup
+    /// Once Stop command is sent the worker thread will exit, however it will destroy the ServerImpl and the 
+    /// entire pvs hashmap so the all underlying C++ objects are freed correctly.
+    ///
+    /// Call start_from_env or start_isolated again and create new PVs to start a new server instance if needed after stopping.
+    pub fn stop_drop(mut self) -> Result<()> {
         let (reply_tx, reply_rx) = channel::bounded(1);
         self.handle
             .tx
@@ -1670,10 +1680,11 @@ impl SharedPV {
         Ok(())
     }
 
-    pub(crate) fn post_enum_with_alarm(&mut self, value: i16, severity: AlarmSeverity, status: AlarmStatus, message: String) -> Result<()> {
+    // TODO: TZ - Review later if needed
+    /*pub(crate) fn post_enum_with_alarm(&mut self, value: i16, severity: AlarmSeverity, status: AlarmStatus, message: String) -> Result<()> {
         bridge::shared_pv_post_enum_with_alarm(self.inner.pin_mut(), value, severity as i32, status as i32, message)?;
         Ok(())
-    }
+    }*/
     
     /// Post a new string value to the PV
     /// 

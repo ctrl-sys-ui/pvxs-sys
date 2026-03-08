@@ -10,12 +10,13 @@ mod test_pvxs_monitor_builder {
 
     #[test]
     fn test_local_server_failes_to_connect_to_remote_client_monitor() -> Result<(), PvxsError> {
+        // Suppress pvxs.tcp.setup Server unable to bind port 5075
+        pvxs_sys::set_logger_level("pvxs.tcp.setup", "CRIT")?;
         // Create isolated server for testing
-        let mut server = Server::create_isolated()?;
+        let server = Server::start_isolated()?;
         
         // Create PV with initial value (automatically added to server)
         server.create_pv_double("TEST:MonitorBuilder:LocalFail", 3.14, NTScalarMetadataBuilder::new())?;
-        server.start()?;
         
         thread::sleep(Duration::from_millis(100));
         
@@ -42,7 +43,7 @@ mod test_pvxs_monitor_builder {
                 assert!(false, "Monitor creation failed unexpectedly: {:?}", e);
             }
         }
-        assert!(server.stop().is_ok());
+        assert!(server.stop_drop().is_ok());
         Ok(())
     }
 
@@ -51,11 +52,12 @@ mod test_pvxs_monitor_builder {
     #[test]
     #[serial]
     fn test_monitor_builder_creation()  -> Result<(), PvxsError> {
+        // Suppress pvxs.tcp.setup Server unable to bind port 5075
+        pvxs_sys::set_logger_level("pvxs.tcp.setup", "CRIT")?;
         let pv_name = "TEST:MonitorBuilder:Creation";
         // Now start a new server from_env to test actual connection
-        let mut server = Server::from_env()?;
+        let mut server = Server::start_from_env().expect("Failed to start server from environment");
         server.create_pv_double(pv_name, 1.0, NTScalarMetadataBuilder::new())?;
-        assert!(server.start().is_ok());
         
         let mut ctx = Context::from_env()?;
         // Test MonitorBuilder creation again - this time server is running
@@ -74,18 +76,23 @@ mod test_pvxs_monitor_builder {
                 assert!(mon.is_connected(), "Monitor should be connected to from_env server");
                 
                 // stop the server
-                assert!(server.stop().is_ok());
+                assert!(server.stop_drop().is_ok());
                 thread::sleep(Duration::from_millis(1000));
                 
                 // After stopping server, should detect disconnection
                 assert_eq!(mon.is_connected(), false, "Monitor should be disconnected after server stop");
                 
-                // start the server again
-                assert!(server.start().is_ok());
+                // start the server again - stop() destroyed the old ServerImpl and all PVs,
+                // so the new server is a blank slate and the PV must be re-registered.
+                server = Server::start_from_env().expect("Failed to restart server from environment");
+                server.create_pv_double(pv_name, 1.0, NTScalarMetadataBuilder::new())
+                    .expect("Failed to re-register PV on restarted server");
+                thread::sleep(Duration::from_millis(1000));
 
                 // Give more time for reconnection (might take longer than initial connection)
                 thread::sleep(Duration::from_millis(5000));
                 assert!(mon.is_connected(), "Monitor should reconnect after server restart");
+                assert!(server.stop_drop().is_ok());
             },
             Err(e) => {
                 assert!(false, "Monitor creation failed: {:?}", e);
@@ -97,12 +104,13 @@ mod test_pvxs_monitor_builder {
     /// Test Monitor pop() method following PVXS pattern
     #[test]
     fn test_monitor_pop_functionality() -> Result<(), PvxsError> {
+        // Suppress pvxs.tcp.setup Server unable to bind port 5075
+        pvxs_sys::set_logger_level("pvxs.tcp.setup", "CRIT").expect("Error in setting logger level");
         // Create isolated server for testing
-        let mut server = Server::from_env()?;
+        let server = Server::start_from_env()?;
         
         // Create PV with initial value (automatically added to server)
         server.create_pv_double("TEST:MonitorBuilder:Pop", 10.0, NTScalarMetadataBuilder::new())?;
-        server.start()?;
         
         thread::sleep(Duration::from_millis(100));
         
@@ -169,18 +177,19 @@ mod test_pvxs_monitor_builder {
         }
         
         monitor.stop()?;
-        server.stop()?;
+        server.stop_drop()?;
         Ok(())
     }
 
     /// Test real Rust function callback functionality
     #[test]
     fn test_monitor_builder_with_callback() -> Result<(), PvxsError> {
+        // Suppress pvxs.tcp.setup Server unable to bind port 5075
+        pvxs_sys::set_logger_level("pvxs.tcp.setup", "CRIT")?;
         // Create isolated server for testing
-        let mut server = Server::from_env()?;
+        let server = Server::start_from_env()?;
         
         server.create_pv_double("TEST:MonitorBuilder:Callback", 42.0, NTScalarMetadataBuilder::new())?;
-        server.start()?;
         
         thread::sleep(Duration::from_millis(100));
         
@@ -244,17 +253,18 @@ mod test_pvxs_monitor_builder {
             values_popped, events_seen);
         
         monitor.stop()?;
-        server.stop()?;
+        server.stop_drop()?;
         Ok(())
     }
 
     /// Test MonitorBuilder with string PV
     #[test]
     fn test_monitor_builder_string_pv() -> Result<(), PvxsError> {
-        let mut server = Server::from_env()?;
+        // Suppress pvxs.tcp.setup Server unable to bind port 5075
+        pvxs_sys::set_logger_level("pvxs.tcp.setup", "CRIT")?;
+        let server = Server::start_from_env()?;
         
         server.create_pv_string("TEST:MonitorBuilder:String", "Hello MonitorBuilder", NTScalarMetadataBuilder::new())?;
-        server.start()?;
         
         thread::sleep(Duration::from_millis(100));
         
@@ -278,13 +288,16 @@ mod test_pvxs_monitor_builder {
         }
         
         monitor.stop()?;
-        server.stop()?;
+        server.stop_drop()?;
         Ok(())
     }
 
     /// Test error handling in MonitorBuilder
     #[test]
     fn test_monitor_builder_error_handling() {
+        // Suppress pvxs.tcp.setup Server unable to bind port 5075
+        pvxs_sys::set_logger_level("pvxs.tcp.setup", "CRIT").expect("Error in setting logger level");
+
         let mut ctx = Context::from_env().expect("Context creation failed");
         
         // Test with non-existent PV
@@ -306,10 +319,12 @@ mod test_pvxs_monitor_builder {
     /// Test monitoring with multiple rapid value changes
     #[test]
     fn test_monitor_builder_rapid_updates() -> Result<(), PvxsError> {
-        let mut server = Server::create_isolated()?;
+        // Suppress pvxs.tcp.setup Server unable to bind port 5075
+        pvxs_sys::set_logger_level("pvxs.tcp.setup", "CRIT").expect("Error in setting logger level");
+
+        let server = Server::start_from_env()?;
         
         server.create_pv_double("TEST:MonitorBuilder:Rapid", 0.0, NTScalarMetadataBuilder::new())?;
-        server.start()?;
         
         thread::sleep(Duration::from_millis(100));
         
@@ -347,17 +362,19 @@ mod test_pvxs_monitor_builder {
         }
         
         monitor.stop()?;
-        server.stop()?;
+        server.stop_drop()?;
         Ok(())
     }
 
     /// Integration test comparing MonitorBuilder vs regular Monitor
     #[test] 
     fn test_monitor_builder_vs_regular_monitor() -> Result<(), PvxsError> {
-        let mut server = Server::create_isolated()?;
+        // Suppress pvxs.tcp.setup Server unable to bind port 5075
+        pvxs_sys::set_logger_level("pvxs.tcp.setup", "CRIT")?;
+        
+        let server = Server::start_from_env()?;
         
         server.create_pv_double("TEST:MonitorBuilder:Compare", 100.0, NTScalarMetadataBuilder::new())?;
-        server.start()?;
         
         thread::sleep(Duration::from_millis(100));
         
@@ -390,7 +407,7 @@ mod test_pvxs_monitor_builder {
         
         regular_monitor.stop()?;
         builder_monitor.stop()?;
-        server.stop()?;
+        server.stop_drop()?;
         Ok(())
     }
 
@@ -398,11 +415,12 @@ mod test_pvxs_monitor_builder {
     #[test]
     fn test_monitor_builder_with_server_side_counter() -> Result<(), PvxsError> {
         use pvxs_sys::MonitorEvent;
+        // Suppress pvxs.tcp.setup Server unable to bind port 5075
+        pvxs_sys::set_logger_level("pvxs.tcp.setup", "CRIT")?;
         // Create server using from_env instead of create_isolated
-        let mut server = Server::from_env()?;
+        let server = Server::start_from_env()?;
         
         server.create_pv_double("TEST:MonitorBuilder:Counter", 0.0, NTScalarMetadataBuilder::new())?;
-        server.start()?;
         
         thread::sleep(Duration::from_millis(200));
         
@@ -462,7 +480,7 @@ mod test_pvxs_monitor_builder {
         assert!(values_received > 0, "Expected to receive some values from server updates, got {}", values_received);
         
         monitor.stop()?;
-        server.stop()?;
+        server.stop_drop()?;
         Ok(())
     }
 
@@ -473,11 +491,13 @@ mod test_pvxs_monitor_builder {
     /// 4. Event fires again
     #[test]
     fn test_monitor_builder_proper_event_pattern() -> Result<(), PvxsError> {
+        // Suppress pvxs.tcp.setup Server unable to bind port 5075
+        pvxs_sys::set_logger_level("pvxs.tcp.setup", "CRIT")?;
+
         // Create server using from_env
-        let mut server = Server::from_env()?;
+        let server = Server::start_from_env()?;
         
         server.create_pv_double("TEST:MonitorBuilder:EventPattern", 0.0, NTScalarMetadataBuilder::new())?;
-        server.start()?;
         
         thread::sleep(Duration::from_millis(200));
         
@@ -533,7 +553,7 @@ mod test_pvxs_monitor_builder {
             values_popped, values_popped_2);
         
         monitor.stop().expect("Monitor stop failed");
-        server.stop()?;
+        server.stop_drop()?;
         Ok(())
     }
 }
