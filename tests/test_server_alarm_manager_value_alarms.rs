@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod test_server_alarm_manager_value_alarms {
-    use pvxs_sys::{Server, Context, NTScalarMetadataBuilder, AlarmMetadata};
+    use pvxs_sys::{Server, Context, NTScalarMetadataBuilder, AlarmMetadata, AlarmSeverity, AlarmStatus};
     use std::thread;
     use std::time::Duration;
 
@@ -11,16 +11,17 @@ mod test_server_alarm_manager_value_alarms {
 
         let pv_name = "test:alarm:high";
         let metadata = NTScalarMetadataBuilder::new()
-            .alarm(AlarmMetadata {
+            .alarm(AlarmSeverity::NoAlarm, AlarmStatus::NoAlarm, "")
+            .alarm_metadata(AlarmMetadata {
                 active: true,
                 low_alarm_limit: 10.0,
                 low_warning_limit: 20.0,
                 high_warning_limit: 80.0,
                 high_alarm_limit: 90.0,
-                low_alarm_severity: 2,    // Major
-                low_warning_severity: 1,  // Minor
-                high_warning_severity: 1, // Minor
-                high_alarm_severity: 2,   // Major
+                low_alarm_severity: AlarmSeverity::Major,    // Major
+                low_warning_severity: AlarmSeverity::Minor,  // Minor
+                high_warning_severity: AlarmSeverity::Minor, // Minor
+                high_alarm_severity: AlarmSeverity::Major,   // Major
                 hysteresis: 0,
             });
 
@@ -44,8 +45,9 @@ mod test_server_alarm_manager_value_alarms {
         let severity = value.get_field_int32("alarm.severity").expect("Failed to get severity");
         let status = value.get_field_int32("alarm.status").expect("Failed to get status");
         
-        assert_eq!(severity, 2, "Expected Major severity (2), got {}", severity);
-        assert_eq!(status, 3, "Expected HiHi status (3), got {}", status); // AlarmStatus::HiHi
+        assert_eq!(severity, AlarmSeverity::Major as i32, "Expected Major severity (2), got {}", severity);
+        assert_eq!(status, AlarmStatus::DeviceStatus as i32, "Expected Device status (1
+        ), got {}", status);
 
         manager.stop_drop().expect("Failed to stop manager");
     }
@@ -57,16 +59,17 @@ mod test_server_alarm_manager_value_alarms {
 
         let pv_name = "test:alarm:high_warn";
         let metadata = NTScalarMetadataBuilder::new()
-            .alarm(AlarmMetadata {
+            .alarm(AlarmSeverity::NoAlarm, AlarmStatus::NoAlarm, "Ok")
+            .alarm_metadata(AlarmMetadata {
                 active: true,
                 low_alarm_limit: 10.0,
                 low_warning_limit: 20.0,
                 high_warning_limit: 80.0,
                 high_alarm_limit: 90.0,
-                low_alarm_severity: 2,
-                low_warning_severity: 1,
-                high_warning_severity: 1,
-                high_alarm_severity: 2,
+                low_alarm_severity: AlarmSeverity::Major,
+                low_warning_severity: AlarmSeverity::Minor,
+                high_warning_severity: AlarmSeverity::Minor,
+                high_alarm_severity: AlarmSeverity::Major,
                 hysteresis: 0,
             });
 
@@ -87,8 +90,8 @@ mod test_server_alarm_manager_value_alarms {
         let severity = value.get_field_int32("alarm.severity").expect("Failed to get severity");
         let status = value.get_field_int32("alarm.status").expect("Failed to get status");
 
-        assert_eq!(severity, 1, "Expected Minor severity (1), got {}", severity);
-        assert_eq!(status, 4, "Expected High status (4), got {}", status); // AlarmStatus::High
+        assert_eq!(severity, AlarmSeverity::Minor as i32, "Expected Minor severity (1), got {}", severity);
+        assert_eq!(status, AlarmStatus::DeviceStatus as i32, "Expected Device status (1), got {}", status);
 
         manager.stop_drop().expect("Failed to stop manager");
     }
@@ -100,16 +103,17 @@ mod test_server_alarm_manager_value_alarms {
 
         let pv_name = "test:alarm:low";
         let metadata = NTScalarMetadataBuilder::new()
-            .alarm(AlarmMetadata {
+            .alarm(AlarmSeverity::NoAlarm, AlarmStatus::NoAlarm, "Ok")
+            .alarm_metadata(AlarmMetadata {
                 active: true,
                 low_alarm_limit: 10.0,
                 low_warning_limit: 20.0,
                 high_warning_limit: 80.0,
                 high_alarm_limit: 90.0,
-                low_alarm_severity: 2,
-                low_warning_severity: 1,
-                high_warning_severity: 1,
-                high_alarm_severity: 2,
+                low_alarm_severity: AlarmSeverity::Major,
+                low_warning_severity: AlarmSeverity::Minor,
+                high_warning_severity: AlarmSeverity::Minor,
+                high_alarm_severity: AlarmSeverity::Major,
                 hysteresis: 0,
             });
 
@@ -130,8 +134,8 @@ mod test_server_alarm_manager_value_alarms {
         let severity = value.get_field_int32("alarm.severity").expect("Failed to get severity");
         let status = value.get_field_int32("alarm.status").expect("Failed to get status");
 
-        assert_eq!(severity, 2, "Expected Major severity (2), got {}", severity);
-        assert_eq!(status, 5, "Expected LoLo status (5), got {}", status); // AlarmStatus::LoLo
+        assert_eq!(severity, AlarmSeverity::Major as i32, "Expected Major severity (2), got {}", severity);
+        assert_eq!(status, AlarmStatus::DeviceStatus as i32, "Expected Device status (1), got {}", status); // AlarmStatus::LoLo
 
         manager.stop_drop().expect("Failed to stop manager");
     }
@@ -143,16 +147,17 @@ mod test_server_alarm_manager_value_alarms {
 
         let pv_name = "test:alarm:low_warn";
         let metadata = NTScalarMetadataBuilder::new()
-            .alarm(AlarmMetadata {
+            .alarm(AlarmSeverity::NoAlarm, AlarmStatus::NoAlarm, "Ok")
+            .alarm_metadata(AlarmMetadata {
                 active: true,
                 low_alarm_limit: 10.0,
                 low_warning_limit: 20.0,
                 high_warning_limit: 80.0,
                 high_alarm_limit: 90.0,
-                low_alarm_severity: 2,
-                low_warning_severity: 1,
-                high_warning_severity: 1,
-                high_alarm_severity: 2,
+                low_alarm_severity: AlarmSeverity::Major,
+                low_warning_severity: AlarmSeverity::Minor,
+                high_warning_severity: AlarmSeverity::Minor,
+                high_alarm_severity: AlarmSeverity::Major,
                 hysteresis: 0,
             });
 
@@ -173,8 +178,8 @@ mod test_server_alarm_manager_value_alarms {
         let severity = value.get_field_int32("alarm.severity").expect("Failed to get severity");
         let status = value.get_field_int32("alarm.status").expect("Failed to get status");
 
-        assert_eq!(severity, 1, "Expected Minor severity (1), got {}", severity);
-        assert_eq!(status, 6, "Expected Low status (6), got {}", status); // AlarmStatus::Low
+        assert_eq!(severity, AlarmSeverity::Minor as i32, "Expected Minor severity (1), got {}", severity);
+        assert_eq!(status, AlarmStatus::DeviceStatus as i32, "Expected Device status (1), got {}", status); // AlarmStatus::Low
 
         manager.stop_drop().expect("Failed to stop manager");
     }
@@ -186,16 +191,17 @@ mod test_server_alarm_manager_value_alarms {
 
         let pv_name = "test:alarm:normal";
         let metadata = NTScalarMetadataBuilder::new()
-            .alarm(AlarmMetadata {
+            .alarm(AlarmSeverity::NoAlarm, AlarmStatus::NoAlarm, "Ok")
+            .alarm_metadata(AlarmMetadata {
                 active: true,
                 low_alarm_limit: 10.0,
                 low_warning_limit: 20.0,
                 high_warning_limit: 80.0,
                 high_alarm_limit: 90.0,
-                low_alarm_severity: 2,
-                low_warning_severity: 1,
-                high_warning_severity: 1,
-                high_alarm_severity: 2,
+                low_alarm_severity: AlarmSeverity::Major,
+                low_warning_severity: AlarmSeverity::Minor,
+                high_warning_severity: AlarmSeverity::Minor,
+                high_alarm_severity: AlarmSeverity::Major,
                 hysteresis: 0,
             });
 
@@ -229,16 +235,17 @@ mod test_server_alarm_manager_value_alarms {
 
         let pv_name = "test:alarm:inactive";
         let metadata = NTScalarMetadataBuilder::new()
-            .alarm(AlarmMetadata {
+            .alarm(AlarmSeverity::NoAlarm, AlarmStatus::NoAlarm, "Ok")
+            .alarm_metadata(AlarmMetadata {
                 active: false, // Alarms disabled
                 low_alarm_limit: 10.0,
                 low_warning_limit: 20.0,
                 high_warning_limit: 80.0,
                 high_alarm_limit: 90.0,
-                low_alarm_severity: 2,
-                low_warning_severity: 1,
-                high_warning_severity: 1,
-                high_alarm_severity: 2,
+                low_alarm_severity: AlarmSeverity::Major,
+                low_warning_severity: AlarmSeverity::Minor,
+                high_warning_severity: AlarmSeverity::Minor,
+                high_alarm_severity: AlarmSeverity::Major,
                 hysteresis: 0,
             });
 
@@ -271,16 +278,17 @@ mod test_server_alarm_manager_value_alarms {
 
         let pv_name = "test:alarm:int32:severity";
         let metadata = NTScalarMetadataBuilder::new()
-            .alarm(AlarmMetadata {
+            .alarm(AlarmSeverity::NoAlarm, AlarmStatus::NoAlarm, "Ok")
+            .alarm_metadata(AlarmMetadata {
                 active: true,
                 low_alarm_limit: 5.0,
                 low_warning_limit: 10.0,
                 high_warning_limit: 90.0,
                 high_alarm_limit: 95.0,
-                low_alarm_severity: 3,    // Invalid
-                low_warning_severity: 1,  // Minor
-                high_warning_severity: 1, // Minor
-                high_alarm_severity: 3,   // Invalid
+                low_alarm_severity: AlarmSeverity::Invalid,    // Invalid
+                low_warning_severity: AlarmSeverity::Minor,  // Minor
+                high_warning_severity: AlarmSeverity::Minor, // Minor
+                high_alarm_severity: AlarmSeverity::Invalid,   // Invalid
                 hysteresis: 0,
             });
 
@@ -300,7 +308,7 @@ mod test_server_alarm_manager_value_alarms {
         let value = ctx.get(pv_name, 2.0).expect("Failed to get value");
         let severity = value.get_field_int32("alarm.severity").expect("Failed to get severity");
 
-        assert_eq!(severity, 3, "Expected Invalid severity (3) for high alarm");
+        assert_eq!(severity, AlarmSeverity::Invalid as i32, "Expected Invalid severity (3) for high alarm");
 
         manager.stop_drop().expect("Failed to stop manager");
     }

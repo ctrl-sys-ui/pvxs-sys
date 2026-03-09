@@ -80,17 +80,14 @@ pub struct AlarmResult {
 pub fn compute_alarm_for_scalar(value: f64, config: &AlarmConfig) -> AlarmResult {
     // Control limits: if present, reject updates outside limits
     if let Some(control) = &config.control {
-        if let Some(alarm_metadata) = &config.alarm_metadata {
-            if value < control.limit_low + alarm_metadata.hysteresis as f64 || 
-                value > control.limit_high - alarm_metadata.hysteresis as f64 {
-                return AlarmResult {
-                    allow: false,
-                    severity: AlarmSeverity::Invalid,
-
+        let hysteresis = config.alarm_metadata.as_ref().map_or(0.0, |m| m.hysteresis as f64);
+        if value < control.limit_low + hysteresis || value > control.limit_high - hysteresis {
+            return AlarmResult {
+                allow: false,
+                severity: AlarmSeverity::Invalid,
                 status: AlarmStatus::RecordStatus,
                 message: "OUT_OF_CONTROL_LIMITS".to_string(),
-                };
-            }
+            };
         }
     }
 

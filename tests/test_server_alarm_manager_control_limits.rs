@@ -139,9 +139,10 @@ mod test_server_alarm_manager_control_limits {
             .expect("Failed to post valid int32");
         thread::sleep(Duration::from_millis(50));
         
+        let valid_value = 200;
         let value = ctx.get(pv_name, 2.0).expect("Failed to get value");
         let retrieved = value.get_field_int32("value").expect("Failed to get int32");
-        assert_eq!(retrieved, 200, "Expected 200");
+        assert_eq!(retrieved, valid_value, "Expected {}", valid_value);
 
         // Post out of range value (above)
         manager.post_int32(pv_name, 300)
@@ -150,7 +151,7 @@ mod test_server_alarm_manager_control_limits {
         
         let value = ctx.get(pv_name, 2.0).expect("Failed to get value");
         let retrieved = value.get_field_int32("value").expect("Failed to get int32");
-        assert_eq!(retrieved, 200, "Value should be unchanged due to control limit");
+        assert_eq!(retrieved, valid_value, "Value should be unchanged due to control limit");
 
         let severity = value.get_field_int32("alarm.severity").expect("Failed to get severity");
         assert_eq!(severity, 3, "Expected Invalid severity");

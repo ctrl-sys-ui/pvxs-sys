@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod test_server_alarm_manager_combined {
-    use pvxs_sys::{Server, Context, NTScalarMetadataBuilder, ControlMetadata, AlarmMetadata, AlarmSeverity, AlarmStatus, Result};
+    use pvxs_sys::{Server, Context, NTScalarMetadataBuilder, ControlMetadata, AlarmMetadata, AlarmSeverity, AlarmStatus};
     use std::thread;
     use std::time::Duration;
 
@@ -17,20 +17,26 @@ mod test_server_alarm_manager_combined {
                 limit_high: 100.0,
                 min_step: 0.1,
             })
-            .alarm(AlarmMetadata {
+            .alarm (
+                AlarmSeverity::NoAlarm,
+                AlarmStatus::NoAlarm,
+                "Ok",
+            )
+            .alarm_metadata(AlarmMetadata {
                 active: true,
                 low_alarm_limit: 10.0,
                 low_warning_limit: 20.0,
                 high_warning_limit: 80.0,
                 high_alarm_limit: 90.0,
-                low_alarm_severity: AlarmSeverity::Major as i32,
-                low_warning_severity: AlarmSeverity::Minor as i32,
-                high_warning_severity: AlarmSeverity::Minor as i32,
-                high_alarm_severity: AlarmSeverity::Major as i32,
+                low_alarm_severity: AlarmSeverity::Major,
+                low_warning_severity: AlarmSeverity::Minor,
+                high_warning_severity: AlarmSeverity::Minor,
+                high_alarm_severity: AlarmSeverity::Major,
                 hysteresis: 0,
             });
-
-        manager.create_pv_double(pv_name, 50.0, metadata)
+        
+        let initial = 50.0;
+        manager.create_pv_double(pv_name, initial, metadata)
             .expect("Failed to create PV");
 
         thread::sleep(Duration::from_millis(100));
@@ -49,10 +55,10 @@ mod test_server_alarm_manager_combined {
         let status = value.get_field_int32("alarm.status").expect("Failed to get status");
 
         // Value should be unchanged (rejected)
-        assert!((retrieved - 50.0).abs() < 1e-6, "Value should be rejected");
+        assert_eq!(retrieved, initial, "Value should be rejected");
         // Control limit violation takes precedence
-        assert_eq!(severity, 3, "Expected Invalid severity"); // AlarmSeverity::Invalid
-        assert_eq!(status, 11, "Expected HwLimit status");    // AlarmStatus::HwLimit
+        assert_eq!(severity, AlarmSeverity::Invalid as i32, "Expected Invalid severity");
+        assert_eq!(status, AlarmStatus::RecordStatus as i32, "Expected Record status");
 
         // Post a value within control limits but triggering high warning
         manager.post_double(pv_name, 85.0)
@@ -65,8 +71,8 @@ mod test_server_alarm_manager_combined {
         let status = value.get_field_int32("alarm.status").expect("Failed to get status");
 
         assert!((retrieved - 85.0).abs() < 1e-6, "Value should be accepted");
-        assert_eq!(severity, 1, "Expected Minor severity for high warning");
-        assert_eq!(status, 4, "Expected High status");
+        assert_eq!(severity, AlarmSeverity::Minor as i32, "Expected Minor severity for high warning");
+        assert_eq!(status, AlarmStatus::DeviceStatus as i32, "Expected Device status");
 
         manager.stop_drop().expect("Failed to stop manager");
     }
@@ -79,16 +85,20 @@ mod test_server_alarm_manager_combined {
 
         let pv_name = "test:transitions";
         let metadata = NTScalarMetadataBuilder::new()
-            .alarm(AlarmMetadata {
+            .alarm(
+                AlarmSeverity::NoAlarm, 
+                AlarmStatus::NoAlarm, 
+                "OK")
+            .alarm_metadata(AlarmMetadata {
                 active: true,
                 low_alarm_limit: 10.0,
                 low_warning_limit: 20.0,
                 high_warning_limit: 80.0,
                 high_alarm_limit: 90.0,
-                low_alarm_severity: AlarmSeverity::Major as i32,
-                low_warning_severity: AlarmSeverity::Minor as i32,
-                high_warning_severity: AlarmSeverity::Minor as i32,
-                high_alarm_severity: AlarmSeverity::Major as i32,
+                low_alarm_severity: AlarmSeverity::Major,
+                low_warning_severity: AlarmSeverity::Minor,
+                high_warning_severity: AlarmSeverity::Minor,
+                high_alarm_severity: AlarmSeverity::Major,
                 hysteresis: 0,
             });
 
@@ -110,42 +120,42 @@ mod test_server_alarm_manager_combined {
         manager.post_double(pv_name, 85.0).expect("Failed to post");
         thread::sleep(Duration::from_millis(50));
         let value = ctx.get(pv_name, 2.0).expect("Failed to get");
-        assert_eq!(value.get_field_int32("alarm.severity").unwrap(), 1, "Should be Minor");
-        assert_eq!(value.get_field_int32("alarm.status").unwrap(), 4, "Should be High");
+        assert_eq!(value.get_field_int32("alarm.severity").unwrap(), AlarmSeverity::Minor as i32, "Should be Minor");
+        assert_eq!(value.get_field_int32("alarm.status").unwrap(), AlarmStatus::DeviceStatus as i32, "Should be DeviceStatus");
 
         // Transition to high alarm
         manager.post_double(pv_name, 95.0).expect("Failed to post");
         thread::sleep(Duration::from_millis(50));
         let value = ctx.get(pv_name, 2.0).expect("Failed to get");
         assert_eq!(value.get_field_int32("alarm.severity").unwrap(), AlarmSeverity::Major as i32, "Should be Major");
-        assert_eq!(value.get_field_int32("alarm.status").unwrap(), AlarmStatus::HiHi as i32, "Should be HiHi");
+        assert_eq!(value.get_field_int32("alarm.status").unwrap(), AlarmStatus::DeviceStatus as i32, "Should be DeviceStatus");
 
         // Return to normal
         manager.post_double(pv_name, 50.0).expect("Failed to post");
         thread::sleep(Duration::from_millis(50));
         let value = ctx.get(pv_name, 2.0).expect("Failed to get");
-        assert_eq!(value.get_field_int32("alarm.severity").unwrap(), 0, "Should return to NoAlarm");
+        assert_eq!(value.get_field_int32("alarm.severity").unwrap(), AlarmSeverity::NoAlarm as i32, "Should return to NoAlarm");
 
         // Transition to low warning
         manager.post_double(pv_name, 15.0).expect("Failed to post");
         thread::sleep(Duration::from_millis(50));
         let value = ctx.get(pv_name, 2.0).expect("Failed to get");
         assert_eq!(value.get_field_int32("alarm.severity").unwrap(), AlarmSeverity::Minor as i32, "Should be Minor");
-        assert_eq!(value.get_field_int32("alarm.status").unwrap(), AlarmStatus::Low as i32, "Should be Low");
+        assert_eq!(value.get_field_int32("alarm.status").unwrap(), AlarmStatus::DeviceStatus as i32, "Should be Low");
 
         // Transition to low alarm
         manager.post_double(pv_name, 5.0).expect("Failed to post");
         thread::sleep(Duration::from_millis(50));
         let value = ctx.get(pv_name, 2.0).expect("Failed to get");
         assert_eq!(value.get_field_int32("alarm.severity").unwrap(), AlarmSeverity::Major as i32, "Should be Major");
-        assert_eq!(value.get_field_int32("alarm.status").unwrap(), AlarmStatus::LoLo as i32, "Should be LoLo");
+        assert_eq!(value.get_field_int32("alarm.status").unwrap(), AlarmStatus::DeviceStatus as i32, "Should be LoLo");
 
         manager.stop_drop().expect("Failed to stop manager");
     }
 
     #[test]
     fn test_multiple_pvs_with_different_alarms() {
-        let manager = Server::start_from_env()
+        let srv = Server::start_from_env()
             .expect("Failed to create Server");
 
         // Create multiple PVs with different alarm configurations
@@ -156,16 +166,17 @@ mod test_server_alarm_manager_combined {
                 limit_high: 100.0,
                 min_step: 0.1,
             })
-            .alarm(AlarmMetadata {
+            .alarm(AlarmSeverity::Minor, AlarmStatus::NoAlarm, "Ok")
+            .alarm_metadata(AlarmMetadata {
                 active: true,
                 low_alarm_limit: 0.0,
                 low_warning_limit: 10.0,
                 high_warning_limit: 90.0,
                 high_alarm_limit: 100.0,
-                low_alarm_severity: AlarmSeverity::Major as i32,
-                low_warning_severity: AlarmSeverity::Minor as i32,
-                high_warning_severity: AlarmSeverity::Minor as i32,
-                high_alarm_severity: AlarmSeverity::Major as i32,
+                low_alarm_severity: AlarmSeverity::Major,
+                low_warning_severity: AlarmSeverity::Minor,
+                high_warning_severity: AlarmSeverity::Minor,
+                high_alarm_severity: AlarmSeverity::Major,
                 hysteresis: 0,
             });
 
@@ -175,11 +186,25 @@ mod test_server_alarm_manager_combined {
                 limit_low: -100.0,
                 limit_high: 100.0,
                 min_step: 1.0,
+            })
+            .alarm(AlarmSeverity::Major, AlarmStatus::NoAlarm, "Ok")
+            .alarm_metadata(AlarmMetadata {
+                active: true,
+                low_alarm_limit: -50.0,
+                low_warning_limit: -20.0,
+                high_warning_limit: 20.0,
+                high_alarm_limit: 50.0,
+                low_alarm_severity: AlarmSeverity::Major,
+                low_warning_severity: AlarmSeverity::Minor,
+                high_warning_severity: AlarmSeverity::Minor,
+                high_alarm_severity: AlarmSeverity::Major,
+                hysteresis: 0,
             });
-
-        manager.create_pv_double(pv1, 50.0, metadata1)
+        let pv1_initial = 50.0;
+        srv.create_pv_double(pv1, pv1_initial, metadata1)
             .expect("Failed to create PV1");
-        manager.create_pv_double(pv2, 0.0, metadata2)
+        let pv2_initial = 1.0;
+        srv.create_pv_double(pv2, pv2_initial, metadata2)
             .expect("Failed to create PV2");
 
         thread::sleep(Duration::from_millis(100));
@@ -187,25 +212,35 @@ mod test_server_alarm_manager_combined {
         let mut ctx = Context::from_env()
             .expect("Failed to create client");
 
+        let pv1_value = 95.0; // Should trigger high alarm on PV1
         // Post alarm condition to PV1
-        manager.post_double(pv1, 95.0).expect("Failed to post to PV1");
-        thread::sleep(Duration::from_millis(50));
-
-        // Post out-of-range to PV2
-        manager.post_double(pv2, 150.0).expect("Failed to post to PV2");
+        srv.post_double(pv1, pv1_value).expect("Failed to post to PV1");
         thread::sleep(Duration::from_millis(50));
 
         // Check PV1 has value alarm
         let value1 = ctx.get(pv1, 2.0).expect("Failed to get PV1");
-        assert_eq!(value1.get_field_int32("alarm.severity").unwrap(), AlarmSeverity::Major as i32);
-        assert!((value1.get_field_double("value").unwrap() - 95.0).abs() < 1e-6);
+        // Check that the value is still the same as pv1_value, the server should have rejected the out-of-range value.
+        match value1.get_field_double("value") {
+            Ok(v) => assert_eq!(v, pv1_value, "PV1 value should be {}", pv1_value),
+            Err(e) => assert!(false, "Failed to get PV1 value: {:?}", e),
+        }
+        // Check that since pv1_value is above 90 but less than 100, it should trigger a Minor alarm
+        match value1.get_field_int32("alarm.severity") {
+            Ok(s) => assert_eq!(s, AlarmSeverity::Minor as i32, "Expected Minor severity for PV1"),
+            Err(e) => assert!(false, "Failed to get PV1 alarm severity: {:?}", e),
+        }
+
+        // Post out-of-range to PV2
+        let pv2_value = 150.0; // Should be rejected by PV2
+        srv.post_double(pv2, pv2_value).expect("Failed to post to PV2");
+        thread::sleep(Duration::from_millis(50));
 
         // Check PV2 rejected the value
         let value2 = ctx.get(pv2, 2.0).expect("Failed to get PV2");
         assert_eq!(value2.get_field_int32("alarm.severity").unwrap(), AlarmSeverity::Invalid as i32);
-        assert!((value2.get_field_double("value").unwrap() - 0.0).abs() < 1e-6);
+        assert_eq!(value2.get_field_double("value").unwrap(), pv2_initial, "PV2 value should remain unchanged at {}", pv2_initial);
 
-        manager.stop_drop().expect("Failed to stop manager");
+        srv.stop_drop().expect("Failed to stop manager");
     }
 
     #[test]
@@ -215,16 +250,17 @@ mod test_server_alarm_manager_combined {
 
         let pv_name = "test:boundary:alarms";
         let metadata = NTScalarMetadataBuilder::new()
-            .alarm(AlarmMetadata {
+            .alarm(AlarmSeverity::NoAlarm, AlarmStatus::NoAlarm, "OK")
+            .alarm_metadata(AlarmMetadata {
                 active: true,
                 low_alarm_limit: 10.0,
                 low_warning_limit: 20.0,
                 high_warning_limit: 80.0,
                 high_alarm_limit: 90.0,
-                low_alarm_severity: AlarmSeverity::Major as i32,
-                low_warning_severity: AlarmSeverity::Minor as i32,
-                high_warning_severity: AlarmSeverity::Minor as i32,
-                high_alarm_severity: AlarmSeverity::Major as i32,
+                low_alarm_severity: AlarmSeverity::Major,
+                low_warning_severity: AlarmSeverity::Minor,
+                high_warning_severity: AlarmSeverity::Minor,
+                high_alarm_severity: AlarmSeverity::Major,
                 hysteresis: 0,
             });
 
@@ -240,19 +276,19 @@ mod test_server_alarm_manager_combined {
         manager.post_double(pv_name, 10.0).expect("Failed to post");
         thread::sleep(Duration::from_millis(50));
         let value = ctx.get(pv_name, 2.0).expect("Failed to get");
-        assert_eq!(value.get_field_int32("alarm.status").unwrap(), AlarmStatus::LoLo as i32, "Exact low limit should trigger LoLo");
+        assert_eq!(value.get_field_int32("alarm.status").unwrap(), AlarmStatus::DeviceStatus as i32, "Exact low limit should trigger LoLo");
 
         // Test exact warning limit (should trigger warning)
         manager.post_double(pv_name, 20.0).expect("Failed to post");
         thread::sleep(Duration::from_millis(50));
         let value = ctx.get(pv_name, 2.0).expect("Failed to get");
-        assert_eq!(value.get_field_int32("alarm.status").unwrap(), AlarmStatus::Low as i32, "Exact low warning should trigger Low");
+        assert_eq!(value.get_field_int32("alarm.status").unwrap(), AlarmStatus::DeviceStatus as i32, "Exact low warning should trigger Low");
 
         // Test between warning and alarm boundaries
         manager.post_double(pv_name, 15.0).expect("Failed to post");
         thread::sleep(Duration::from_millis(50));
         let value = ctx.get(pv_name, 2.0).expect("Failed to get");
-        assert_eq!(value.get_field_int32("alarm.status").unwrap(), AlarmStatus::Low as i32, "Between limits should trigger Low");
+        assert_eq!(value.get_field_int32("alarm.status").unwrap(), AlarmStatus::DeviceStatus as i32, "Between limits should trigger Low");
 
         manager.stop_drop().expect("Failed to stop manager");
     }

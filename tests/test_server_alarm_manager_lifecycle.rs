@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod test_server_alarm_manager_lifecycle {
-    use pvxs_sys::{Server, Context, NTScalarMetadataBuilder, ControlMetadata, AlarmMetadata};
+    use pvxs_sys::{Server, Context, NTScalarMetadataBuilder, ControlMetadata, AlarmMetadata, AlarmSeverity};
     use std::thread;
     use std::time::Duration;
 
@@ -13,16 +13,17 @@ mod test_server_alarm_manager_lifecycle {
         for i in 0..5 {
             let pv_name = format!("test:lifecycle:pv{}", i);
             let metadata = NTScalarMetadataBuilder::new()
-                .alarm(AlarmMetadata {
+
+                .alarm_metadata(AlarmMetadata {
                     active: true,
                     low_alarm_limit: (i * 10) as f64,
                     low_warning_limit: (i * 10 + 10) as f64,
                     high_warning_limit: (i * 10 + 80) as f64,
                     high_alarm_limit: (i * 10 + 90) as f64,
-                    low_alarm_severity: 2,
-                    low_warning_severity: 1,
-                    high_warning_severity: 1,
-                    high_alarm_severity: 2,
+                    low_alarm_severity: AlarmSeverity::Major,
+                    low_warning_severity: AlarmSeverity::Minor,
+                    high_warning_severity: AlarmSeverity::Minor,
+                    high_alarm_severity: AlarmSeverity::Major,
                     hysteresis: 0,
                 });
 
@@ -53,16 +54,16 @@ mod test_server_alarm_manager_lifecycle {
 
         let pv_name = "test:lifecycle:remove";
         let metadata = NTScalarMetadataBuilder::new()
-            .alarm(AlarmMetadata {
+            .alarm_metadata(AlarmMetadata {
                 active: true,
                 low_alarm_limit: 10.0,
                 low_warning_limit: 20.0,
                 high_warning_limit: 80.0,
                 high_alarm_limit: 90.0,
-                low_alarm_severity: 2,
-                low_warning_severity: 1,
-                high_warning_severity: 1,
-                high_alarm_severity: 2,
+                low_alarm_severity: AlarmSeverity::Major,
+                low_warning_severity: AlarmSeverity::Minor,
+                high_warning_severity: AlarmSeverity::Minor,
+                high_alarm_severity: AlarmSeverity::Major,
                 hysteresis: 0,
             });
 
@@ -98,22 +99,21 @@ mod test_server_alarm_manager_lifecycle {
 
         let pv_name = "test:lifecycle:duplicate";
         let metadata = NTScalarMetadataBuilder::new()
-            .alarm(AlarmMetadata {
+            .alarm_metadata(AlarmMetadata {
                 active: true,
                 low_alarm_limit: 10.0,
                 low_warning_limit: 20.0,
                 high_warning_limit: 80.0,
                 high_alarm_limit: 90.0,
-                low_alarm_severity: 2,
-                low_warning_severity: 1,
-                high_warning_severity: 1,
-                high_alarm_severity: 2,
+                low_alarm_severity: AlarmSeverity::Major,
+                low_warning_severity: AlarmSeverity::Minor,
+                high_warning_severity: AlarmSeverity::Minor,
+                high_alarm_severity: AlarmSeverity::Major,
                 hysteresis: 0,
             });
 
         // Create first PV
-        manager.create_pv_double(pv_name, 50.0, metadata.clone())
-            .expect("Failed to create PV");
+        manager.create_pv_double(pv_name, 50.0, metadata.clone()).expect("Failed to create PV");
 
         // Try to create duplicate - should fail
         let result = manager.create_pv_double(pv_name, 75.0, metadata);
@@ -203,16 +203,16 @@ mod test_server_alarm_manager_lifecycle {
             .expect("Failed to create Server");
 
         let metadata_double = NTScalarMetadataBuilder::new()
-            .alarm(AlarmMetadata {
+            .alarm_metadata(AlarmMetadata {
                 active: true,
                 low_alarm_limit: 10.0,
                 low_warning_limit: 20.0,
                 high_warning_limit: 80.0,
                 high_alarm_limit: 90.0,
-                low_alarm_severity: 2,
-                low_warning_severity: 1,
-                high_warning_severity: 1,
-                high_alarm_severity: 2,
+                low_alarm_severity: AlarmSeverity::Major,
+                low_warning_severity: AlarmSeverity::Minor,
+                high_warning_severity: AlarmSeverity::Minor,
+                high_alarm_severity: AlarmSeverity::Major,
                 hysteresis: 0,
             });
 

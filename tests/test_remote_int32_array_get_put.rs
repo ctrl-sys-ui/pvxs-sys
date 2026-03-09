@@ -7,15 +7,11 @@ fn test_pv_remote_int32_array_get_put() {
     let timeout = 5.0;
     let initial_array = vec![10, 20, 30, 40, 50];
     let name = "remote:int32:array";
-    let mut srv = Server::from_env()
-        .expect("Failed to create server from env");
+    let srv = Server::start_from_env().expect("Failed to create server from env");
     
     // Create server with int32 array PV (automatically added)
     srv.create_pv_int32_array(name, initial_array.clone(), NTScalarMetadataBuilder::new())
         .expect("Failed to create pv:int32:array on server");
-
-    // start the server
-    srv.start().expect("Failed to start server");
 
     // Create a client context to interact with the server
     let mut ctx = Context::from_env()
@@ -44,7 +40,7 @@ fn test_pv_remote_int32_array_get_put() {
         },
         Err(_) => {
             // Skip the test if arrays aren't supported
-            srv.stop().expect("Failed to stop server");
+            srv.stop_drop().expect("Failed to stop server");
             return;
         }
     }
@@ -82,7 +78,7 @@ fn test_pv_remote_int32_array_get_put() {
     }
 
     // Close the server after test
-    srv.stop().expect("Failed to stop server");
+    srv.stop_drop().expect("Failed to stop server");
 }
 
 #[test]
@@ -91,12 +87,9 @@ fn test_pv_remote_int32_array_boundary() {
     let timeout = 5.0;
     let name = "remote:int32:array:boundary";
     
-    let mut srv = Server::from_env()
-        .expect("Failed to create server from env");
+    let srv = Server::start_from_env().expect("Failed to create server from env");
     srv.create_pv_int32_array(name, vec![0], NTScalarMetadataBuilder::new())
         .expect("Failed to create pv:int32:array on server");
-
-    srv.start().expect("Failed to start server");
 
     let mut ctx = Context::from_env()
         .expect("Failed to create client context from env");
@@ -137,5 +130,5 @@ fn test_pv_remote_int32_array_boundary() {
         Err(e) => assert!(false, "Sequence array not supported: {:?}", e),
     }
 
-    srv.stop().expect("Failed to stop server");
+    srv.stop_drop().expect("Failed to stop server");
 }

@@ -10,14 +10,36 @@
 //! 
 //! ## Features
 //! 
-//! - **GET operations**: Read process variable values
-//! - **PUT operations**: Write process variable values  
-//! - **INFO operations**: Query PV type information
-//! - **MONITOR operations**: Subscribe to value changes with callbacks
-//! - **MonitorBuilder**: Advanced monitor configuration with PVXS-style API
-//! - **Array support**: Read/write arrays of double, int32, and string values
-//! - **Server support**: Create and manage PVAccess servers
-//! - Thread-safe client context
+//! ### Client
+//! - **GET**: Read scalar and array PV values ([`Context::get`])
+//! - **PUT**: Write double, int32, string, and enum scalars or arrays
+//!   ([`Context::put_double`], [`Context::put_int32`], [`Context::put_string`],
+//!   [`Context::put_enum`], and their `_array` variants)
+//! - **Monitor**: Subscribe to real-time value changes via
+//!   [`Context::monitor_builder`] → [`MonitorBuilder::connect_exception`] /
+//!   [`MonitorBuilder::disconnect_exception`] / [`MonitorBuilder::event`] /
+//!   [`MonitorBuilder::exec`] → [`Monitor::pop`]
+//! 
+//! ### Server
+//! - **Start**: [`Server::start_from_env`] (production) or [`Server::start_isolated`] (testing)
+//! - **PV creation**: `create_pv_double`, `create_pv_int32`, `create_pv_string`,
+//!   `create_pv_enum`, and their `_array` variants
+//! - **POST**: Publish new values with automatic alarm computation —
+//!   `post_double`, `post_int32`, `post_string`, `post_enum`, and `_array` variants
+//! - **Fetch**: Read the current server-side value with alarm info —
+//!   `fetch_double`, `fetch_int32`, `fetch_string`, `fetch_enum`
+//! - **Stop**: [`Server::stop_drop`] — consumes the server and frees all resources
+//! - **Handle**: [`ServerHandle`] — clone-able, thread-safe handle for use across threads
+//! 
+//! ### Metadata & Alarms
+//! - [`NTScalarMetadataBuilder`] / [`NTEnumMetadataBuilder`]: configure PV metadata at
+//!   creation time (display limits, units, precision, control limits, value alarm thresholds)
+//! - [`ControlMetadata`], [`AlarmMetadata`]: structs passed to the builders
+//! - [`AlarmSeverity`], [`AlarmStatus`]: alarm state reported in fetched values and monitors
+//! 
+//! ### Other
+//! - **Logging**: [`set_logger_level`] — programmatically set PVXS log levels
+//! - Thread-safe [`Context`] (implements `Send + Sync`)
 //! 
 
 pub mod bridge;

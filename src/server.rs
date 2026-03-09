@@ -1866,6 +1866,7 @@ impl StaticSource {
 ///     int highAlarmSeverity
 ///     byte hysteresis
 /// ```
+#[derive(Debug, Clone)]
 pub struct NTScalarMetadataBuilder {
     alarm_severity: AlarmSeverity,
     alarm_status: AlarmStatus,
