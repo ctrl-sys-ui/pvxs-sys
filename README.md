@@ -19,6 +19,15 @@ This crate provides idiomatic Rust wrappers around the PVXS C++ library using th
 - **Stop** — `stop_drop()` consumes the server and frees all resources
 - **Handle** — `ServerHandle` for thread-safe access from multiple threads
 
+Each server instance is backed by a dedicated worker thread and a thread-safe
+[crossbeam](https://docs.rs/crossbeam-channel) channel. All `create_pv_*`,
+`post_*`, and `fetch_*` calls are dispatched through this channel, so the
+server can be driven safely from any number of threads simultaneously. The
+worker thread also applies automatic alarm computation and control-limit
+validation on every `post_*` call — bringing IOC-level alarm behaviour
+(value alarms, control limit enforcement, severity/status propagation) into
+pure Rust without any external IOC.
+
 ### Metadata & Alarms
 - `NTScalarMetadataBuilder` / `NTEnumMetadataBuilder` — configure PV metadata at creation
 - `ControlMetadata`, `AlarmMetadata` — control limits and value alarm thresholds
@@ -74,7 +83,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-pvxs-sys = "0.1"
+pvxs-sys = "0.1.1"
 ```
 
 ## Quick Start
