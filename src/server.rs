@@ -1,3 +1,5 @@
+﻿// Copyright 2026 Tine Zata
+// SPDX-License-Identifier: MPL-2.0
 use cxx::UniquePtr;
 use crossbeam_channel as channel;
 use std::collections::HashMap;

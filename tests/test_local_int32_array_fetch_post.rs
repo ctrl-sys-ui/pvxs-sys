@@ -1,3 +1,5 @@
+﻿// Copyright 2026 Tine Zata
+// SPDX-License-Identifier: MPL-2.0
 mod test_pvxs_local_int32_array_fetch_post {
     use pvxs_sys::{Server, NTScalarMetadataBuilder};
 

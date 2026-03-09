@@ -1,3 +1,5 @@
+﻿// Copyright 2026 Tine Zata
+// SPDX-License-Identifier: MPL-2.0
 // server_wrapper.cpp - C++ server wrapper layer for PVXS
 
 #include "wrapper.h"

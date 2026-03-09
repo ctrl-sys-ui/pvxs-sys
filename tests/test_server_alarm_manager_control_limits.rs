@@ -1,3 +1,5 @@
+﻿// Copyright 2026 Tine Zata
+// SPDX-License-Identifier: MPL-2.0
 #[cfg(test)]
 mod test_server_alarm_manager_control_limits {
     use pvxs_sys::{Server, Context, NTScalarMetadataBuilder, ControlMetadata};

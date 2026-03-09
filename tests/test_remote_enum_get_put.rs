@@ -1,3 +1,5 @@
+﻿// Copyright 2026 Tine Zata
+// SPDX-License-Identifier: MPL-2.0
 mod test_pvxs_remote_enum_get_put {
     use pvxs_sys::{Server, Context, PvxsError, NTEnumMetadataBuilder};
 

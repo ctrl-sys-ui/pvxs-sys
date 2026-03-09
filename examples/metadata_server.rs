@@ -1,3 +1,5 @@
+﻿// Copyright 2026 Tine Zata
+// SPDX-License-Identifier: MPL-2.0
 use pvxs_sys::{AlarmSeverity, AlarmStatus, ControlMetadata, DisplayMetadata, NTScalarMetadataBuilder, Server};
 use std::thread;
 use std::time::Duration;

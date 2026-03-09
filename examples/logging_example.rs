@@ -1,3 +1,5 @@
+﻿// Copyright 2026 Tine Zata
+// SPDX-License-Identifier: MPL-2.0
 // Example demonstrating PVXS logging configuration
 //
 // This shows how to filter PVXS internal log messages, particularly

@@ -1,3 +1,5 @@
+﻿// Copyright 2026 Tine Zata
+// SPDX-License-Identifier: MPL-2.0
 // bridge.rs - CXX bridge definition for Rust/C++ FFI
 // This defines the interface between Rust and C++
 

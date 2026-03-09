@@ -1,3 +1,5 @@
+﻿// Copyright 2026 Tine Zata
+// SPDX-License-Identifier: MPL-2.0
 mod test_pvxs_monitor_builder {
     use pvxs_sys::{Context, Monitor, PvxsError, Server, NTScalarMetadataBuilder, MonitorEvent};
     use std::thread;

@@ -1,3 +1,5 @@
+﻿// Copyright 2026 Tine Zata
+// SPDX-License-Identifier: MPL-2.0
 mod test_pvxs_monitor_callbacks {
     use pvxs_sys::{Context, Server, NTScalarMetadataBuilder, AtomicUsize, Ordering, MonitorEvent};
     use std::thread;

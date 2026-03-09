@@ -1,3 +1,5 @@
+﻿// Copyright 2026 Tine Zata
+// SPDX-License-Identifier: MPL-2.0
 use crate::{AlarmSeverity};
 
 /// Alarm metadata for NTScalar

@@ -1,3 +1,5 @@
+﻿// Copyright 2026 Tine Zata
+// SPDX-License-Identifier: MPL-2.0
 //! # EPICS PVXS Rust Bindings
 //! 
 //! Safe Rust bindings for the EPICS PVXS (PVAccess) library.
