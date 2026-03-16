@@ -1,3 +1,5 @@
+﻿// Copyright 2026 Tine Zata
+// SPDX-License-Identifier: MPL-2.0
 mod test_pvxs_remote_string_get_put {
     use pvxs_sys::{Server, Context, PvxsError, NTScalarMetadataBuilder};
 
@@ -8,13 +10,10 @@ mod test_pvxs_remote_string_get_put {
         let timeout = 5.0;
         let initial_value = "Remote string PV";
         let name = "remote:string";
-        let mut srv = Server::from_env()
+        let srv = Server::start_from_env()
             .expect("Failed to create server from env");
         srv.create_pv_string(name, initial_value, NTScalarMetadataBuilder::new())
             .expect("Failed to create pv:string on server");
-
-        // start the server
-        srv.start().expect("Failed to start server");
 
         // Create a client context to interact with the server
         let mut ctx = Context::from_env()
@@ -30,7 +29,7 @@ mod test_pvxs_remote_string_get_put {
         }
 
         // Stop the server to simulate a network error
-        srv.stop().expect("Failed to stop server");
+        srv.stop_drop().expect("Failed to stop server");
 
         // Try to do a get which should fail due to server being down
         let failed_get: Result<pvxs_sys::Value, PvxsError> = ctx.get(name, timeout);
@@ -43,7 +42,9 @@ mod test_pvxs_remote_string_get_put {
         }
 
         // Restart the server
-        srv.start().expect("Failed to restart server");
+        let srv = Server::start_from_env().expect("Failed to restart server");
+        srv.create_pv_string(name, initial_value, NTScalarMetadataBuilder::new())
+            .expect("Failed to create pv:string on server");
 
         // Do a put to set a new value
         let new_value = "Updated remote string";
@@ -62,7 +63,7 @@ mod test_pvxs_remote_string_get_put {
         }
 
         // Close the server after test
-        srv.stop().expect("Failed to stop server");
+        srv.stop_drop().expect("Failed to stop server");
     }
 
     #[test]
@@ -71,11 +72,10 @@ mod test_pvxs_remote_string_get_put {
         let timeout = 5.0;
         let name = "remote:string:encoding";
         
-        let mut srv = Server::from_env()
+        let srv = Server::start_from_env()
             .expect("Failed to create server from env");
         srv.create_pv_string(name, "", NTScalarMetadataBuilder::new())
             .expect("Failed to create pv:string on server");
-        srv.start().expect("Failed to start server");
 
         let mut ctx = Context::from_env()
             .expect("Failed to create client context from env");
@@ -106,6 +106,6 @@ mod test_pvxs_remote_string_get_put {
             }
         }
 
-        srv.stop().expect("Failed to stop server");
+        srv.stop_drop().expect("Failed to stop server");
     }
 }

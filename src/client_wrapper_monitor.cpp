@@ -1,3 +1,5 @@
+﻿// Copyright 2026 Tine Zata
+// SPDX-License-Identifier: MPL-2.0
 #include "wrapper.h"
 #include <iostream>
 

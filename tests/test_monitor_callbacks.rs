@@ -1,3 +1,5 @@
+﻿// Copyright 2026 Tine Zata
+// SPDX-License-Identifier: MPL-2.0
 mod test_pvxs_monitor_callbacks {
     use pvxs_sys::{Context, Server, NTScalarMetadataBuilder, AtomicUsize, Ordering, MonitorEvent};
     use std::thread;
@@ -27,10 +29,9 @@ mod test_pvxs_monitor_callbacks {
     fn test_monitor_connection_and_disconnection_events_off() {
         
         // Create a server with a PV
-        let mut srv = Server::from_env().expect("Failed to create server");
-        let _pv = srv.create_pv_double("callback:test:stop", 2.71, NTScalarMetadataBuilder::new())
+        let srv = Server::start_from_env().expect("Failed to create server");
+        srv.create_pv_double("callback:test:stop", 2.71, NTScalarMetadataBuilder::new())
             .expect("Failed to create PV");
-        srv.start().expect("Failed to start server");
 
         thread::sleep(Duration::from_millis(500));
 
@@ -87,16 +88,15 @@ mod test_pvxs_monitor_callbacks {
         assert!(!got_generic_exception, "Did not expect a generic client error exception");
         assert_eq!(data_count1, 1, "Expected data with as pop returns data after the initial connection");
     
-    srv.stop().expect("Failed to stop server");
+    srv.stop_drop().expect("Failed to stop server");
     }
 
     #[test]
     fn test_monitor_connection_on_and_disconnection_off() {
         // Create a server with a PV
-        let mut srv = Server::from_env().expect("Failed to create server");
-        let _pv = srv.create_pv_double("callback:test:stop", 2.71, NTScalarMetadataBuilder::new())
+        let srv = Server::start_from_env().expect("Failed to create server");
+        srv.create_pv_double("callback:test:stop", 2.71, NTScalarMetadataBuilder::new())
             .expect("Failed to create PV");
-        srv.start().expect("Failed to start server");
 
         let mut ctx = Context::from_env().expect("Failed to create context");
 
@@ -152,16 +152,15 @@ mod test_pvxs_monitor_callbacks {
         assert!(!got_generic_exception, "Did not expect a generic client error exception");
         assert!(data_count2 > 0 , "Expected data before disconnection occurred, but got {}", data_count2);
 
-        srv.stop().expect("Failed to stop server");
+        srv.stop_drop().expect("Failed to stop server");
     }
     
     #[test]
     fn test_monitor_connection_off_disconnection_on() {
         // Create a server with a PV
-        let mut srv = Server::from_env().expect("Failed to create server");
-        let _pv = srv.create_pv_double("callback:test:stop", 2.71, NTScalarMetadataBuilder::new())
+        let mut srv = Some(Server::start_from_env().expect("Failed to create server"));
+        srv.as_ref().unwrap().create_pv_double("callback:test:stop", 2.71, NTScalarMetadataBuilder::new())
             .expect("Failed to create PV");
-        srv.start().expect("Failed to start server");
 
         let mut ctx = Context::from_env().expect("Failed to create context");
         thread::sleep(Duration::from_millis(500));
@@ -213,7 +212,7 @@ mod test_pvxs_monitor_callbacks {
             }
             if i == 10 {
                 // Stop the SERVER to trigger disconnection event
-                srv.stop().expect("Failed to stop server to trigger disconnection");
+                srv.take().unwrap().stop_drop().expect("Failed to stop server to trigger disconnection");
                 thread::sleep(Duration::from_millis(500));
             }
         }
@@ -238,10 +237,9 @@ mod test_pvxs_monitor_callbacks {
         CONNECT_COUNTER.store(0, Ordering::SeqCst);
         DISCONNECT_COUNTER.store(0, Ordering::SeqCst);
 
-        let mut srv = Server::from_env().expect("Failed to create server");
+        let srv = Server::start_from_env().expect("Failed to create server");
         let _pv = srv.create_pv_double("callback:test:multi", 4.56, NTScalarMetadataBuilder::new())
             .expect("Failed to create PV");
-        srv.start().expect("Failed to start server");
 
         thread::sleep(Duration::from_millis(500));
 
@@ -282,7 +280,7 @@ mod test_pvxs_monitor_callbacks {
         // Cleanup
         mon_connect.stop().expect("Failed to stop connection monitor");
         mon_disconnect.stop().expect("Failed to stop disconnection monitor");
-        srv.stop().expect("Failed to stop server");
+        srv.stop_drop().expect("Failed to stop server");
     }
 
     #[test]
@@ -290,15 +288,16 @@ mod test_pvxs_monitor_callbacks {
         // Test that callbacks are invoked when values update
         EVENT_COUNTER.store(0, Ordering::SeqCst);
 
-        let mut srv = Server::from_env().expect("Failed to create server");
-        let mut pv = srv.create_pv_double("callback:test:updates", 0.0, NTScalarMetadataBuilder::new())
+        let name = "callback:test:updates";
+
+        let srv = Server::start_from_env().expect("Failed to create server");
+        srv.create_pv_double(name, 0.0, NTScalarMetadataBuilder::new())
             .expect("Failed to create PV");
-        srv.start().expect("Failed to start server");
 
         thread::sleep(Duration::from_millis(500));
 
         let mut ctx = Context::from_env().expect("Failed to create context");
-        let mut monitor = ctx.monitor_builder("callback:test:updates")
+        let mut monitor = ctx.monitor_builder(name)
             .expect("Failed to create monitor builder")
             .connect_exception(true)
             .disconnect_exception(false)
@@ -309,27 +308,51 @@ mod test_pvxs_monitor_callbacks {
         monitor.start().expect("Failed to start monitor");
         thread::sleep(Duration::from_millis(500));
 
-        // Reset counter after initial connection
-        EVENT_COUNTER.store(0, Ordering::SeqCst);
-
-        // Post some values to trigger callbacks
-        for i in 1..=5 {
-            pv.post_double(i as f64).expect("Failed to post value");
-            thread::sleep(Duration::from_millis(100));
+        // Drain the queue completely before resetting the counter.
+        // PVXS event callbacks only fire on the empty→non-empty queue transition,
+        // so any items left in the queue from the initial connection will prevent
+        // subsequent posts from triggering the callback.
+        loop {
+            match monitor.pop() {
+                Ok(Some(_)) => {},
+                Ok(None) => break,
+                Err(_) => {},
+            }
         }
 
-        // Wait for callbacks to be processed
-        thread::sleep(Duration::from_millis(500));
+        // Reset counter after draining, so queue is empty and the next post triggers the callback
+        EVENT_COUNTER.store(0, Ordering::SeqCst);
+
+        // Post some values to trigger callbacks.
+        // Between each post we must drain the queue completely: PVXS only fires the
+        // event callback on the empty→non-empty queue transition, so if the previous
+        // item is still sitting in the queue the next post never triggers the callback.
+        for i in 1..=5 {
+            srv.post_double(name, i as f64).expect("Failed to post value");
+            // Wait long enough for the item to arrive in the subscription queue
+            thread::sleep(Duration::from_millis(100));
+            // Drain so the queue is empty before the next post
+            loop {
+                match monitor.pop() {
+                    Ok(Some(_)) => {},
+                    Ok(None) => break,
+                    Err(_) => {},
+                }
+            }
+        }
+
+        // Wait for any in-flight callbacks to complete
+        thread::sleep(Duration::from_millis(200));
 
         let event_count = EVENT_COUNTER.load(Ordering::SeqCst);
         println!("Callbacks after {} updates: {}", 5, event_count);
         
-        // We should get callbacks for the updates
-        assert!(event_count > 0, "Expected callbacks for value updates");
+        // Each post should trigger exactly one callback (one empty→non-empty transition each)
+        assert_eq!(event_count, 5, "Expected 5 callbacks, one per post (got {})", event_count);
 
         // Cleanup
         monitor.stop().expect("Failed to stop monitor");
-        srv.stop().expect("Failed to stop server");
+        srv.stop_drop().expect("Failed to stop server");
     }
 
     #[test]
@@ -337,10 +360,9 @@ mod test_pvxs_monitor_callbacks {
         // Test that mask configuration works correctly
         
         // Create a server
-        let mut srv = Server::from_env().expect("Failed to create server");
-        let _pv = srv.create_pv_double("callback:test:mask", 1.23, NTScalarMetadataBuilder::new())
+        let srv = Server::start_from_env().expect("Failed to create server");
+        srv.create_pv_double("callback:test:mask", 1.23, NTScalarMetadataBuilder::new())
             .expect("Failed to create PV");
-        srv.start().expect("Failed to start server");
 
         thread::sleep(Duration::from_millis(500));
 
@@ -386,6 +408,7 @@ mod test_pvxs_monitor_callbacks {
         // Cleanup
         monitor1.stop().expect("Failed to stop monitor1");
         monitor2.stop().expect("Failed to stop monitor2");
-        srv.stop().expect("Failed to stop server");
+        srv.stop_drop().expect("Failed to stop server");
     }
 }
+

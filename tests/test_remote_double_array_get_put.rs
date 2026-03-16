@@ -1,3 +1,5 @@
+﻿// Copyright 2026 Tine Zata
+// SPDX-License-Identifier: MPL-2.0
 mod test_pvxs_remote_double_array_get_put {
     use pvxs_sys::{Server, Context, PvxsError, NTScalarMetadataBuilder};
 
@@ -8,16 +10,13 @@ mod test_pvxs_remote_double_array_get_put {
         let timeout = 5.0;
         let initial_array = vec![1.1, 2.2, 3.3, 4.4, 5.5];
         let name = "remote:double:array";
-        let mut srv = Server::from_env()
+        let srv = Server::start_from_env()
             .expect("Failed to create server from env");
         
         // Create server with double array PV (this may require special setup)
         // Note: Array PV creation might need different approach depending on server implementation
         srv.create_pv_double_array(name, initial_array.clone(), NTScalarMetadataBuilder::new())
             .expect("Failed to create pv:double:array on server");
-
-        // start the server
-        srv.start().expect("Failed to start server");
 
         // Create a client context to interact with the server
         let mut ctx = Context::from_env()
@@ -70,7 +69,7 @@ mod test_pvxs_remote_double_array_get_put {
         }
 
         // Close the server after test
-        srv.stop().expect("Failed to stop server");
+        srv.stop_drop().expect("Failed to stop server");
     }
 
     #[test]
@@ -79,10 +78,8 @@ mod test_pvxs_remote_double_array_get_put {
         let timeout = 5.0;
         let name = "remote:double:array:special";
         
-        let mut srv = Server::from_env().expect("Failed to create server from env");
+        let srv = Server::start_from_env().expect("Failed to create server from env");
         srv.create_pv_double_array(name, vec![0.0], NTScalarMetadataBuilder::new()).expect("Failed to create pv:double:array on server");
-        srv.start().expect("Failed to start server");
-
         let mut ctx = Context::from_env().expect("Failed to create client context from env");
 
         // Test array with special values
@@ -112,6 +109,6 @@ mod test_pvxs_remote_double_array_get_put {
             Err(e) => assert!(false, "Special values array not supported: {:?}", e),
         }
 
-        srv.stop().expect("Failed to stop server");
+        srv.stop_drop().expect("Failed to stop server");
     }
 }
