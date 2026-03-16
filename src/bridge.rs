@@ -1,3 +1,5 @@
+﻿// Copyright 2026 Tine Zata
+// SPDX-License-Identifier: MPL-2.0
 // bridge.rs - CXX bridge definition for Rust/C++ FFI
 // This defines the interface between Rust and C++
 
@@ -42,16 +44,20 @@ mod ffi {
                              high_warning_severity: i32, high_alarm_severity: i32, hysteresis: u8) -> UniquePtr<NTScalarValueAlarm>;
         
         // Helper functions to build metadata with optional fields
-        fn create_metadata_no_optional(alarm: &NTScalarAlarm, time_stamp: &NTScalarTime, has_form: bool) -> UniquePtr<NTScalarMetadata>;
-        fn create_metadata_with_display(alarm: &NTScalarAlarm, time_stamp: &NTScalarTime, display: &NTScalarDisplay, has_form: bool) -> UniquePtr<NTScalarMetadata>;
-        fn create_metadata_with_control(alarm: &NTScalarAlarm, time_stamp: &NTScalarTime, control: &NTScalarControl, has_form: bool) -> UniquePtr<NTScalarMetadata>;
-        fn create_metadata_with_value_alarm(alarm: &NTScalarAlarm, time_stamp: &NTScalarTime, value_alarm: &NTScalarValueAlarm, has_form: bool) -> UniquePtr<NTScalarMetadata>;
-        fn create_metadata_with_display_control(alarm: &NTScalarAlarm, time_stamp: &NTScalarTime, display: &NTScalarDisplay, control: &NTScalarControl, has_form: bool) -> UniquePtr<NTScalarMetadata>;
-        fn create_metadata_with_display_value_alarm(alarm: &NTScalarAlarm, time_stamp: &NTScalarTime, display: &NTScalarDisplay, value_alarm: &NTScalarValueAlarm, has_form: bool) -> UniquePtr<NTScalarMetadata>;
-        fn create_metadata_with_control_value_alarm(alarm: &NTScalarAlarm, time_stamp: &NTScalarTime, control: &NTScalarControl, value_alarm: &NTScalarValueAlarm, has_form: bool) -> UniquePtr<NTScalarMetadata>;
-        fn create_metadata_full(alarm: &NTScalarAlarm, time_stamp: &NTScalarTime, display: &NTScalarDisplay, control: &NTScalarControl, value_alarm: &NTScalarValueAlarm, has_form: bool) -> UniquePtr<NTScalarMetadata>;
+        fn create_metadata_no_optional(alarm: &NTScalarAlarm, time_stamp: &NTScalarTime) -> UniquePtr<NTScalarMetadata>;
+        fn create_metadata_with_display(alarm: &NTScalarAlarm, time_stamp: &NTScalarTime, display: &NTScalarDisplay) -> UniquePtr<NTScalarMetadata>;
+        fn create_metadata_with_control(alarm: &NTScalarAlarm, time_stamp: &NTScalarTime, control: &NTScalarControl) -> UniquePtr<NTScalarMetadata>;
+        fn create_metadata_with_value_alarm(alarm: &NTScalarAlarm, time_stamp: &NTScalarTime, value_alarm: &NTScalarValueAlarm) -> UniquePtr<NTScalarMetadata>;
+        fn create_metadata_with_display_control(alarm: &NTScalarAlarm, time_stamp: &NTScalarTime, display: &NTScalarDisplay, control: &NTScalarControl) -> UniquePtr<NTScalarMetadata>;
+        fn create_metadata_with_display_value_alarm(alarm: &NTScalarAlarm, time_stamp: &NTScalarTime, display: &NTScalarDisplay, value_alarm: &NTScalarValueAlarm) -> UniquePtr<NTScalarMetadata>;
+        fn create_metadata_with_control_value_alarm(alarm: &NTScalarAlarm, time_stamp: &NTScalarTime, control: &NTScalarControl, value_alarm: &NTScalarValueAlarm) -> UniquePtr<NTScalarMetadata>;
+        fn create_metadata_full(alarm: &NTScalarAlarm, time_stamp: &NTScalarTime, display: &NTScalarDisplay, control: &NTScalarControl, value_alarm: &NTScalarValueAlarm) -> UniquePtr<NTScalarMetadata>;
 
         fn create_enum_metadata(alarm: &NTScalarAlarm, time_stamp: &NTScalarTime) -> UniquePtr<NTEnumMetadata>;
+        
+        // Logging control functions
+        fn pvxs_logger_config_env() -> Result<()>;
+        fn pvxs_logger_level_set(name: String, level: String) -> Result<()>;
         
         // Note: RpcSourceWrapper - to be implemented later
         
@@ -181,9 +187,12 @@ mod ffi {
         fn shared_pv_is_open(pv: &SharedPVWrapper) -> bool;
         fn shared_pv_close(pv: Pin<&mut SharedPVWrapper>) -> Result<()>;
         fn shared_pv_post_double(pv: Pin<&mut SharedPVWrapper>, value: f64) -> Result<()>;
+        fn shared_pv_post_double_with_alarm(pv: Pin<&mut SharedPVWrapper>, value: f64, severity: i32, status: i32, message: String) -> Result<()>;
         fn shared_pv_post_int32(pv: Pin<&mut SharedPVWrapper>, value: i32) -> Result<()>;
+        fn shared_pv_post_int32_with_alarm(pv: Pin<&mut SharedPVWrapper>, value: i32, severity: i32, status: i32, message: String) -> Result<()>;
         fn shared_pv_post_string(pv: Pin<&mut SharedPVWrapper>, value: String) -> Result<()>;
         fn shared_pv_post_enum(pv: Pin<&mut SharedPVWrapper>, value: i16) -> Result<()>;
+        fn shared_pv_post_enum_with_alarm(pv: Pin<&mut SharedPVWrapper>, value: i16, severity: i32, status: i32, message: String) -> Result<()>;
         fn shared_pv_post_double_array(pv: Pin<&mut SharedPVWrapper>, value: Vec<f64>) -> Result<()>;
         fn shared_pv_post_int32_array(pv: Pin<&mut SharedPVWrapper>, value: Vec<i32>) -> Result<()>;
         fn shared_pv_post_string_array(pv: Pin<&mut SharedPVWrapper>, value: Vec<String>) -> Result<()>;

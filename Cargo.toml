@@ -1,6 +1,6 @@
 [package]
 name = "pvxs-sys"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Tine Zata <https://github.com/TineZata>"]
 description = "Low-level FFI bindings for EPICS PVXS library"
@@ -16,10 +16,11 @@ homepage = "https://github.com/ctrl-sys-ui/pvxs-sys"
 links = "pvxs"
 
 [dependencies]
-cxx = "1.0.120"
-tokio = { version = "1.0", features = ["full"], optional = true }
-futures = { version = "0.3", optional = true }
-chrono = { version = "0.4", features = ["serde"] }
+cxx = "1.0.194"
+tokio = { version = "1.50.0", features = ["full"], optional = true }
+futures = { version = "0.3.32", optional = true }
+chrono = { version = "0.4.44", features = ["serde"] }
+crossbeam-channel = "0.5"
 
 [features]
 default = ["async"]
@@ -29,7 +30,7 @@ async = ["tokio", "futures"]
 cxx-build = "1.0.189"
 
 [dev-dependencies]
-serial_test = "3.0"
+serial_test = "3.4.0"
 
 [lib]
 name = "pvxs_sys"

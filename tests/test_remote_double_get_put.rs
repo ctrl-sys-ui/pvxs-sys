@@ -1,3 +1,5 @@
+﻿// Copyright 2026 Tine Zata
+// SPDX-License-Identifier: MPL-2.0
 mod test_pvxs_remote_double_get_put {
     use pvxs_sys::{Server, Context, PvxsError, NTScalarMetadataBuilder};
 
@@ -8,11 +10,8 @@ mod test_pvxs_remote_double_get_put {
         let timeout = 5.0;
         let initial_value = 3.14159;
         let name = "remote:double";
-        let mut srv = Server::from_env().expect("Failed to create server from env");
+        let srv = Server::start_from_env().expect("Failed to create server from env");
         srv.create_pv_double(name, initial_value, NTScalarMetadataBuilder::new()).expect("Failed to create pv:double on server");
-
-        // start the server
-        srv.start().expect("Failed to start server");
 
         // Create a client context to interact with the server
         let mut ctx = Context::from_env().expect("Failed to create client context from env");
@@ -21,13 +20,13 @@ mod test_pvxs_remote_double_get_put {
         let first_get: Result<pvxs_sys::Value, PvxsError> = ctx.get(name, timeout);
         match first_get {
             Ok(value) => {
-                assert!((value.get_field_double("value").unwrap() - initial_value).abs() < 1e-6);
+                assert_eq!(value.get_field_double("value").unwrap(), initial_value);
             },
             Err(e) => assert!(false, "Failed to get value from remote pv: {:?}", e),
         }
 
         // Stop the server to simulate a network error
-        srv.stop().expect("Failed to stop server");
+        srv.stop_drop().expect("Failed to stop server");
 
         // Try to do a get which should fail due to server being down
         let failed_get: Result<pvxs_sys::Value, PvxsError> = ctx.get(name, timeout);
@@ -40,7 +39,8 @@ mod test_pvxs_remote_double_get_put {
         }
 
         // Restart the server
-        srv.start().expect("Failed to restart server");
+        let srv = Server::start_from_env().expect("Failed to restart server");
+        srv.create_pv_double(name, initial_value, NTScalarMetadataBuilder::new()).expect("Failed to create pv:double on server");
 
         // Do a put to set a new value
         let new_value = 2.71828;
@@ -53,13 +53,13 @@ mod test_pvxs_remote_double_get_put {
         let second_get: Result<pvxs_sys::Value, PvxsError> = ctx.get(name, timeout);
         match second_get {
             Ok(value) => {
-                assert!((value.get_field_double("value").unwrap() - new_value).abs() < 1e-6);
+                assert_eq!(value.get_field_double("value").unwrap(), new_value);
             },
             Err(e) => assert!(false, "Failed to get value from remote pv: {:?}", e),
         }
 
         // Close the server after test
-        srv.stop().expect("Failed to stop server");
+        srv.stop_drop().expect("Failed to stop server");
     }
 
     #[test]
@@ -69,11 +69,9 @@ mod test_pvxs_remote_double_get_put {
         let name = "remote:double:precision";
         let precision_value = 1.23456789012345; // High precision value
         
-        let mut srv = Server::from_env()
-            .expect("Failed to create server from env");
+        let srv = Server::start_from_env().expect("Failed to create server from env");
         srv.create_pv_double(name, precision_value, NTScalarMetadataBuilder::new())
             .expect("Failed to create pv:double on server");
-        srv.start().expect("Failed to start server");
 
         let mut ctx = Context::from_env()
             .expect("Failed to create client context from env");
@@ -92,6 +90,6 @@ mod test_pvxs_remote_double_get_put {
         let retrieved_small = value.get_field_double("value").unwrap();
         assert!((retrieved_small - small_value).abs() < 1e-16);
 
-        srv.stop().expect("Failed to stop server");
+        srv.stop_drop().expect("Failed to stop server");
     }
 }
