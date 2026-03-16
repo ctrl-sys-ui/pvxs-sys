@@ -72,7 +72,7 @@ mod test_server_alarm_manager_combined {
         let severity = value.get_field_int32("alarm.severity").expect("Failed to get severity");
         let status = value.get_field_int32("alarm.status").expect("Failed to get status");
 
-        assert!((retrieved - 85.0).abs() < 1e-6, "Value should be accepted");
+        assert_eq!(retrieved, 85.0, "Value should be accepted");
         assert_eq!(severity, AlarmSeverity::Minor as i32, "Expected Minor severity for high warning");
         assert_eq!(status, AlarmStatus::DeviceStatus as i32, "Expected Device status");
 

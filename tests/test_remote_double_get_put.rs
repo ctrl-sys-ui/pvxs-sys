@@ -20,7 +20,7 @@ mod test_pvxs_remote_double_get_put {
         let first_get: Result<pvxs_sys::Value, PvxsError> = ctx.get(name, timeout);
         match first_get {
             Ok(value) => {
-                assert!((value.get_field_double("value").unwrap() - initial_value).abs() < 1e-6);
+                assert_eq!(value.get_field_double("value").unwrap(), initial_value);
             },
             Err(e) => assert!(false, "Failed to get value from remote pv: {:?}", e),
         }
@@ -53,7 +53,7 @@ mod test_pvxs_remote_double_get_put {
         let second_get: Result<pvxs_sys::Value, PvxsError> = ctx.get(name, timeout);
         match second_get {
             Ok(value) => {
-                assert!((value.get_field_double("value").unwrap() - new_value).abs() < 1e-6);
+                assert_eq!(value.get_field_double("value").unwrap(), new_value);
             },
             Err(e) => assert!(false, "Failed to get value from remote pv: {:?}", e),
         }

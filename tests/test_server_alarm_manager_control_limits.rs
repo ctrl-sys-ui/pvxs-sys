@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MPL-2.0
 #[cfg(test)]
 mod test_server_alarm_manager_control_limits {
-    use pvxs_sys::{Server, Context, NTScalarMetadataBuilder, ControlMetadata};
+    use pvxs_sys::{Server, Context, NTScalarMetadataBuilder, ControlMetadata, AlarmSeverity, AlarmStatus};
     use std::thread;
     use std::time::Duration;
 
@@ -29,15 +29,16 @@ mod test_server_alarm_manager_control_limits {
         let mut ctx = Context::from_env()
             .expect("Failed to create client context");
 
+        let posted_value = 75.0;
         // Post a value within limits - should succeed
-        manager.post_double(pv_name, 75.0)
+        manager.post_double(pv_name, posted_value)
             .expect("Failed to post value within limits");
         
         thread::sleep(Duration::from_millis(50));
         
         let value = ctx.get(pv_name, 2.0).expect("Failed to get value");
         let retrieved = value.get_field_double("value").expect("Failed to get double value");
-        assert!((retrieved - 75.0).abs() < 1e-6, "Expected 75.0, got {}", retrieved);
+        assert_eq!(retrieved, posted_value, "Expected {}, got {}", posted_value, retrieved);
 
         // Post a value above upper limit - should be rejected
         manager.post_double(pv_name, 150.0)
@@ -48,13 +49,13 @@ mod test_server_alarm_manager_control_limits {
         let value = ctx.get(pv_name, 2.0).expect("Failed to get value");
         let retrieved = value.get_field_double("value").expect("Failed to get double value");
         // Value should still be 75.0 (previous valid value)
-        assert!((retrieved - 75.0).abs() < 1e-6, "Expected 75.0 (rejected update), got {}", retrieved);
+        assert_eq!(retrieved, posted_value, "Expected 75.0 (rejected update), got {}", retrieved);
 
         // Check that alarm status indicates out of bounds
         let severity = value.get_field_int32("alarm.severity").expect("Failed to get severity");
         let status = value.get_field_int32("alarm.status").expect("Failed to get status");
-        assert_eq!(severity, 3, "Expected Invalid severity (3), got {}", severity); // AlarmSeverity::Invalid
-        assert_eq!(status, 11, "Expected HwLimit status (11), got {}", status); // AlarmStatus::HwLimit
+        assert_eq!(severity, AlarmSeverity::Invalid as i32, "Expected Invalid severity (3), got {}", severity); // AlarmSeverity::Invalid
+        assert_eq!(status, AlarmStatus::RecordStatus as i32, "Expected RecordStatus status (3), got {}", status); // AlarmStatus::HwLimit
 
         // Post a value below lower limit - should be rejected
         manager.post_double(pv_name, -10.0)
@@ -65,10 +66,10 @@ mod test_server_alarm_manager_control_limits {
         let value = ctx.get(pv_name, 2.0).expect("Failed to get value");
         let retrieved = value.get_field_double("value").expect("Failed to get double value");
         // Value should still be 75.0
-        assert!((retrieved - 75.0).abs() < 1e-6, "Expected 75.0 (rejected update), got {}", retrieved);
+        assert_eq!(retrieved, posted_value, "Expected 75.0 (rejected update), got {}", retrieved);
 
         let severity = value.get_field_int32("alarm.severity").expect("Failed to get severity");
-        assert_eq!(severity, 3, "Expected Invalid severity for out-of-bounds");
+        assert_eq!(severity, AlarmSeverity::Invalid as i32, "Expected Invalid severity for out-of-bounds");
 
         manager.stop_drop().expect("Failed to stop manager");
     }
@@ -101,7 +102,7 @@ mod test_server_alarm_manager_control_limits {
         
         let value = ctx.get(pv_name, 2.0).expect("Failed to get value");
         let retrieved = value.get_field_double("value").expect("Failed to get value");
-        assert!((retrieved - (-50.0)).abs() < 1e-6, "Lower boundary should be accepted");
+        assert_eq!(retrieved, -50.0, "Lower boundary should be accepted");
 
         // Test exact upper boundary
         manager.post_double(pv_name, 50.0)
@@ -110,7 +111,7 @@ mod test_server_alarm_manager_control_limits {
         
         let value = ctx.get(pv_name, 2.0).expect("Failed to get value");
         let retrieved = value.get_field_double("value").expect("Failed to get value");
-        assert!((retrieved - 50.0).abs() < 1e-6, "Upper boundary should be accepted");
+        assert_eq!(retrieved, 50.0, "Upper boundary should be accepted");
 
         manager.stop_drop().expect("Failed to stop manager");
     }

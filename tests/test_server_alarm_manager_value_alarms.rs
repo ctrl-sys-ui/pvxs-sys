@@ -42,7 +42,7 @@ mod test_server_alarm_manager_value_alarms {
 
         let value = ctx.get(pv_name, 2.0).expect("Failed to get value");
         let retrieved = value.get_field_double("value").expect("Failed to get value");
-        assert!((retrieved - 95.0).abs() < 1e-6, "Value should be updated");
+        assert_eq!(retrieved, 95.0, "Value should be updated");
 
         let severity = value.get_field_int32("alarm.severity").expect("Failed to get severity");
         let status = value.get_field_int32("alarm.status").expect("Failed to get status");

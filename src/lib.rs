@@ -23,7 +23,7 @@
 //!   [`MonitorBuilder::exec`] → [`Monitor::pop`]
 //! 
 //! ### Server
-//! - **Start**: [`Server::start_from_env`] (production) or [`Server::start_isolated`] (testing)
+//! - **Start**: [`Server::start_from_env`] (network) or [`Server::start_isolated`] (local-only)
 //! - **PV creation**: `create_pv_double`, `create_pv_int32`, `create_pv_string`,
 //!   `create_pv_enum`, and their `_array` variants
 //! - **POST**: Publish new values with automatic alarm computation —

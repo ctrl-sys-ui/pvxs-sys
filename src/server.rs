@@ -39,10 +39,9 @@ impl ServerImpl {
     /// ```no_run
     /// use pvxs_sys::server::ServerImpl;
     /// 
-    /// let mut server = ServerImpl::create_isolated()?;
-    /// server.start()?;
+    /// let server = ServerImpl::start_isolated()?;
     /// println!("Isolated server started on TCP port {}", server.tcp_port());
-    /// server.stop()?;
+    /// server.stop_drop()?;
     /// # Ok::<(), pvxs_sys::PvxsError>(())
     /// ```
     pub fn create_isolated() -> Result<Self> {
@@ -145,7 +144,7 @@ impl ServerImpl {
     /// 
     /// ```no_run
     /// # use pvxs_sys::{Server, NTScalarMetadataBuilder};
-    /// # let mut server = Server::create_isolated().unwrap();
+    /// # let mut server = Server::start_isolated().unwrap();
     /// let pv = server.create_pv_double("test:double", 42.5, NTScalarMetadataBuilder::new())?;
     /// # Ok::<(), pvxs_sys::PvxsError>(())
     /// ```
@@ -812,7 +811,7 @@ impl ServerHandle {
 /// server.create_pv_double("test:pv", 50.0, metadata)?;
 /// server.post_double("test:pv", 75.0)?;  // Validated and with alarms
 /// 
-/// server.stop()?;
+/// server.stop_drop()?;
 /// # Ok::<(), pvxs_sys::PvxsError>(())
 /// ```
 pub struct Server {

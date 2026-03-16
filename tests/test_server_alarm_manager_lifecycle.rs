@@ -43,7 +43,7 @@ mod test_server_alarm_manager_lifecycle {
             let pv_name = format!("test:lifecycle:pv{}", i);
             let value = ctx.get(&pv_name, 2.0)
                 .expect(&format!("Failed to get PV {}", i));
-            assert!((value.get_field_double("value").unwrap() - 50.0).abs() < 1e-6);
+            assert_eq!(value.get_field_double("value").unwrap(), 50.0);
         }
 
         manager.stop_drop().expect("Failed to stop manager");
@@ -79,7 +79,7 @@ mod test_server_alarm_manager_lifecycle {
 
         // Verify PV exists
         let value = ctx.get(pv_name, 2.0).expect("Failed to get PV");
-        assert!((value.get_field_double("value").unwrap() - 50.0).abs() < 1e-6);
+        assert_eq!(value.get_field_double("value").unwrap(), 50.0);
 
         // Remove the PV
         manager.remove_pv(pv_name)
@@ -162,20 +162,20 @@ mod test_server_alarm_manager_lifecycle {
         manager.post_double(pv_name, 75.0).expect("Failed to post");
         thread::sleep(Duration::from_millis(50));
         let value = ctx.get(pv_name, 2.0).expect("Failed to get");
-        assert!((value.get_field_double("value").unwrap() - 75.0).abs() < 1e-6);
+        assert_eq!(value.get_field_double("value").unwrap(), 75.0);
 
         // Post invalid value (out of control range)
         manager.post_double(pv_name, 150.0).expect("Failed to post");
         thread::sleep(Duration::from_millis(50));
         let value = ctx.get(pv_name, 2.0).expect("Failed to get");
         // Value should remain at last valid value
-        assert!((value.get_field_double("value").unwrap() - 75.0).abs() < 1e-6);
+        assert_eq!(value.get_field_double("value").unwrap(), 75.0);
 
         // Post another valid value to verify system still works
         manager.post_double(pv_name, 25.0).expect("Failed to post");
         thread::sleep(Duration::from_millis(50));
         let value = ctx.get(pv_name, 2.0).expect("Failed to get");
-        assert!((value.get_field_double("value").unwrap() - 25.0).abs() < 1e-6);
+        assert_eq!(value.get_field_double("value").unwrap(), 25.0);
 
         manager.stop_drop().expect("Failed to stop manager");
     }
@@ -239,7 +239,7 @@ mod test_server_alarm_manager_lifecycle {
 
         // Verify all types are accessible
         let val_double = ctx.get("test:lifecycle:mixed:double", 2.0).expect("Failed to get double");
-        assert!((val_double.get_field_double("value").unwrap() - 50.0).abs() < 1e-6);
+        assert_eq!(val_double.get_field_double("value").unwrap(), 50.0);
 
         let val_int = ctx.get("test:lifecycle:mixed:int32", 2.0).expect("Failed to get int32");
         assert_eq!(val_int.get_field_int32("value").unwrap(), 128);
