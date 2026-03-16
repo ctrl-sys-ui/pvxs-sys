@@ -1,7 +1,7 @@
-﻿// Copyright 2026 Tine Zata
+// Copyright 2026 Tine Zata
 // SPDX-License-Identifier: MPL-2.0
 mod test_pvxs_remote_double_get_put {
-    use pvxs_sys::{Server, Context, PvxsError, NTScalarMetadataBuilder};
+    use pvxs_sys::{Context, NTScalarMetadataBuilder, PvxsError, Server};
 
     #[test]
     fn test_pv_remote_double_get_put() {
@@ -11,7 +11,8 @@ mod test_pvxs_remote_double_get_put {
         let initial_value = 3.14159;
         let name = "remote:double";
         let srv = Server::start_from_env().expect("Failed to create server from env");
-        srv.create_pv_double(name, initial_value, NTScalarMetadataBuilder::new()).expect("Failed to create pv:double on server");
+        srv.create_pv_double(name, initial_value, NTScalarMetadataBuilder::new())
+            .expect("Failed to create pv:double on server");
 
         // Create a client context to interact with the server
         let mut ctx = Context::from_env().expect("Failed to create client context from env");
@@ -21,7 +22,7 @@ mod test_pvxs_remote_double_get_put {
         match first_get {
             Ok(value) => {
                 assert_eq!(value.get_field_double("value").unwrap(), initial_value);
-            },
+            }
             Err(e) => assert!(false, "Failed to get value from remote pv: {:?}", e),
         }
 
@@ -31,16 +32,20 @@ mod test_pvxs_remote_double_get_put {
         // Try to do a get which should fail due to server being down
         let failed_get: Result<pvxs_sys::Value, PvxsError> = ctx.get(name, timeout);
         match failed_get {
-            Ok(_) => assert!(false, "Expected error when getting from stopped server, but got Ok"),
+            Ok(_) => assert!(
+                false,
+                "Expected error when getting from stopped server, but got Ok"
+            ),
             Err(e) => {
                 // Just verify we got an error - could be timeout or connection error
                 assert!(e.to_string().contains("Timeout") || e.to_string().contains("Error"));
-            },
+            }
         }
 
         // Restart the server
         let srv = Server::start_from_env().expect("Failed to restart server");
-        srv.create_pv_double(name, initial_value, NTScalarMetadataBuilder::new()).expect("Failed to create pv:double on server");
+        srv.create_pv_double(name, initial_value, NTScalarMetadataBuilder::new())
+            .expect("Failed to create pv:double on server");
 
         // Do a put to set a new value
         let new_value = 2.71828;
@@ -54,7 +59,7 @@ mod test_pvxs_remote_double_get_put {
         match second_get {
             Ok(value) => {
                 assert_eq!(value.get_field_double("value").unwrap(), new_value);
-            },
+            }
             Err(e) => assert!(false, "Failed to get value from remote pv: {:?}", e),
         }
 
@@ -68,24 +73,26 @@ mod test_pvxs_remote_double_get_put {
         let timeout = 5.0;
         let name = "remote:double:precision";
         let precision_value = 1.23456789012345; // High precision value
-        
+
         let srv = Server::start_from_env().expect("Failed to create server from env");
         srv.create_pv_double(name, precision_value, NTScalarMetadataBuilder::new())
             .expect("Failed to create pv:double on server");
 
-        let mut ctx = Context::from_env()
-            .expect("Failed to create client context from env");
+        let mut ctx = Context::from_env().expect("Failed to create client context from env");
 
         // Get the high precision value
-        let value = ctx.get(name, timeout).expect("Failed to get precision value");
+        let value = ctx
+            .get(name, timeout)
+            .expect("Failed to get precision value");
         let retrieved_value = value.get_field_double("value").unwrap();
-        
+
         // Verify precision is maintained (within double precision limits)
         assert!((retrieved_value - precision_value).abs() < 1e-14);
-        
+
         // Test very small numbers
         let small_value = 1e-15;
-        ctx.put_double(name, small_value, timeout).expect("Failed to put small value");
+        ctx.put_double(name, small_value, timeout)
+            .expect("Failed to put small value");
         let value = ctx.get(name, timeout).expect("Failed to get small value");
         let retrieved_small = value.get_field_double("value").unwrap();
         assert!((retrieved_small - small_value).abs() < 1e-16);

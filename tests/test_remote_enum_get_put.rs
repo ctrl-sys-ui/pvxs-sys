@@ -1,7 +1,7 @@
-﻿// Copyright 2026 Tine Zata
+// Copyright 2026 Tine Zata
 // SPDX-License-Identifier: MPL-2.0
 mod test_pvxs_remote_enum_get_put {
-    use pvxs_sys::{Server, Context, PvxsError, NTEnumMetadataBuilder};
+    use pvxs_sys::{Context, NTEnumMetadataBuilder, PvxsError, Server};
 
     #[test]
     fn test_pv_remote_enum_get_put() {
@@ -11,14 +11,18 @@ mod test_pvxs_remote_enum_get_put {
         let choices = vec!["DISABLED", "ENABLED", "TESTING"];
         let initial_index = 0; // "DISABLED"
         let name = "remote:enum";
-        
+
         let srv = Server::start_from_env().expect("Failed to create server from env");
-        srv.create_pv_enum(name, choices.clone(), initial_index, NTEnumMetadataBuilder::new())
-            .expect("Failed to create pv:enum on server");
+        srv.create_pv_enum(
+            name,
+            choices.clone(),
+            initial_index,
+            NTEnumMetadataBuilder::new(),
+        )
+        .expect("Failed to create pv:enum on server");
 
         // Create a client context to interact with the server
-        let mut ctx = Context::from_env()
-            .expect("Failed to create client context from env");
+        let mut ctx = Context::from_env().expect("Failed to create client context from env");
 
         // Do a get to verify initial value
         let first_get: Result<pvxs_sys::Value, PvxsError> = ctx.get(name, timeout);
@@ -26,14 +30,14 @@ mod test_pvxs_remote_enum_get_put {
             Ok(value) => {
                 let index = value.get_field_enum("value.index").unwrap();
                 assert_eq!(index, initial_index);
-                
+
                 // Verify choices array
                 let retrieved_choices = value.get_field_string_array("value.choices").unwrap();
                 assert_eq!(retrieved_choices.len(), choices.len());
                 assert_eq!(retrieved_choices[0], "DISABLED");
                 assert_eq!(retrieved_choices[1], "ENABLED");
                 assert_eq!(retrieved_choices[2], "TESTING");
-            },
+            }
             Err(e) => assert!(false, "Failed to get value from remote pv: {:?}", e),
         }
 
@@ -43,17 +47,25 @@ mod test_pvxs_remote_enum_get_put {
         // Try to do a get which should fail due to server being down
         let failed_get: Result<pvxs_sys::Value, PvxsError> = ctx.get(name, timeout);
         match failed_get {
-            Ok(_) => assert!(false, "Expected error when getting from stopped server, but got Ok"),
+            Ok(_) => assert!(
+                false,
+                "Expected error when getting from stopped server, but got Ok"
+            ),
             Err(e) => {
                 // Just verify we got an error - could be timeout or connection error
                 assert!(e.to_string().contains("Timeout") || e.to_string().contains("Error"));
-            },
+            }
         }
 
         // Restart the server
         let srv = Server::start_from_env().expect("Failed to restart server");
-        srv.create_pv_enum(name, choices.clone(), initial_index, NTEnumMetadataBuilder::new())
-            .expect("Failed to create pv:enum on server");
+        srv.create_pv_enum(
+            name,
+            choices.clone(),
+            initial_index,
+            NTEnumMetadataBuilder::new(),
+        )
+        .expect("Failed to create pv:enum on server");
 
         // Do a put to set a new value
         let new_index = 1; // "ENABLED"
@@ -68,7 +80,7 @@ mod test_pvxs_remote_enum_get_put {
             Ok(value) => {
                 let index = value.get_field_enum("value.index").unwrap();
                 assert_eq!(index, new_index);
-            },
+            }
             Err(e) => assert!(false, "Failed to get value from remote pv: {:?}", e),
         }
 
@@ -82,13 +94,12 @@ mod test_pvxs_remote_enum_get_put {
         let timeout = 5.0;
         let name = "remote:enum:states";
         let choices = vec!["INIT", "READY", "ACTIVE", "PAUSED", "STOPPED"];
-        
+
         let srv = Server::start_from_env().expect("Failed to create server from env");
         srv.create_pv_enum(name, choices.clone(), 0, NTEnumMetadataBuilder::new())
             .expect("Failed to create pv:enum on server");
 
-        let mut ctx = Context::from_env()
-            .expect("Failed to create client context from env");
+        let mut ctx = Context::from_env().expect("Failed to create client context from env");
 
         // Test state transitions: INIT -> READY -> ACTIVE -> PAUSED -> STOPPED
         for (expected_index, expected_state) in choices.iter().enumerate() {
@@ -97,12 +108,13 @@ mod test_pvxs_remote_enum_get_put {
                 .expect(&format!("Failed to put state {}", expected_state));
 
             // Get and verify
-            let value = ctx.get(name, timeout)
+            let value = ctx
+                .get(name, timeout)
                 .expect(&format!("Failed to get state {}", expected_state));
-            
+
             let index = value.get_field_enum("value.index").unwrap();
             assert_eq!(index as usize, expected_index);
-            
+
             let retrieved_choices = value.get_field_string_array("value.choices").unwrap();
             assert_eq!(&retrieved_choices[index as usize], expected_state);
         }
@@ -116,22 +128,21 @@ mod test_pvxs_remote_enum_get_put {
         let timeout = 5.0;
         let name = "remote:enum:invalid";
         let choices = vec!["OPTION_A", "OPTION_B", "OPTION_C"];
-        
+
         let srv = Server::start_from_env().expect("Failed to create server from env");
         srv.create_pv_enum(name, choices.clone(), 0, NTEnumMetadataBuilder::new())
             .expect("Failed to create pv:enum on server");
 
-        let mut ctx = Context::from_env()
-            .expect("Failed to create client context from env");
+        let mut ctx = Context::from_env().expect("Failed to create client context from env");
 
         // Try to put an invalid (out of range) index
         match ctx.put_enum(name, 99, timeout) {
             Ok(_) => {
                 assert!(false, "Server accepted out-of-range enum index");
-            },
+            }
             Err(_) => {
                 assert!(true, "Server did not reject invalid index"); // Expected behavior
-            },
+            }
         }
 
         // Try negative index
@@ -139,7 +150,7 @@ mod test_pvxs_remote_enum_get_put {
             Ok(_) => assert!(false, "Server accepted negative enum index"),
             Err(_) => {
                 assert!(true, "Server did not reject a negative index"); // Expected behavior
-            },
+            }
         }
 
         srv.stop_drop().expect("Failed to stop server");
@@ -151,17 +162,18 @@ mod test_pvxs_remote_enum_get_put {
         let timeout = 5.0;
         let name = "remote:enum:immutable";
         let choices = vec!["CHOICE_1", "CHOICE_2", "CHOICE_3", "CHOICE_4"];
-        
+
         let srv = Server::start_from_env().expect("Failed to create server from env");
         srv.create_pv_enum(name, choices.clone(), 0, NTEnumMetadataBuilder::new())
             .expect("Failed to create pv:enum on server");
 
-        let mut ctx = Context::from_env()
-            .expect("Failed to create client context from env");
+        let mut ctx = Context::from_env().expect("Failed to create client context from env");
 
         // Get initial choices
         let initial_value = ctx.get(name, timeout).expect("Failed to get initial value");
-        let initial_choices = initial_value.get_field_string_array("value.choices").unwrap();
+        let initial_choices = initial_value
+            .get_field_string_array("value.choices")
+            .unwrap();
 
         // Change the index multiple times
         for idx in 0..choices.len() {
@@ -174,7 +186,9 @@ mod test_pvxs_remote_enum_get_put {
         let final_choices = final_value.get_field_string_array("value.choices").unwrap();
 
         assert_eq!(initial_choices.len(), final_choices.len());
-        for (i, (initial, final_choice)) in initial_choices.iter().zip(final_choices.iter()).enumerate() {
+        for (i, (initial, final_choice)) in
+            initial_choices.iter().zip(final_choices.iter()).enumerate()
+        {
             assert_eq!(initial, final_choice, "Choice at index {} changed", i);
         }
 

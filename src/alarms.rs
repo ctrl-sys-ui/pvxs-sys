@@ -1,6 +1,6 @@
-﻿// Copyright 2026 Tine Zata
+// Copyright 2026 Tine Zata
 // SPDX-License-Identifier: MPL-2.0
-use crate::{ControlMetadata, AlarmMetadata};
+use crate::{AlarmMetadata, ControlMetadata};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum AlarmSeverity {
@@ -9,7 +9,7 @@ pub enum AlarmSeverity {
     Major = 2,
     Invalid = 3,
     UndefinedAlarm = 4,
- } 
+}
 impl Default for AlarmSeverity {
     fn default() -> Self {
         AlarmSeverity::NoAlarm
@@ -29,9 +29,9 @@ impl From<i32> for AlarmSeverity {
     }
 }
 
- #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub enum AlarmStatus  {
-    NoAlarm = 0 ,
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum AlarmStatus {
+    NoAlarm = 0,
     DeviceStatus = 1,
     DriverStatus = 2,
     RecordStatus = 3,
@@ -63,8 +63,6 @@ impl From<i32> for AlarmStatus {
     }
 }
 
-
-
 #[derive(Clone, Debug, Default)]
 pub struct AlarmConfig {
     pub(crate) control: Option<ControlMetadata>,
@@ -82,7 +80,10 @@ pub struct AlarmResult {
 pub fn compute_alarm_for_scalar(value: f64, config: &AlarmConfig) -> AlarmResult {
     // Control limits: if present, reject updates outside limits
     if let Some(control) = &config.control {
-        let hysteresis = config.alarm_metadata.as_ref().map_or(0.0, |m| m.hysteresis as f64);
+        let hysteresis = config
+            .alarm_metadata
+            .as_ref()
+            .map_or(0.0, |m| m.hysteresis as f64);
         if value < control.limit_low + hysteresis || value > control.limit_high - hysteresis {
             return AlarmResult {
                 allow: false,

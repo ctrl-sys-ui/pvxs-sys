@@ -1,7 +1,7 @@
-﻿// Copyright 2026 Tine Zata
+// Copyright 2026 Tine Zata
 // SPDX-License-Identifier: MPL-2.0
 mod test_pvxs_remote_string_get_put {
-    use pvxs_sys::{Server, Context, PvxsError, NTScalarMetadataBuilder};
+    use pvxs_sys::{Context, NTScalarMetadataBuilder, PvxsError, Server};
 
     #[test]
     fn test_pv_remote_string_get_put() {
@@ -10,21 +10,19 @@ mod test_pvxs_remote_string_get_put {
         let timeout = 5.0;
         let initial_value = "Remote string PV";
         let name = "remote:string";
-        let srv = Server::start_from_env()
-            .expect("Failed to create server from env");
+        let srv = Server::start_from_env().expect("Failed to create server from env");
         srv.create_pv_string(name, initial_value, NTScalarMetadataBuilder::new())
             .expect("Failed to create pv:string on server");
 
         // Create a client context to interact with the server
-        let mut ctx = Context::from_env()
-            .expect("Failed to create client context from env");
+        let mut ctx = Context::from_env().expect("Failed to create client context from env");
 
         // Do a get to verify initial value
         let first_get: Result<pvxs_sys::Value, PvxsError> = ctx.get(name, timeout);
         match first_get {
             Ok(value) => {
                 assert_eq!(value.get_field_string("value").unwrap(), initial_value);
-            },
+            }
             Err(e) => assert!(false, "Failed to get value from remote pv: {:?}", e),
         }
 
@@ -34,11 +32,14 @@ mod test_pvxs_remote_string_get_put {
         // Try to do a get which should fail due to server being down
         let failed_get: Result<pvxs_sys::Value, PvxsError> = ctx.get(name, timeout);
         match failed_get {
-            Ok(_) => assert!(false, "Expected error when getting from stopped server, but got Ok"),
+            Ok(_) => assert!(
+                false,
+                "Expected error when getting from stopped server, but got Ok"
+            ),
             Err(e) => {
                 // Just verify we got an error - could be timeout or connection error
                 assert!(e.to_string().contains("Timeout") || e.to_string().contains("Error"));
-            },
+            }
         }
 
         // Restart the server
@@ -58,7 +59,7 @@ mod test_pvxs_remote_string_get_put {
         match second_get {
             Ok(value) => {
                 assert_eq!(value.get_field_string("value").unwrap(), new_value);
-            },
+            }
             Err(e) => assert!(false, "Failed to get value from remote pv: {:?}", e),
         }
 
@@ -71,14 +72,12 @@ mod test_pvxs_remote_string_get_put {
         // Test that string encoding is preserved across network
         let timeout = 5.0;
         let name = "remote:string:encoding";
-        
-        let srv = Server::start_from_env()
-            .expect("Failed to create server from env");
+
+        let srv = Server::start_from_env().expect("Failed to create server from env");
         srv.create_pv_string(name, "", NTScalarMetadataBuilder::new())
             .expect("Failed to create pv:string on server");
 
-        let mut ctx = Context::from_env()
-            .expect("Failed to create client context from env");
+        let mut ctx = Context::from_env().expect("Failed to create client context from env");
 
         // Test various string encodings
         let test_strings = vec![
@@ -98,10 +97,18 @@ mod test_pvxs_remote_string_get_put {
                     // Get it back and verify
                     let value = ctx.get(name, timeout).expect("Failed to get string value");
                     let retrieved = value.get_field_string("value").unwrap();
-                    assert_eq!(retrieved, test_string, "String encoding not preserved for: {}", test_string);
-                },
+                    assert_eq!(
+                        retrieved, test_string,
+                        "String encoding not preserved for: {}",
+                        test_string
+                    );
+                }
                 Err(e) => {
-                    assert!(false, "Failed to put string '{}' to remote pv: {:?}", test_string, e);
+                    assert!(
+                        false,
+                        "Failed to put string '{}' to remote pv: {:?}",
+                        test_string, e
+                    );
                 }
             }
         }

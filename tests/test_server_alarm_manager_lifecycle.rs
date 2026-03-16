@@ -1,47 +1,47 @@
-﻿// Copyright 2026 Tine Zata
+// Copyright 2026 Tine Zata
 // SPDX-License-Identifier: MPL-2.0
 #[cfg(test)]
 mod test_server_alarm_manager_lifecycle {
-    use pvxs_sys::{Server, Context, NTScalarMetadataBuilder, ControlMetadata, AlarmMetadata, AlarmSeverity};
+    use pvxs_sys::{
+        AlarmMetadata, AlarmSeverity, Context, ControlMetadata, NTScalarMetadataBuilder, Server,
+    };
     use std::thread;
     use std::time::Duration;
 
     #[test]
     fn test_create_multiple_pvs_with_alarms() {
-        let manager = Server::start_from_env()
-            .expect("Failed to create Server");
+        let manager = Server::start_from_env().expect("Failed to create Server");
 
         // Create multiple PVs with alarm metadata
         for i in 0..5 {
             let pv_name = format!("test:lifecycle:pv{}", i);
-            let metadata = NTScalarMetadataBuilder::new()
+            let metadata = NTScalarMetadataBuilder::new().alarm_metadata(AlarmMetadata {
+                active: true,
+                low_alarm_limit: (i * 10) as f64,
+                low_warning_limit: (i * 10 + 10) as f64,
+                high_warning_limit: (i * 10 + 80) as f64,
+                high_alarm_limit: (i * 10 + 90) as f64,
+                low_alarm_severity: AlarmSeverity::Major,
+                low_warning_severity: AlarmSeverity::Minor,
+                high_warning_severity: AlarmSeverity::Minor,
+                high_alarm_severity: AlarmSeverity::Major,
+                hysteresis: 0,
+            });
 
-                .alarm_metadata(AlarmMetadata {
-                    active: true,
-                    low_alarm_limit: (i * 10) as f64,
-                    low_warning_limit: (i * 10 + 10) as f64,
-                    high_warning_limit: (i * 10 + 80) as f64,
-                    high_alarm_limit: (i * 10 + 90) as f64,
-                    low_alarm_severity: AlarmSeverity::Major,
-                    low_warning_severity: AlarmSeverity::Minor,
-                    high_warning_severity: AlarmSeverity::Minor,
-                    high_alarm_severity: AlarmSeverity::Major,
-                    hysteresis: 0,
-                });
-
-            manager.create_pv_double(&pv_name, 50.0, metadata)
+            manager
+                .create_pv_double(&pv_name, 50.0, metadata)
                 .expect(&format!("Failed to create PV {}", i));
         }
 
         thread::sleep(Duration::from_millis(100));
 
-        let mut ctx = Context::from_env()
-            .expect("Failed to create client");
+        let mut ctx = Context::from_env().expect("Failed to create client");
 
         // Verify all PVs are accessible
         for i in 0..5 {
             let pv_name = format!("test:lifecycle:pv{}", i);
-            let value = ctx.get(&pv_name, 2.0)
+            let value = ctx
+                .get(&pv_name, 2.0)
                 .expect(&format!("Failed to get PV {}", i));
             assert_eq!(value.get_field_double("value").unwrap(), 50.0);
         }
@@ -51,39 +51,36 @@ mod test_server_alarm_manager_lifecycle {
 
     #[test]
     fn test_remove_pv_with_alarms() {
-        let manager = Server::start_from_env()
-            .expect("Failed to create Server");
+        let manager = Server::start_from_env().expect("Failed to create Server");
 
         let pv_name = "test:lifecycle:remove";
-        let metadata = NTScalarMetadataBuilder::new()
-            .alarm_metadata(AlarmMetadata {
-                active: true,
-                low_alarm_limit: 10.0,
-                low_warning_limit: 20.0,
-                high_warning_limit: 80.0,
-                high_alarm_limit: 90.0,
-                low_alarm_severity: AlarmSeverity::Major,
-                low_warning_severity: AlarmSeverity::Minor,
-                high_warning_severity: AlarmSeverity::Minor,
-                high_alarm_severity: AlarmSeverity::Major,
-                hysteresis: 0,
-            });
+        let metadata = NTScalarMetadataBuilder::new().alarm_metadata(AlarmMetadata {
+            active: true,
+            low_alarm_limit: 10.0,
+            low_warning_limit: 20.0,
+            high_warning_limit: 80.0,
+            high_alarm_limit: 90.0,
+            low_alarm_severity: AlarmSeverity::Major,
+            low_warning_severity: AlarmSeverity::Minor,
+            high_warning_severity: AlarmSeverity::Minor,
+            high_alarm_severity: AlarmSeverity::Major,
+            hysteresis: 0,
+        });
 
-        manager.create_pv_double(pv_name, 50.0, metadata)
+        manager
+            .create_pv_double(pv_name, 50.0, metadata)
             .expect("Failed to create PV");
 
         thread::sleep(Duration::from_millis(100));
 
-        let mut ctx = Context::from_env()
-            .expect("Failed to create client");
+        let mut ctx = Context::from_env().expect("Failed to create client");
 
         // Verify PV exists
         let value = ctx.get(pv_name, 2.0).expect("Failed to get PV");
         assert_eq!(value.get_field_double("value").unwrap(), 50.0);
 
         // Remove the PV
-        manager.remove_pv(pv_name)
-            .expect("Failed to remove PV");
+        manager.remove_pv(pv_name).expect("Failed to remove PV");
 
         thread::sleep(Duration::from_millis(100));
 
@@ -96,26 +93,26 @@ mod test_server_alarm_manager_lifecycle {
 
     #[test]
     fn test_duplicate_pv_creation() {
-        let manager = Server::start_from_env()
-            .expect("Failed to create Server");
+        let manager = Server::start_from_env().expect("Failed to create Server");
 
         let pv_name = "test:lifecycle:duplicate";
-        let metadata = NTScalarMetadataBuilder::new()
-            .alarm_metadata(AlarmMetadata {
-                active: true,
-                low_alarm_limit: 10.0,
-                low_warning_limit: 20.0,
-                high_warning_limit: 80.0,
-                high_alarm_limit: 90.0,
-                low_alarm_severity: AlarmSeverity::Major,
-                low_warning_severity: AlarmSeverity::Minor,
-                high_warning_severity: AlarmSeverity::Minor,
-                high_alarm_severity: AlarmSeverity::Major,
-                hysteresis: 0,
-            });
+        let metadata = NTScalarMetadataBuilder::new().alarm_metadata(AlarmMetadata {
+            active: true,
+            low_alarm_limit: 10.0,
+            low_warning_limit: 20.0,
+            high_warning_limit: 80.0,
+            high_alarm_limit: 90.0,
+            low_alarm_severity: AlarmSeverity::Major,
+            low_warning_severity: AlarmSeverity::Minor,
+            high_warning_severity: AlarmSeverity::Minor,
+            high_alarm_severity: AlarmSeverity::Major,
+            hysteresis: 0,
+        });
 
         // Create first PV
-        manager.create_pv_double(pv_name, 50.0, metadata.clone()).expect("Failed to create PV");
+        manager
+            .create_pv_double(pv_name, 50.0, metadata.clone())
+            .expect("Failed to create PV");
 
         // Try to create duplicate - should fail
         let result = manager.create_pv_double(pv_name, 75.0, metadata);
@@ -127,11 +124,13 @@ mod test_server_alarm_manager_lifecycle {
 
     #[test]
     fn test_post_to_nonexistent_pv() {
-        let manager = Server::start_from_env()
-            .expect("Failed to create Server");
+        let manager = Server::start_from_env().expect("Failed to create Server");
 
         let result = manager.post_double("test:lifecycle:nonexistent", 42.0);
-        assert!(result.is_err(), "Should not be able to post to non-existent PV");
+        assert!(
+            result.is_err(),
+            "Should not be able to post to non-existent PV"
+        );
         assert!(result.unwrap_err().to_string().contains("not found"));
 
         manager.stop_drop().expect("Failed to stop manager");
@@ -139,24 +138,22 @@ mod test_server_alarm_manager_lifecycle {
 
     #[test]
     fn test_alarm_persistence_across_posts() {
-        let manager = Server::start_from_env()
-            .expect("Failed to create Server");
+        let manager = Server::start_from_env().expect("Failed to create Server");
 
         let pv_name = "test:lifecycle:persistence";
-        let metadata = NTScalarMetadataBuilder::new()
-            .control(ControlMetadata {
-                limit_low: 0.0,
-                limit_high: 100.0,
-                min_step: 0.1,
-            });
+        let metadata = NTScalarMetadataBuilder::new().control(ControlMetadata {
+            limit_low: 0.0,
+            limit_high: 100.0,
+            min_step: 0.1,
+        });
 
-        manager.create_pv_double(pv_name, 50.0, metadata)
+        manager
+            .create_pv_double(pv_name, 50.0, metadata)
             .expect("Failed to create PV");
 
         thread::sleep(Duration::from_millis(100));
 
-        let mut ctx = Context::from_env()
-            .expect("Failed to create client");
+        let mut ctx = Context::from_env().expect("Failed to create client");
 
         // Post valid value
         manager.post_double(pv_name, 75.0).expect("Failed to post");
@@ -182,72 +179,83 @@ mod test_server_alarm_manager_lifecycle {
 
     #[test]
     fn test_manager_handle_after_stop() {
-        let manager = Server::start_from_env()
-            .expect("Failed to create Server");
+        let manager = Server::start_from_env().expect("Failed to create Server");
 
         let handle = manager.handle();
         let pv_name = "test:lifecycle:handle";
         let metadata = NTScalarMetadataBuilder::new();
 
-        handle.create_pv_double(pv_name, 42.0, metadata)
+        handle
+            .create_pv_double(pv_name, 42.0, metadata)
             .expect("Failed to create PV via handle");
 
         manager.stop_drop().expect("Failed to stop manager");
 
         // Try to use handle after manager stopped
         let result = handle.post_double(pv_name, 100.0);
-        assert!(result.is_err(), "Handle should not work after manager stopped");
+        assert!(
+            result.is_err(),
+            "Handle should not work after manager stopped"
+        );
     }
 
     #[test]
     fn test_mixed_pv_types_with_alarms() {
-        let manager = Server::start_from_env()
-            .expect("Failed to create Server");
+        let manager = Server::start_from_env().expect("Failed to create Server");
 
-        let metadata_double = NTScalarMetadataBuilder::new()
-            .alarm_metadata(AlarmMetadata {
-                active: true,
-                low_alarm_limit: 10.0,
-                low_warning_limit: 20.0,
-                high_warning_limit: 80.0,
-                high_alarm_limit: 90.0,
-                low_alarm_severity: AlarmSeverity::Major,
-                low_warning_severity: AlarmSeverity::Minor,
-                high_warning_severity: AlarmSeverity::Minor,
-                high_alarm_severity: AlarmSeverity::Major,
-                hysteresis: 0,
-            });
+        let metadata_double = NTScalarMetadataBuilder::new().alarm_metadata(AlarmMetadata {
+            active: true,
+            low_alarm_limit: 10.0,
+            low_warning_limit: 20.0,
+            high_warning_limit: 80.0,
+            high_alarm_limit: 90.0,
+            low_alarm_severity: AlarmSeverity::Major,
+            low_warning_severity: AlarmSeverity::Minor,
+            high_warning_severity: AlarmSeverity::Minor,
+            high_alarm_severity: AlarmSeverity::Major,
+            hysteresis: 0,
+        });
 
-        let metadata_int = NTScalarMetadataBuilder::new()
-            .control(ControlMetadata {
-                limit_low: 0.0,
-                limit_high: 255.0,
-                min_step: 1.0,
-            });
+        let metadata_int = NTScalarMetadataBuilder::new().control(ControlMetadata {
+            limit_low: 0.0,
+            limit_high: 255.0,
+            min_step: 1.0,
+        });
 
-        manager.create_pv_double("test:lifecycle:mixed:double", 50.0, metadata_double)
+        manager
+            .create_pv_double("test:lifecycle:mixed:double", 50.0, metadata_double)
             .expect("Failed to create double PV");
-        manager.create_pv_int32("test:lifecycle:mixed:int32", 128, metadata_int)
+        manager
+            .create_pv_int32("test:lifecycle:mixed:int32", 128, metadata_int)
             .expect("Failed to create int32 PV");
-        manager.create_pv_string("test:lifecycle:mixed:string", "test", NTScalarMetadataBuilder::new())
+        manager
+            .create_pv_string(
+                "test:lifecycle:mixed:string",
+                "test",
+                NTScalarMetadataBuilder::new(),
+            )
             .expect("Failed to create string PV");
 
         thread::sleep(Duration::from_millis(100));
 
-        let mut ctx = Context::from_env()
-            .expect("Failed to create client");
+        let mut ctx = Context::from_env().expect("Failed to create client");
 
         // Verify all types are accessible
-        let val_double = ctx.get("test:lifecycle:mixed:double", 2.0).expect("Failed to get double");
+        let val_double = ctx
+            .get("test:lifecycle:mixed:double", 2.0)
+            .expect("Failed to get double");
         assert_eq!(val_double.get_field_double("value").unwrap(), 50.0);
 
-        let val_int = ctx.get("test:lifecycle:mixed:int32", 2.0).expect("Failed to get int32");
+        let val_int = ctx
+            .get("test:lifecycle:mixed:int32", 2.0)
+            .expect("Failed to get int32");
         assert_eq!(val_int.get_field_int32("value").unwrap(), 128);
 
-        let val_string = ctx.get("test:lifecycle:mixed:string", 2.0).expect("Failed to get string");
+        let val_string = ctx
+            .get("test:lifecycle:mixed:string", 2.0)
+            .expect("Failed to get string");
         assert_eq!(val_string.get_field_string("value").unwrap(), "test");
 
         manager.stop_drop().expect("Failed to stop manager");
     }
 }
-

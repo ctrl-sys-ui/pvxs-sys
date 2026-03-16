@@ -1,7 +1,7 @@
-﻿// Copyright 2026 Tine Zata
+// Copyright 2026 Tine Zata
 // SPDX-License-Identifier: MPL-2.0
 mod test_pvxs_remote_int32_get_put {
-    use pvxs_sys::{Server, Context, PvxsError, NTScalarMetadataBuilder};
+    use pvxs_sys::{Context, NTScalarMetadataBuilder, PvxsError, Server};
 
     #[test]
     fn test_pv_remote_int_get_put() {
@@ -15,15 +15,14 @@ mod test_pvxs_remote_int32_get_put {
             .expect("Failed to create pv:int on server");
 
         // Create a client context to interact with the server
-        let mut ctx = Context::from_env()
-            .expect("Failed to create client context from env");
+        let mut ctx = Context::from_env().expect("Failed to create client context from env");
 
         // Do a get to verify initial value
         let first_get: Result<pvxs_sys::Value, PvxsError> = ctx.get(name, timeout);
         match first_get {
             Ok(value) => {
                 assert!(value.get_field_int32("value").unwrap() == initial_value);
-            },
+            }
             Err(e) => assert!(false, "Failed to get value from remote pv: {:?}", e),
         }
 
@@ -33,11 +32,14 @@ mod test_pvxs_remote_int32_get_put {
         // Try to do a get which should fail due to server being down
         let failed_get: Result<pvxs_sys::Value, PvxsError> = ctx.get(name, timeout);
         match failed_get {
-            Ok(_) => assert!(false, "Expected error when getting from stopped server, but got Ok"),
+            Ok(_) => assert!(
+                false,
+                "Expected error when getting from stopped server, but got Ok"
+            ),
             Err(e) => {
                 // Just verify we got an error - could be timeout or connection error
                 assert!(e.to_string().contains("Timeout") || e.to_string().contains("Error"));
-            },
+            }
         }
 
         // Restart the server
@@ -57,12 +59,11 @@ mod test_pvxs_remote_int32_get_put {
         match second_get {
             Ok(value) => {
                 assert!(value.get_field_int32("value").unwrap() == new_value);
-            },
+            }
             Err(e) => assert!(false, "Failed to get value from remote pv: {:?}", e),
         }
 
         // Close the server after test
         srv.stop_drop().expect("Failed to stop server");
-
     }
 }

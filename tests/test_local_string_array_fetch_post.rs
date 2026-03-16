@@ -1,7 +1,7 @@
-﻿// Copyright 2026 Tine Zata
+// Copyright 2026 Tine Zata
 // SPDX-License-Identifier: MPL-2.0
 mod test_pvxs_local_string_array_fetch_post {
-    use pvxs_sys::{Server, NTScalarMetadataBuilder};
+    use pvxs_sys::{NTScalarMetadataBuilder, Server};
 
     #[test]
     fn test_pv_local_string_array_fetch_post() {
@@ -9,11 +9,11 @@ mod test_pvxs_local_string_array_fetch_post {
         // server-side fetch() and post_string() operations.
         let initial_value = "Initial string array element";
         let name = "loc:string:array";
-        let loc_srv = Server::start_isolated()
-            .expect("Failed to create isolated server");
+        let loc_srv = Server::start_isolated().expect("Failed to create isolated server");
 
         // Create a string PV and capture for server-side operations
-        loc_srv.create_pv_string(name, initial_value, NTScalarMetadataBuilder::new())
+        loc_srv
+            .create_pv_string(name, initial_value, NTScalarMetadataBuilder::new())
             .expect("Failed to create pv:string:array");
 
         // Verify we can fetch the initial scalar value
@@ -27,30 +27,37 @@ mod test_pvxs_local_string_array_fetch_post {
         // Test posting different string values and reading back
         let test_values = vec![
             "Simple test".to_string(),
-            "".to_string(),  // Empty string
+            "".to_string(), // Empty string
             "Unicode: αβγ δεζ 中文 🚀".to_string(),
             "Special chars: !@#$%^&*()".to_string(),
             "Line\nbreaks\nand\ttabs".to_string(),
             format!("Very long string: {}", "A".repeat(100)),
         ];
-        
+
         for test_val in test_values {
-            loc_srv.post_string(name, &test_val).expect("Failed to post test value");
-            
-            let fetched = loc_srv.fetch_string(name).expect("Failed to fetch test value");
-            assert_eq!(fetched.value, test_val, "Value mismatch: posted '{}', got '{}'", test_val, fetched.value);
+            loc_srv
+                .post_string(name, &test_val)
+                .expect("Failed to post test value");
+
+            let fetched = loc_srv
+                .fetch_string(name)
+                .expect("Failed to fetch test value");
+            assert_eq!(
+                fetched.value, test_val,
+                "Value mismatch: posted '{}', got '{}'",
+                test_val, fetched.value
+            );
         }
-        
     }
 
     #[test]
     fn test_pv_local_string_array_special_characters() {
         // Test local handling of special characters using server-side operations
         let name = "loc:string:special";
-        let loc_srv = Server::start_isolated()
-            .expect("Failed to create isolated server");
+        let loc_srv = Server::start_isolated().expect("Failed to create isolated server");
 
-        loc_srv.create_pv_string(name, "", NTScalarMetadataBuilder::new())
+        loc_srv
+            .create_pv_string(name, "", NTScalarMetadataBuilder::new())
             .expect("Failed to create pv:string:special");
 
         // Test various character encodings and special cases
@@ -75,15 +82,27 @@ mod test_pvxs_local_string_array_fetch_post {
         ];
 
         for (test_name, test_string) in special_strings {
-            loc_srv.post_string(name, test_string).expect(&format!("Failed to post {} string", test_name));
-            let fetched = loc_srv.fetch_string(name).expect("Failed to fetch special string");
-            assert_eq!(fetched.value, test_string, "{}: string not preserved correctly", test_name);
+            loc_srv
+                .post_string(name, test_string)
+                .expect(&format!("Failed to post {} string", test_name));
+            let fetched = loc_srv
+                .fetch_string(name)
+                .expect("Failed to fetch special string");
+            assert_eq!(
+                fetched.value, test_string,
+                "{}: string not preserved correctly",
+                test_name
+            );
             if test_string.len() > 50 {
-                assert!(test_string.len() > 50, "{}: string length {}", test_name, test_string.len());
+                assert!(
+                    test_string.len() > 50,
+                    "{}: string length {}",
+                    test_name,
+                    test_string.len()
+                );
             }
         }
     }
-
 
     #[test]
     fn test_pv_local_string_array_error_handling() -> Result<(), Box<dyn std::error::Error>> {
@@ -106,15 +125,18 @@ mod test_pvxs_local_string_array_fetch_post {
         // String PVs should generally accept all string values
         // Test edge cases that might cause issues
         let edge_cases = vec![
-            "",  // Empty string
-            "\0",  // Null character (might be problematic)
-            "\u{FFFF}",  // High Unicode
+            "",         // Empty string
+            "\0",       // Null character (might be problematic)
+            "\u{FFFF}", // High Unicode
         ];
 
         for test_case in edge_cases {
             loc_srv.post_string(name, test_case)?;
             let fetched = loc_srv.fetch_string(name)?;
-            assert!(fetched.value == test_case, "Failed to retrieve posted edge case string");
+            assert!(
+                fetched.value == test_case,
+                "Failed to retrieve posted edge case string"
+            );
         }
 
         // Verify PV still works after edge case tests
