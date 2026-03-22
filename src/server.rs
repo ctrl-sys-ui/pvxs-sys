@@ -1339,8 +1339,15 @@ impl Server {
                         let result = match pvs.get_mut(&name) {
                             Some(ManagedPv::Double { pv, alarm, last }) => {
                                 let alarm_result = compute_alarm_for_scalar(value, alarm);
-                                // If not allowed revert to last value
-                                let post_value = if alarm_result.allow { value } else { *last };
+                                // If not allowed, fall back to the live value currently in the PV
+                                // (which may have been written by a client PUT since the last Rust post)
+                                let post_value = if alarm_result.allow {
+                                    value
+                                } else {
+                                    pv.fetch()
+                                        .and_then(|v| v.get_field_double("value"))
+                                        .unwrap_or(*last)
+                                };
                                 let result = pv.post_double_with_alarm(
                                     post_value,
                                     alarm_result.severity,
@@ -1367,8 +1374,15 @@ impl Server {
                         let result = match pvs.get_mut(&name) {
                             Some(ManagedPv::Int32 { pv, alarm, last }) => {
                                 let alarm_result = compute_alarm_for_scalar(value as f64, alarm);
-                                // If not allowed revert to last value
-                                let post_value = if alarm_result.allow { value } else { *last };
+                                // If not allowed, fall back to the live value currently in the PV
+                                // (which may have been written by a client PUT since the last Rust post)
+                                let post_value = if alarm_result.allow {
+                                    value
+                                } else {
+                                    pv.fetch()
+                                        .and_then(|v| v.get_field_int32("value"))
+                                        .unwrap_or(*last)
+                                };
                                 let result = pv.post_int32_with_alarm(
                                     post_value,
                                     alarm_result.severity,

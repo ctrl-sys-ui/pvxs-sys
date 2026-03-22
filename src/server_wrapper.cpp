@@ -572,12 +572,70 @@ namespace pvxs_wrapper
             ValueWrapper wrapper(std::move(initial));
             pv.open(wrapper);
 
-            // Add a simple PUT handler that accepts external writes
-            // Rust code can use fetch() to detect changes and apply validation/alarms
-            auto onPut = [](pvxs::server::SharedPV &spv, std::unique_ptr<pvxs::server::ExecOp> &&op, pvxs::Value &&value)
+            // NOTE: alarm logic below must match compute_alarm_for_scalar() in src/alarms.rs
+            auto opt_control     = metadata.control;
+            auto opt_value_alarm = metadata.value_alarm;
+            auto onPut = [opt_control, opt_value_alarm](pvxs::server::SharedPV &spv,
+                                                        std::unique_ptr<pvxs::server::ExecOp> &&op,
+                                                        pvxs::Value &&value)
             {
                 try
                 {
+                    double new_val = value["value"].as<double>();
+
+                    // Determine hysteresis (0 when no value-alarm config)
+                    double hyst = opt_value_alarm.has_value()
+                                      ? static_cast<double>(opt_value_alarm->hysteresis)
+                                      : 0.0;
+
+                    // Control limits: reject out-of-range PUTs
+                    if (opt_control.has_value())
+                    {
+                        const auto &ctrl = opt_control.value();
+                        if (new_val < ctrl.limit_low + hyst || new_val > ctrl.limit_high - hyst)
+                        {
+                            op->error("OUT_OF_CONTROL_LIMITS");
+                            return;
+                        }
+                    }
+
+                    // Value-alarm thresholds
+                    int32_t sev = 0; // NoAlarm
+                    int32_t sts = 0; // NoAlarm
+                    std::string msg = "OK";
+                    if (opt_value_alarm.has_value() && opt_value_alarm->active)
+                    {
+                        const auto &va = opt_value_alarm.value();
+                        if (new_val <= va.low_alarm_limit + hyst)
+                        {
+                            sev = va.low_alarm_severity;
+                            sts = 1; // DeviceStatus
+                            msg = "LOW_ALARM";
+                        }
+                        else if (new_val <= va.low_warning_limit + hyst)
+                        {
+                            sev = va.low_warning_severity;
+                            sts = 1;
+                            msg = "LOW_WARNING";
+                        }
+                        else if (new_val >= va.high_alarm_limit - hyst)
+                        {
+                            sev = va.high_alarm_severity;
+                            sts = 1;
+                            msg = "HIGH_ALARM";
+                        }
+                        else if (new_val >= va.high_warning_limit - hyst)
+                        {
+                            sev = va.high_warning_severity;
+                            sts = 1;
+                            msg = "HIGH_WARNING";
+                        }
+                    }
+
+                    value["alarm.severity"] = sev;
+                    value["alarm.status"]   = sts;
+                    value["alarm.message"]  = msg;
+
                     spv.post(std::move(value));
                     op->reply();
                 }
@@ -742,12 +800,70 @@ namespace pvxs_wrapper
             ValueWrapper wrapper(std::move(initial));
             pv.open(wrapper);
 
-            // Add a simple PUT handler that accepts external writes
-            // Rust code can use fetch() to detect changes and apply validation/alarms
-            auto onPut = [](pvxs::server::SharedPV &spv, std::unique_ptr<pvxs::server::ExecOp> &&op, pvxs::Value &&value)
+            // NOTE: alarm logic below must match compute_alarm_for_scalar() in src/alarms.rs
+            auto opt_control     = metadata.control;
+            auto opt_value_alarm = metadata.value_alarm;
+            auto onPut = [opt_control, opt_value_alarm](pvxs::server::SharedPV &spv,
+                                                        std::unique_ptr<pvxs::server::ExecOp> &&op,
+                                                        pvxs::Value &&value)
             {
                 try
                 {
+                    double new_val = static_cast<double>(value["value"].as<int32_t>());
+
+                    // Determine hysteresis (0 when no value-alarm config)
+                    double hyst = opt_value_alarm.has_value()
+                                      ? static_cast<double>(opt_value_alarm->hysteresis)
+                                      : 0.0;
+
+                    // Control limits: reject out-of-range PUTs
+                    if (opt_control.has_value())
+                    {
+                        const auto &ctrl = opt_control.value();
+                        if (new_val < ctrl.limit_low + hyst || new_val > ctrl.limit_high - hyst)
+                        {
+                            op->error("OUT_OF_CONTROL_LIMITS");
+                            return;
+                        }
+                    }
+
+                    // Value-alarm thresholds
+                    int32_t sev = 0; // NoAlarm
+                    int32_t sts = 0; // NoAlarm
+                    std::string msg = "OK";
+                    if (opt_value_alarm.has_value() && opt_value_alarm->active)
+                    {
+                        const auto &va = opt_value_alarm.value();
+                        if (new_val <= va.low_alarm_limit + hyst)
+                        {
+                            sev = va.low_alarm_severity;
+                            sts = 1; // DeviceStatus
+                            msg = "LOW_ALARM";
+                        }
+                        else if (new_val <= va.low_warning_limit + hyst)
+                        {
+                            sev = va.low_warning_severity;
+                            sts = 1;
+                            msg = "LOW_WARNING";
+                        }
+                        else if (new_val >= va.high_alarm_limit - hyst)
+                        {
+                            sev = va.high_alarm_severity;
+                            sts = 1;
+                            msg = "HIGH_ALARM";
+                        }
+                        else if (new_val >= va.high_warning_limit - hyst)
+                        {
+                            sev = va.high_warning_severity;
+                            sts = 1;
+                            msg = "HIGH_WARNING";
+                        }
+                    }
+
+                    value["alarm.severity"] = sev;
+                    value["alarm.status"]   = sts;
+                    value["alarm.message"]  = msg;
+
                     spv.post(std::move(value));
                     op->reply();
                 }
