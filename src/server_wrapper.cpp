@@ -783,14 +783,17 @@ namespace pvxs_wrapper
                 initial["control.minStep"] = ctrl.min_step;
             }
             // Optional: valueAlarm fields
+            // NOTE: For NTScalar<Int32>, PVXS types valueAlarm limit fields as Int32,
+            // so the double limits from metadata must be cast to int32_t to avoid a
+            // type-mismatch exception on field assignment.
             if (metadata.value_alarm.has_value())
             {
                 const auto &valarm = metadata.value_alarm.value();
                 initial["valueAlarm.active"] = valarm.active;
-                initial["valueAlarm.lowAlarmLimit"] = valarm.low_alarm_limit;
-                initial["valueAlarm.lowWarningLimit"] = valarm.low_warning_limit;
-                initial["valueAlarm.highWarningLimit"] = valarm.high_warning_limit;
-                initial["valueAlarm.highAlarmLimit"] = valarm.high_alarm_limit;
+                initial["valueAlarm.lowAlarmLimit"] = static_cast<int32_t>(valarm.low_alarm_limit);
+                initial["valueAlarm.lowWarningLimit"] = static_cast<int32_t>(valarm.low_warning_limit);
+                initial["valueAlarm.highWarningLimit"] = static_cast<int32_t>(valarm.high_warning_limit);
+                initial["valueAlarm.highAlarmLimit"] = static_cast<int32_t>(valarm.high_alarm_limit);
                 initial["valueAlarm.lowAlarmSeverity"] = valarm.low_alarm_severity;
                 initial["valueAlarm.lowWarningSeverity"] = valarm.low_warning_severity;
                 initial["valueAlarm.highWarningSeverity"] = valarm.high_warning_severity;
