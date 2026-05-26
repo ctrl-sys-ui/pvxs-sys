@@ -1,6 +1,6 @@
 [package]
 name = "pvxs-sys"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 authors = ["Tine Zata <https://github.com/TineZata>"]
 description = "Low-level FFI bindings for EPICS PVXS library"

@@ -2,6 +2,153 @@
 
 Safe Rust bindings for the [EPICS PVXS](https://github.com/epics-base/pvxs) (PVAccess) library.
 
+`pvxs-sys` wraps the PVXS C++ API with idiomatic Rust types built on `cxx`. It covers the main client and server workflows needed for EPICS PVAccess applications: GET/PUT, monitors, server-side PV creation, metadata, and alarm handling.
+
+## What This Crate Covers
+
+- Client access through `Context`
+- Real-time subscriptions through `MonitorBuilder`
+- In-process test and application servers through `Server` and `ServerHandle`
+- Scalar and array values for `double`, `int32`, `string`, and `enum`
+- NT scalar and enum metadata, control limits, and value alarms
+
+## Prerequisites
+
+You need:
+
+1. EPICS Base `>= 7.0.9`
+2. PVXS `>= 1.4.1`
+3. A C++17 compiler
+4. CMake `>= 3.10`
+
+Required environment variables:
+
+| Variable | Description |
+|---|---|
+| `EPICS_BASE` | Path to the EPICS base installation |
+| `EPICS_PVXS` | Path to the PVXS installation |
+| `EPICS_HOST_ARCH` | Host architecture, if auto-detection is not enough |
+
+Example setup:
+
+```powershell
+$env:EPICS_BASE = "C:\epics\base"
+$env:EPICS_HOST_ARCH = "windows-x64"
+$env:EPICS_PVXS = "C:\epics\pvxs"
+```
+
+```bash
+export EPICS_BASE=/opt/epics/base
+export EPICS_HOST_ARCH=linux-x86_64
+export EPICS_PVXS=/opt/epics/pvxs
+```
+
+On Windows, the build script copies the required PVXS, EPICS, and libevent DLLs into `target/debug` and `target/release`.
+
+## Install And Build
+
+Add the crate to your `Cargo.toml`:
+
+```toml
+[dependencies]
+pvxs-sys = "0.1.1"
+```
+
+Then build and run tests:
+
+```bash
+cargo build
+cargo test
+```
+
+## Start With The Tests
+
+The unit tests in `tests/` are the best usage examples in this repository. They are small, focused, and cover the real APIs directly.
+
+Recommended starting points:
+
+- Local server-side fetch/post flows: `tests/test_local_double_fetch_post.rs`, `tests/test_local_int32_fetch_post.rs`, `tests/test_local_string_fetch_post.rs`, `tests/test_local_enum_fetch_post.rs`
+- Local array flows: `tests/test_local_double_array_fetch_post.rs`, `tests/test_local_int32_array_fetch_post.rs`, `tests/test_local_string_array_fetch_post.rs`
+- Remote client/server GET/PUT flows: `tests/test_remote_double_get_put.rs`, `tests/test_remote_int32_get_put.rs`, `tests/test_remote_string_get_put.rs`, `tests/test_remote_enum_get_put.rs`
+- Remote array flows: `tests/test_remote_double_array_get_put.rs`, `tests/test_remote_int32_array_get_put.rs`, `tests/test_remote_string_array_get_put.rs`
+- Monitor usage: `tests/test_monitor_builder.rs`, `tests/test_monitor_callbacks.rs`
+- Alarm and metadata behavior: `tests/test_server_alarm_manager_lifecycle.rs`, `tests/test_server_alarm_manager_value_alarms.rs`, `tests/test_server_alarm_manager_control_limits.rs`, `tests/test_server_alarm_manager_combined.rs`
+
+These tests show the crate in the form most users actually need: creating test servers, defining PVs, posting and fetching values, connecting client contexts, and verifying monitor and alarm behavior.
+
+The files under `examples/` are still useful, but they are secondary to the tests when you want concrete API usage.
+
+## Minimal Usage
+
+Client GET:
+
+```rust
+use pvxs_sys::{Context, PvxsError};
+
+fn main() -> Result<(), PvxsError> {
+    let mut ctx = Context::from_env()?;
+    let value = ctx.get("TEST:DOUBLE", 5.0)?;
+    println!("{}", value.get_field_double("value")?);
+    Ok(())
+}
+```
+
+Server setup:
+
+```rust
+use pvxs_sys::{NTScalarMetadataBuilder, PvxsError, Server};
+
+fn main() -> Result<(), PvxsError> {
+    let server = Server::start_isolated()?;
+    server.create_pv_double("sensor:temp", 23.5, NTScalarMetadataBuilder::new())?;
+    server.post_double("sensor:temp", 25.0)?;
+    let fetched = server.fetch_double("sensor:temp")?;
+    println!("{}", fetched.value);
+    server.stop_drop()?;
+    Ok(())
+}
+```
+
+## Main API Surface
+
+- `Context` for GET, PUT, and monitor creation
+- `MonitorBuilder` and monitor `pop()` for subscriptions
+- `Server` and `ServerHandle` for hosted PVs
+- `NTScalarMetadataBuilder` and `NTEnumMetadataBuilder` for metadata
+- `AlarmSeverity`, `AlarmStatus`, `AlarmMetadata`, and `ControlMetadata` for alarm behavior
+- `set_logger_level` for PVXS logging control
+
+## Troubleshooting
+
+`EPICS_BASE environment variable not set`
+
+```powershell
+$env:EPICS_BASE = "C:\epics\base"
+```
+
+`cannot find -lpvxs`
+
+Ensure the PVXS libraries are present under the selected host architecture.
+
+`pvxs/client.h: No such file or directory`
+
+Ensure the PVXS headers are present in `include/pvxs` under your PVXS installation.
+
+GET timeouts or failed discovery:
+
+- verify the environment variables
+- check any address-list settings for your EPICS environment
+- make sure firewall rules are not blocking PVAccess traffic
+
+## References
+
+- [PVXS Documentation](https://epics-base.github.io/pvxs/)
+- [PVXS GitHub](https://github.com/epics-base/pvxs)
+- [CXX Crate](https://cxx.rs/)
+- [LICENSE](LICENSE)
+
+Safe Rust bindings for the [EPICS PVXS](https://github.com/epics-base/pvxs) (PVAccess) library.
+
 This crate provides idiomatic Rust wrappers around the PVXS C++ library using the `cxx` crate. PVXS implements the PVAccess network protocol used in EPICS (Experimental Physics and Industrial Control System).
 
 ## Features
@@ -409,33 +556,6 @@ cargo test
 ```
 
 **Note**: Tests create isolated servers and do not require external IOCs.
-
-## Project Structure
-
-```text
-pvxs-sys/
-├── build.rs                          # Build script (C++ compilation, C++17)
-├── Cargo.toml
-├── include/
-│   └── wrapper.h                     # Shared C++ wrapper header
-├── src/
-│   ├── lib.rs                        # Public Rust API
-│   ├── bridge.rs                     # CXX bridge definitions
-│   ├── client.rs                     # Context, Monitor, MonitorBuilder, Rpc
-│   ├── server.rs                     # Server, ServerHandle, SharedPV, metadata builders
-│   ├── value.rs                      # Value wrapper
-│   ├── alarms.rs                     # AlarmSeverity, AlarmStatus, AlarmConfig
-│   ├── metadata.rs                   # DisplayMetadata, ControlMetadata, AlarmMetadata
-│   ├── client_wrapper.cpp            # C++ GET/PUT
-│   ├── client_wrapper_monitor.cpp    # C++ monitor/subscription
-│   ├── client_wrapper_rpc.cpp        # C++ RPC
-│   ├── client_wrapper_async.cpp      # C++ async operations
-│   └── server_wrapper.cpp            # C++ server, SharedPV, NTScalar
-├── examples/
-│   ├── logging_example.rs
-│   └── metadata_server.rs
-└── tests/                            # Integration tests (isolated, no external IOC needed)
-```
 
 ## Troubleshooting
 
