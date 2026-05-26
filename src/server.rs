@@ -40,9 +40,9 @@ impl ServerImpl {
     /// # Example
     ///
     /// ```no_run
-    /// use pvxs_sys::server::ServerImpl;
+    /// use pvxs_sys::Server;
     ///
-    /// let server = ServerImpl::start_isolated()?;
+    /// let server = Server::start_isolated()?;
     /// println!("Isolated server started on TCP port {}", server.tcp_port());
     /// server.stop_drop()?;
     /// # Ok::<(), pvxs_sys::PvxsError>(())
