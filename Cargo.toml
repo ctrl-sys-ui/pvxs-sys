@@ -10,7 +10,7 @@ keywords = ["epics", "pvxs", "rust", "c++", "wrapper"]
 categories = ["external-ffi-bindings", "development-tools", "science"]
 readme = "README.md"
 documentation = "https://docs.rs/pvxs-sys"
-homepage = "https://github.com/ctrl-sys-ui/pvxs-sys"
+homepage = "https://github.com/TineZata/pvxs-sys"
 
 # This is a *-sys crate providing low-level FFI bindings
 links = "pvxs"
